@@ -1,0 +1,802 @@
+<!DOCTYPE html>
+<html lang="vi" data-theme="light">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title>CLB Cầu Lông Thái Thịnh - Bảng Xếp Hạng & Ghép Sân</title>
+  <meta name="description" content="Ứng dụng xếp hạng Elo đánh đôi, ghép cặp tự động thông minh và quản lý buổi đánh cho CLB Cầu Lông Thái Thịnh">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏸</text></svg>">
+  <link rel="stylesheet" href="/src/styles/main.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="brand-badge">
+        <div class="brand-icon-wrap">
+          🏸
+        </div>
+        <div>
+          <h1 class="brand-title">
+            CLB THÁI THỊNH
+            <span class="brand-tag">PRO</span>
+          </h1>
+          <div class="brand-subtitle">Hệ Thống Xếp Hạng Elo Đôi & Ghép Sân</div>
+        </div>
+      </div>
+
+      <!-- Desktop Navigation -->
+      <nav class="desktop-nav">
+        <button class="nav-tab-btn active" data-tab="court">
+          <span>🏸</span> Sân Đấu
+        </button>
+        <button class="nav-tab-btn" data-tab="sessions">
+          <span>📅</span> Lịch Sân
+        </button>
+        <button class="nav-tab-btn" data-tab="leaderboard">
+          <span>🏆</span> Xếp Hạng
+        </button>
+        <button class="nav-tab-btn" data-tab="attendance">
+          <span>📋</span> Điểm Danh
+        </button>
+        <button class="nav-tab-btn" data-tab="members">
+          <span>👥</span> Thành Viên
+        </button>
+        <button class="nav-tab-btn" data-tab="history">
+          <span>📜</span> Lịch Sử
+        </button>
+      </nav>
+
+      <!-- Header Quick Actions -->
+      <div class="header-actions">
+        <!-- 1. Nút Quỹ Cầu Lông MoMo / VietQR -->
+        <button id="btn-open-club-fund" class="btn-fund-chip" title="Góp Quỹ Sân & Cầu MoMo">
+          <span class="fund-chip-icon">💰</span>
+          <span class="fund-chip-text">Quỹ CLB</span>
+        </button>
+
+        <!-- 2. Chuyển đổi Giao diện Sáng / Tối -->
+        <button id="btn-toggle-theme" class="btn-icon" title="Đổi giao diện Sáng / Tối">
+          ☀️
+        </button>
+
+        <!-- 3. Cài Đặt & Tiện Ích CLB (Âm thanh, Sao lưu, Cloud) -->
+        <button id="btn-open-settings" class="btn-icon" title="Cài đặt & Tiện ích CLB">
+          ⚙️
+        </button>
+      </div>
+    </header>
+
+    <!-- MAIN VIEWS -->
+    <main id="main-content">
+      
+      <!-- ================= 1. TAB: SÂN ĐẤU (COURT & MATCHMAKER) ================= -->
+      <section id="tab-court" class="tab-view active">
+        <!-- Banner thông tin buổi đánh -->
+        <div class="section-banner">
+          <div class="banner-info">
+            <h2><span>🏸</span> Sân Đấu & Xếp Trận 1 Chạm</h2>
+            <p>Ghép cặp tự động cân kèo Elo, ưu tiên người nghỉ lâu và ghi điểm trực tiếp</p>
+          </div>
+          <div class="session-status-pill">
+            <span class="status-dot"></span>
+            <span id="session-counter-text">Có mặt: 0 | Đã đấu: 0 trận</span>
+          </div>
+        </div>
+
+        <!-- BỘ CHỌN 2 SÂN SONG SONG: SÂN 1 & SÂN 2 -->
+        <div class="court-parallel-selector-bar">
+          <div class="court-tabs-group">
+            <button class="court-switch-btn active" id="court-tab-btn-1" data-court-id="court_1">
+              <span class="court-tab-badge-num">1</span>
+              <div class="court-switch-info">
+                <span class="court-switch-name">🏸 SÂN 1</span>
+                <span class="court-switch-status" id="court-1-status-text">Đang trống</span>
+              </div>
+            </button>
+            <button class="court-switch-btn" id="court-tab-btn-2" data-court-id="court_2">
+              <span class="court-tab-badge-num">2</span>
+              <div class="court-switch-info">
+                <span class="court-switch-name">🏸 SÂN 2</span>
+                <span class="court-switch-status" id="court-2-status-text">Đang trống</span>
+              </div>
+            </button>
+          </div>
+
+          <div class="court-dual-spin-wrap">
+            <button id="btn-spin-dual-courts" class="btn-dual-spin" title="Tự động bốc 8 người chia đều cho cả 2 sân">
+              <span>⚡⚡</span> Ghép Cả 2 Sân (8 Người)
+            </button>
+          </div>
+        </div>
+
+        <div class="court-container">
+          <!-- Badminton Visualizer Court -->
+          <div class="badminton-court-card">
+            <div class="court-lines-wrap">
+              <div class="court-net-line">
+                <span class="net-badge">LƯỚI THÁI THỊNH</span>
+              </div>
+            </div>
+
+            <!-- Team 1 (Phía trên sân) -->
+            <div class="court-half team-1-half">
+              <div class="team-header-bar">
+                <div class="team-title team-1-title">
+                  <span>🔵</span> ĐỘI 1
+                </div>
+                <div id="team1-avg-elo" class="team-avg-elo">Elo TB: 0</div>
+              </div>
+              <div id="team1-players-grid" class="court-players-grid">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
+            <!-- Team 2 (Phía dưới sân) -->
+            <div class="court-half team-2-half">
+              <div class="team-header-bar">
+                <div class="team-title team-2-title">
+                  <span>🟠</span> ĐỘI 2
+                </div>
+                <div id="team2-avg-elo" class="team-avg-elo">Elo TB: 0</div>
+              </div>
+              <div id="team2-players-grid" class="court-players-grid">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
+            <!-- Khung thông báo sân trống (Empty State Overlay) -->
+            <div id="court-empty-overlay" class="court-empty-overlay" style="display: none;">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Controls & Scoreboard -->
+          <div class="match-controls-card">
+            <div class="controls-card-header">
+              <h3 class="controls-card-title">
+                <span>⚙️</span> Chế Độ Xếp Cặp
+              </h3>
+            </div>
+
+            <!-- Chọn Mode Ghép Cặp -->
+            <div class="mode-selector">
+              <button class="mode-btn active" data-mode="balanced">
+                <span class="mode-icon">⚖️</span>
+                <span>Cân Kèo</span>
+              </button>
+              <button class="mode-btn" data-mode="mixed">
+                <span class="mode-icon">👫</span>
+                <span>Đôi Nam Nữ</span>
+              </button>
+              <button class="mode-btn" data-mode="random">
+                <span class="mode-icon">🎲</span>
+                <span>Xốc Đĩa</span>
+              </button>
+            </div>
+
+            <!-- Nút Tạo Trận / Đổi Người -->
+            <div class="action-btn-row">
+              <button id="btn-generate-match" class="btn-primary">
+                <span>⚡</span> Quay Trận Mới
+              </button>
+              <button id="btn-swap-teams" class="btn-secondary" title="Đổi chéo người chơi giữa 2 đội">
+                <span>🔄</span> Đổi Kèo
+              </button>
+            </div>
+
+            <!-- Bảng Ghi Tỷ Số Trực Tiếp -->
+            <div class="scoreboard-box">
+              <div class="scoreboard-header-row">
+                <div class="scoreboard-header-label">
+                  BẢNG TỶ SỐ TRỰC TIẾP
+                </div>
+                <div class="court-pos-wrap">
+                  <span class="court-pos-label">Vị trí:</span>
+                  <select id="select-active-court" class="court-position-select">
+                    <option value="Sân 1">🏸 Sân 1</option>
+                    <option value="Sân 2">🏸 Sân 2</option>
+                    <option value="Sân 3">🏸 Sân 3</option>
+                    <option value="Sân Giao Hữu">🏸 Sân Giao Hữu</option>
+                  </select>
+                </div>
+              </div>
+
+              <div class="score-display-row">
+                <!-- Team 1 Score -->
+                <div class="score-team-col score-team-1">
+                  <div id="score-team1-val" class="score-number">21</div>
+                  <div class="score-btn-group">
+                    <button class="score-adj-btn" id="btn-t1-minus">-</button>
+                    <button class="score-adj-btn" id="btn-t1-plus">+</button>
+                  </div>
+                </div>
+
+                <div class="score-vs-divider">VS</div>
+
+                <!-- Team 2 Score -->
+                <div class="score-team-col score-team-2">
+                  <div id="score-team2-val" class="score-number">18</div>
+                  <div class="score-btn-group">
+                    <button class="score-adj-btn" id="btn-t2-minus">-</button>
+                    <button class="score-adj-btn" id="btn-t2-plus">+</button>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Presets tỷ số nhanh -->
+              <div class="score-presets-row">
+                <button class="preset-chip" data-s1="21" data-s2="19">21 - 19</button>
+                <button class="preset-chip" data-s1="21" data-s2="15">21 - 15</button>
+                <button class="preset-chip" data-s1="21" data-s2="10">21 - 10</button>
+                <button class="preset-chip" data-s1="19" data-s2="21">19 - 21</button>
+                <button class="preset-chip" data-s1="15" data-s2="21">15 - 21</button>
+              </div>
+
+              <!-- Dự đoán biến động Elo -->
+              <div id="elo-preview-box" class="elo-preview-card">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+
+            <!-- Nút Lưu Kết Quả Trận Đấu -->
+            <button id="btn-finish-match" class="btn-primary" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff;">
+              <span>🏆</span> XÁC NHẬN KẾT QUẢ & CẬP NHẬT RANK
+            </button>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 2. TAB: LỊCH BUỔI ĐÁNH & SÂN ĐẤU (SESSIONS) ================= -->
+      <section id="tab-sessions" class="tab-view" style="display: none;">
+        <div class="section-banner">
+          <div class="banner-info">
+            <h2><span>📅</span> Lịch Buổi Đánh & Sân Cầu Lông</h2>
+            <p>Theo dõi lịch dạng ô lưới trực quan theo tháng, tự động highlight các ngày có kèo đánh</p>
+          </div>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
+            <button id="btn-toggle-calendar-view" class="btn-secondary" style="padding: 9px 14px; font-size: 0.85rem;">
+              <span id="calendar-view-icon">📋</span> <span id="calendar-view-text">Dạng Danh Sách</span>
+            </button>
+            <button id="btn-open-add-session" class="btn-primary" style="padding: 9px 16px; font-size: 0.88rem; flex: none;">
+              <span>➕</span> Đặt Lịch Mới
+            </button>
+          </div>
+        </div>
+
+        <!-- 1. GIAO DIỆN LỊCH DẠNG LƯỚI TỪNG Ô (CALENDAR GRID VIEW) -->
+        <div id="calendar-grid-view" class="calendar-wrapper">
+          <!-- Thanh điều hướng tháng -->
+          <div class="calendar-nav-bar">
+            <div class="cal-nav-controls">
+              <button id="btn-cal-prev" class="btn-cal-nav-arrow" title="Tháng trước">◀</button>
+              <h3 id="cal-month-heading" class="cal-month-heading">Tháng 9, 2026</h3>
+              <button id="btn-cal-next" class="btn-cal-nav-arrow" title="Tháng sau">▶</button>
+              <button id="btn-cal-today" class="btn-cal-today-btn">Hôm Nay</button>
+            </div>
+            <div class="cal-legend-bar">
+              <span class="cal-legend-tag"><span class="legend-badge-highlight"></span> Ngày có lịch đánh</span>
+              <span class="cal-legend-tag"><span class="legend-badge-today"></span> Hôm nay</span>
+            </div>
+          </div>
+
+          <!-- Hàng tiêu đề 7 thứ trong tuần -->
+          <div class="calendar-weekdays-row">
+            <div class="cal-weekday-col"><span class="weekday-long">Thứ 2</span><span class="weekday-short">T2</span></div>
+            <div class="cal-weekday-col"><span class="weekday-long">Thứ 3</span><span class="weekday-short">T3</span></div>
+            <div class="cal-weekday-col"><span class="weekday-long">Thứ 4</span><span class="weekday-short">T4</span></div>
+            <div class="cal-weekday-col"><span class="weekday-long">Thứ 5</span><span class="weekday-short">T5</span></div>
+            <div class="cal-weekday-col"><span class="weekday-long">Thứ 6</span><span class="weekday-short">T6</span></div>
+            <div class="cal-weekday-col weekend"><span class="weekday-long">Thứ 7</span><span class="weekday-short">T7</span></div>
+            <div class="cal-weekday-col weekend"><span class="weekday-long">Chủ Nhật</span><span class="weekday-short">CN</span></div>
+          </div>
+
+          <!-- Lưới các ô ngày -->
+          <div id="calendar-days-grid" class="calendar-days-grid">
+            <!-- Injected via JS -->
+          </div>
+
+          <!-- Khung chi tiết ngày được chọn -->
+          <div id="calendar-selected-day-panel" class="calendar-day-panel">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- 2. GIAO DIỆN DANH SÁCH THẺ (LIST VIEW) -->
+        <div id="sessions-list-container" class="sessions-list-grid" style="display: none;">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- ================= 3. TAB: BẢNG XẾP HẠNG (LEADERBOARD) ================= -->
+      <section id="tab-leaderboard" class="tab-view" style="display: none;">
+        <div class="section-banner">
+          <div class="banner-info">
+            <h2><span>🏆</span> Bảng Xếp Hạng CLB Thái Thịnh</h2>
+            <p>Hệ thống Elo Đánh Đôi linh hoạt, phân chia rõ ràng trình độ & đóng góp</p>
+          </div>
+          <div id="total-members-count-badge" class="session-status-pill">
+            16 Thành Viên
+          </div>
+        </div>
+
+        <!-- Filter Sub-tabs -->
+        <div class="leaderboard-tabs-bar">
+          <button class="lb-subtab-btn active" data-lbsort="elo">
+            <span>👑</span> Cao Thủ (Elo)
+          </button>
+          <button class="lb-subtab-btn" data-lbsort="matches">
+            <span>⚡</span> Cày Cuốc (Số trận)
+          </button>
+          <button class="lb-subtab-btn" data-lbsort="wins">
+            <span>🔥</span> Thắng Nhiều Nhất
+          </button>
+          <button class="lb-subtab-btn" data-lbsort="winrate">
+            <span>🎯</span> Tỷ Lệ Thắng (%)
+          </button>
+        </div>
+
+        <!-- Podium Top 3 -->
+        <div id="podium-section" class="podium-container">
+          <!-- Injected via JS -->
+        </div>
+
+        <!-- Full Ranking List -->
+        <div id="leaderboard-list-container" class="leaderboard-list">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- ================= 3. TAB: ĐIỂM DANH (ATTENDANCE) ================= -->
+      <section id="tab-attendance" class="tab-view" style="display: none;">
+        <div class="section-banner">
+          <div class="banner-info">
+            <h2><span>📋</span> Điểm Danh Buổi Đánh Hôm Nay</h2>
+            <p>Tick chọn người có mặt để máy tự động ghép sân cho những ai đang ở sân</p>
+          </div>
+          <div class="action-btn-row">
+            <button id="btn-checkin-regulars" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+              ⚡ Chọn Nòng Cốt
+            </button>
+            <button id="btn-checkin-all" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+              ✅ Chọn Tất Cả
+            </button>
+            <button id="btn-checkin-none" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+              ❌ Bỏ Chọn
+            </button>
+          </div>
+        </div>
+
+        <div id="attendance-grid-container" class="attendance-grid">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- ================= 4. TAB: THÀNH VIÊN (MEMBERS MANAGEMENT) ================= -->
+      <section id="tab-members" class="tab-view" style="display: none;">
+        <div class="members-header-bar">
+          <div class="search-input-wrap">
+            <span class="search-icon">🔍</span>
+            <input type="text" id="member-search-input" class="search-input" placeholder="Tìm tên hoặc biệt danh...">
+          </div>
+          <button id="btn-open-add-member" class="btn-primary" style="padding: 10px 18px; font-size: 0.9rem;">
+            <span>➕</span> Thêm Thành Viên
+          </button>
+        </div>
+
+        <div id="members-grid-container" class="members-grid">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+      <!-- ================= 5. TAB: LỊCH SỬ (MATCH HISTORY) ================= -->
+      <section id="tab-history" class="tab-view" style="display: none;">
+        <div class="section-banner">
+          <div class="banner-info">
+            <h2><span>📜</span> Lịch Sử Các Trận Đấu</h2>
+            <p>Theo dõi chi tiết điểm số và biến động Elo từng trận, hỗ trợ hoàn tác nếu nhầm lẫn</p>
+          </div>
+          <div id="total-matches-count-badge" class="session-status-pill">
+            0 Trận
+          </div>
+        </div>
+
+        <div id="history-matches-container" class="matches-history-list">
+          <!-- Injected via JS -->
+        </div>
+      </section>
+
+    </main>
+
+    <!-- Mobile Bottom Nav Bar -->
+    <nav class="mobile-nav">
+      <button class="mobile-nav-item active" data-tab="court">
+        <span class="nav-icon">🏸</span>
+        <span>Sân Đấu</span>
+      </button>
+      <button class="mobile-nav-item" data-tab="sessions">
+        <span class="nav-icon">📅</span>
+        <span>Lịch Sân</span>
+      </button>
+      <button class="mobile-nav-item" data-tab="leaderboard">
+        <span class="nav-icon">🏆</span>
+        <span>Xếp Hạng</span>
+      </button>
+      <button class="mobile-nav-item" data-tab="attendance">
+        <span class="nav-icon">📋</span>
+        <span>Điểm Danh</span>
+      </button>
+      <button class="mobile-nav-item" data-tab="members">
+        <span class="nav-icon">👥</span>
+        <span>Thành Viên</span>
+      </button>
+      <button class="mobile-nav-item" data-tab="history">
+        <span class="nav-icon">📜</span>
+        <span>Lịch Sử</span>
+      </button>
+    </nav>
+  </div>
+
+  <!-- ================= MODALS ================= -->
+
+  <!-- Modal 1: Thêm / Sửa Thành Viên & Upload Avatar -->
+  <div id="modal-member-form" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="member-modal-title">Thêm Thành Viên Mới</h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <form id="form-member">
+        <input type="hidden" id="field-member-id">
+        <div class="modal-body">
+          <!-- Upload Avatar Area -->
+          <div class="form-group">
+            <label class="form-label">Ảnh Đại Diện</label>
+            <div id="avatar-dropzone" class="avatar-upload-area">
+              <img id="preview-avatar-img" class="avatar-preview-circle" src="" alt="Avatar">
+              <div class="upload-instruction">
+                <strong style="color: var(--volt);">Bấm vào đây</strong> để chọn ảnh từ máy hoặc chụp ảnh
+                <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 2px;">Tự động cắt vuông và nén gọn</div>
+              </div>
+              <input type="file" id="input-avatar-file" accept="image/*" style="display: none;">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Họ và Tên *</label>
+            <input type="text" id="field-member-name" class="form-input" placeholder="Nhập họ và tên..." required>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Biệt Danh Sân Cầu (Nickname)</label>
+            <input type="text" id="field-member-nickname" class="form-input" placeholder="Nhập biệt danh (tùy chọn)...">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Giới Tính</label>
+              <select id="field-member-gender" class="form-select">
+                <option value="male">Nam 👨</option>
+                <option value="female">Nữ 👩</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Tần Suất Đánh</label>
+              <select id="field-member-frequency" class="form-select">
+                <option value="regular">Thường Xuyên ⚡</option>
+                <option value="occasional">Thỉnh Thoảng 🍃</option>
+              </select>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Điểm Elo Khởi Điểm</label>
+            <input type="number" id="field-member-elo" class="form-input" value="1000" min="500" max="2500">
+            <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+              Mặc định: 1000 Elo (Bậc Chặt Cầu Phủi)
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary btn-close-modal">Hủy</button>
+          <button type="submit" class="btn-primary" style="flex: none; padding: 10px 24px;">Lưu Thành Viên</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 2: Hiệu Ứng Vòng Quay / Xốc Đĩa May Mắn -->
+  <div id="modal-spinner" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 360px;">
+      <div class="modal-body">
+        <div class="spinning-wheel-overlay">
+          <div class="shuttlecock-spinner">🏸</div>
+          <h3 style="font-family: var(--font-heading); font-size: 1.3rem;">Đang Bốc Thăm Ghép Cặp...</h3>
+          <p id="spinner-subtitle" style="font-size: 0.85rem; color: var(--text-muted);">
+            Thuật toán đang tính toán chênh lệch Elo cân bằng nhất
+          </p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Cài Đặt & Tiện Ích CLB (Tập trung & Khoa Học) -->
+  <div id="modal-club-settings" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>⚙️</span> Cài Đặt & Tiện Ích CLB
+        </h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <!-- 1. Âm thanh thi đấu -->
+        <div class="settings-group-card">
+          <div class="settings-card-header">
+            <div class="settings-card-title">
+              <span>🔊</span> Âm Thanh Sân Đấu
+            </div>
+            <button id="btn-settings-sound-toggle" class="btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;">
+              <span id="settings-sound-label">Bật 🔊</span>
+            </button>
+          </div>
+          <p class="settings-card-desc">
+            Hiệu ứng tiếng còi khai cuộc, tiếng smash đập cầu và âm thanh ăn mừng khi kết thúc set đấu.
+          </p>
+        </div>
+
+        <!-- 2. Đồng bộ Supabase Cloud -->
+        <div class="settings-group-card" style="margin-top: 12px;">
+          <div class="settings-card-header">
+            <div class="settings-card-title">
+              <span>☁️</span> Đồng Bộ Đám Mây (Supabase)
+            </div>
+            <button id="btn-settings-open-cloud" class="btn-secondary" style="padding: 5px 12px; font-size: 0.8rem;">
+              Cài Đặt
+            </button>
+          </div>
+          <p class="settings-card-desc">
+            Kết nối Supabase Cloud để tự động đồng bộ kết quả, bảng xếp hạng và điểm danh tức thì giữa tất cả các máy trong CLB.
+          </p>
+        </div>
+
+        <!-- 3. Sao lưu & Khôi phục dữ liệu -->
+        <div class="settings-group-card" style="margin-top: 12px;">
+          <div class="settings-card-title" style="margin-bottom: 6px;">
+            <span>💾</span> Dữ Liệu & Sao Lưu (JSON)
+          </div>
+          <p class="settings-card-desc" style="margin-bottom: 12px;">
+            Tải file dữ liệu JSON về máy hoặc nhập dữ liệu từ máy khác vào.
+          </p>
+          <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+            <button id="btn-settings-export" class="btn-primary" style="flex: 1; padding: 8px 14px; font-size: 0.82rem;">
+              <span>📥</span> Xuất File JSON
+            </button>
+            <label class="btn-secondary" style="flex: 1; padding: 8px 14px; font-size: 0.82rem; cursor: pointer; text-align: center; display: flex; align-items: center; justify-content: center; gap: 5px;">
+              <span>📤</span> Nhập File JSON
+              <input type="file" id="input-settings-import-json" accept=".json" style="display: none;">
+            </label>
+          </div>
+          <button id="btn-settings-reset" class="btn-secondary" style="width: 100%; margin-top: 10px; color: var(--coral); font-size: 0.8rem; padding: 7px;">
+            <span>🗑️</span> Xóa Trắng Dữ Liệu Cục Bộ
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 3: Sao Lưu & Khôi Phục Dữ Liệu -->
+  <div id="modal-backup" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3>Sao Lưu & Đồng Bộ Dữ Liệu</h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px;">
+          Toàn bộ dữ liệu CLB Thái Thịnh (Thành viên, Điểm Elo, Lịch sử trận, Ảnh đại diện) được lưu an toàn trên máy bạn. Bạn có thể tải file JSON về máy để chuyển sang điện thoại khác.
+        </p>
+
+        <div style="display: flex; flex-direction: column; gap: 10px;">
+          <button id="btn-export-json" class="btn-primary">
+            <span>📥</span> Tải File Dữ Liệu (Export JSON)
+          </button>
+          <label class="btn-secondary" style="cursor: pointer; text-align: center;">
+            <span>📤</span> Nhập File Dữ Liệu (Import JSON)
+            <input type="file" id="input-import-json" accept=".json" style="display: none;">
+          </label>
+          <button id="btn-reset-default" class="btn-secondary" style="color: var(--coral); margin-top: 10px;">
+            <span>🗑️</span> Xóa Toàn Bộ Dữ Liệu (Làm Sạch 100%)
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 4: Cài Đặt Supabase Cloud Database -->
+  <div id="modal-supabase-config" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>☁️</span> Kết Nối Supabase Cloud
+        </h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 14px;">
+          Kết nối Supabase để toàn bộ 20 anh chị em trong CLB xem chung một bảng xếp hạng, tự động đồng bộ thời gian thực (Realtime) khi mở trên điện thoại.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Supabase Project URL</label>
+          <input type="text" id="input-supabase-url" class="form-input" placeholder="https://xyzcompany.supabase.co">
+        </div>
+
+        <div class="form-group">
+          <label class="form-label">Supabase Anon Public Key</label>
+          <input type="password" id="input-supabase-key" class="form-input" placeholder="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...">
+        </div>
+
+        <div id="supabase-test-result" style="font-size: 0.82rem; margin-bottom: 12px; display: none;"></div>
+
+        <div style="background: rgba(204, 255, 0, 0.05); border: 1px dashed rgba(204, 255, 0, 0.3); border-radius: var(--radius-md); padding: 10px; font-size: 0.78rem; color: var(--text-muted);">
+          💡 <strong>Mẹo:</strong> Bạn chỉ cần copy nội dung file <code style="color: var(--volt);">supabase_schema.sql</code> và dán vào <strong>SQL Editor</strong> trên Supabase để tạo bảng trong 10 giây!
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: space-between;">
+        <button type="button" id="btn-disconnect-supabase" class="btn-secondary" style="color: var(--coral);">
+          Ngắt Kết Nối
+        </button>
+        <div style="display: flex; gap: 8px;">
+          <button type="button" id="btn-test-supabase" class="btn-secondary">
+            Kiểm Tra
+          </button>
+          <button type="button" id="btn-save-supabase" class="btn-primary" style="flex: none; padding: 10px 20px;">
+            Lưu & Kết Nối
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 5: Hồ Sơ Vận Động Viên Chuyên Nghiệp (Player Profile Pro) -->
+  <div id="modal-player-profile" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 520px;">
+      <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
+        <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--volt); letter-spacing: 0.05em;">
+          HỒ SƠ VẬN ĐỘNG VIÊN
+        </div>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body" id="player-profile-modal-body" style="padding-top: 10px;">
+        <!-- Injected via JS -->
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 6: Thêm / Sửa Buổi Đánh & Sân Đấu -->
+  <div id="modal-session-form" class="modal-backdrop">
+    <div class="modal-content">
+      <div class="modal-header">
+        <h3 id="session-modal-title">Đặt Lịch Buổi Đánh Mới</h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <form id="form-session">
+        <input type="hidden" id="field-session-id">
+        <div class="modal-body">
+          <div class="form-group">
+            <label class="form-label">Tên Buổi Đánh</label>
+            <input type="text" id="field-session-title" class="form-input" placeholder="Tên buổi đánh (Ví dụ: Buổi đánh tuần này)">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1.2fr 1fr 1fr; gap: 10px;">
+            <div class="form-group">
+              <label class="form-label">Ngày Đánh *</label>
+              <input type="date" id="field-session-date" class="form-input" required>
+            </div>
+            <div class="form-group">
+              <label class="form-label">Giờ Bắt Đầu</label>
+              <input type="time" id="field-session-start" class="form-input">
+            </div>
+            <div class="form-group">
+              <label class="form-label">Giờ Kết Thúc</label>
+              <input type="time" id="field-session-end" class="form-input">
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tên Sân Cầu Lông</label>
+            <input type="text" id="field-session-venue" class="form-input" placeholder="Tên sân cầu lông">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Địa Chỉ Sân</label>
+            <input type="text" id="field-session-address" class="form-input" placeholder="Địa chỉ sân (để tạo link mở Google Maps)">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Số Sân Thuê</label>
+            <input type="text" id="field-session-courts" class="form-input" placeholder="Số sân (Ví dụ: Sân 1, Sân 2...)">
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Ghi Chú Chi Phí / Thông Báo</label>
+            <input type="text" id="field-session-fee" class="form-input" placeholder="Ghi chú chi phí hoặc lời nhắn cho thành viên">
+          </div>
+        </div>
+        <div class="modal-footer">
+          <button type="button" class="btn-secondary btn-close-modal">Hủy</button>
+          <button type="submit" class="btn-primary" style="flex: none; padding: 10px 24px;">Lưu Lịch Buổi Đánh</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal 4: Quỹ Cầu Lông MoMo / VietQR (CLB Thái Thịnh) -->
+  <div id="modal-club-fund" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 440px; text-align: center;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>💰</span> Quỹ CLB Cầu Lông Thái Thịnh
+        </h3>
+        <button class="btn-icon btn-close-modal" id="btn-close-fund-modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding: 20px;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.4;">
+          Quét mã MoMo / VietQR Napas 247 để góp quỹ sân, quả cầu & nước uống minh bạch.
+        </p>
+
+        <!-- Khung ảnh QR Code MoMo chính xác từ người dùng -->
+        <div style="background: #ffffff; border: 2px solid var(--fund-gold); border-radius: 16px; padding: 12px; display: inline-block; box-shadow: 0 10px 25px rgba(245, 158, 11, 0.2); margin-bottom: 16px; max-width: 270px;">
+          <img src="/images/momo_fund_qr.jpg" alt="Mã QR Góp Quỹ MoMo CLB Thái Thịnh" style="width: 100%; height: auto; border-radius: 10px; display: block;" />
+        </div>
+
+        <!-- Thông tin chi tiết kèm nút sao chép 1 chạm -->
+        <div class="fund-info-list" style="display: flex; flex-direction: column; gap: 10px; text-align: left; background: var(--bg-card); border: 1px solid var(--border-glass); border-radius: 12px; padding: 14px; box-shadow: var(--shadow-card);">
+          <div class="fund-info-row" style="display: flex; justify-content: space-between; align-items: center;">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Chủ Tài Khoản</div>
+              <div style="font-weight: 800; color: var(--text-main); font-size: 0.95rem;">PHUNG THU SANG</div>
+            </div>
+            <button class="btn-mini-action btn-copy-fund" data-copy="PHUNG THU SANG" title="Sao chép tên chủ TK">📋</button>
+          </div>
+
+          <div class="fund-info-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 8px;">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Ngân Hàng / Ví</div>
+              <div style="font-weight: 800; color: var(--fund-gold-dark); font-size: 0.92rem;">MoMo (Napas 247)</div>
+            </div>
+            <span style="font-size: 0.75rem; font-weight: 800; background: rgba(245, 158, 11, 0.12); color: var(--fund-gold-dark); padding: 3px 8px; border-radius: 9999px;">Quỹ MoMo</span>
+          </div>
+
+          <div class="fund-info-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 8px;">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Mã Quỹ / Số Tài Khoản</div>
+              <div style="font-weight: 900; font-family: var(--font-heading); color: var(--volt); font-size: 1.05rem; letter-spacing: 0.5px;">PSG2603618700000024</div>
+            </div>
+            <button class="btn-mini-action btn-copy-fund" data-copy="PSG2603618700000024" title="Sao chép số TK / Mã quỹ">📋</button>
+          </div>
+
+          <div class="fund-info-row" style="display: flex; justify-content: space-between; align-items: center; border-top: 1px solid var(--border-glass); padding-top: 8px;">
+            <div>
+              <div style="font-size: 0.72rem; color: var(--text-dim); text-transform: uppercase; font-weight: 700;">Nội Dung Gợi Ý</div>
+              <div style="font-weight: 700; color: var(--text-muted); font-size: 0.85rem;">[Tên bạn] - Tien cau</div>
+            </div>
+            <button class="btn-mini-action btn-copy-fund" data-copy="Tien cau Thai Thinh" title="Sao chép nội dung gợi ý">📋</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: center;">
+        <button type="button" class="btn-primary btn-close-modal" style="width: 100%; font-size: 0.95rem;">Đã Hiểu & Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Toast Notification Container -->
+  <div id="toast-container" class="toast-container"></div>
+
+  <!-- App Script -->
+  <script type="module" src="/src/js/app.js"></script>
+</body>
+</html>
