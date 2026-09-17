@@ -125,7 +125,14 @@ export function calculateDoublesElo(team1Players, team2Players, score1, score2) 
 
   // Lượng điểm thay đổi
   let deltaTeam1 = Math.round(k1 * (actual1 - expected1) * marginMultiplier);
-  // Đảm bảo thắng luôn được ít nhất +5 điểm, thua trừ tối đa tương đương
+
+  // Giới hạn biên độ cân bằng thể thao:
+  // - Trần tối đa: Tránh trận bất thường gây biến động quá mức (max ~30 cho người cũ, ~45 cho người mới)
+  // - Sàn tối thiểu: Đảm bảo thắng luôn được ít nhất +5 điểm để khích lệ người chơi
+  const maxDelta = Math.round(Math.max(k1, k2) * 1.2);
+  if (deltaTeam1 > maxDelta) deltaTeam1 = maxDelta;
+  if (deltaTeam1 < -maxDelta) deltaTeam1 = -maxDelta;
+
   if (actual1 === 1 && deltaTeam1 < 5) deltaTeam1 = 5;
   if (actual1 === 0 && deltaTeam1 > -5) deltaTeam1 = -5;
 
