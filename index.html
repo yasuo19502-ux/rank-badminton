@@ -521,6 +521,30 @@
     </div>
   </div>
 
+  <!-- Modal: Tùy Chỉnh / Đổi Cầu Thủ Trên Sân -->
+  <div id="modal-swap-court-player" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 460px;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>🔄</span> Đổi Cầu Thủ Trên Sân
+        </h3>
+        <button class="btn-icon btn-close-modal" id="btn-close-swap-modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 10px;">
+        <div style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 10px; background: var(--bg-surface); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: var(--radius-sm);">
+          Vị trí đang chọn: <strong id="swap-target-label" style="color: var(--emerald-dark);">Đội 1</strong>
+        </div>
+        <div class="search-input-wrap" style="margin-bottom: 10px;">
+          <span class="search-icon">🔍</span>
+          <input type="text" id="input-search-swap-player" class="search-input" placeholder="Tìm tên thành viên...">
+        </div>
+        <div id="swap-player-list-container" class="swap-player-list" style="max-height: 360px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px;">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Modal: Cài Đặt & Tiện Ích CLB (Tập trung & Khoa Học) -->
   <div id="modal-club-settings" class="modal-backdrop">
     <div class="modal-content">

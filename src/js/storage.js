@@ -322,18 +322,119 @@ export const StorageService = {
     return newMatch;
   },
 
-  deleteMatch(id) {
+  /**
+   * Hoàn tác trận đấu: Khôi phục lại Elo, số trận, số thắng/thua, streak và số trận hôm nay
+   */
+  undoMatch(id) {
     let matches = this.getMatches();
     const matchToDelete = matches.find(m => m.id === id);
     if (!matchToDelete) return null;
 
+    const members = this.getMembers();
+    const memberMap = new Map(members.map(m => [m.id, m]));
+
+    // Xác định điểm Elo biến động của từng đội trong trận này
+    const score1 = Number(matchToDelete.score1) || 0;
+    const score2 = Number(matchToDelete.score2) || 0;
+    const team1Won = score1 > score2;
+
+    let delta1 = 0;
+    let delta2 = 0;
+    if (matchToDelete.deltaTeam1 !== undefined && matchToDelete.deltaTeam2 !== undefined) {
+      delta1 = Number(matchToDelete.deltaTeam1);
+      delta2 = Number(matchToDelete.deltaTeam2);
+    } else {
+      const eloChange = Number(matchToDelete.eloChange) || 16;
+      delta1 = team1Won ? eloChange : -eloChange;
+      delta2 = -delta1;
+    }
+
+    // Hoàn trả thông số cho Team 1
+    const t1Ids = matchToDelete.team1 || [];
+    t1Ids.forEach(playerId => {
+      const mem = memberMap.get(playerId);
+      if (mem) {
+        mem.elo = Math.max(500, (mem.elo || 1000) - delta1);
+        mem.matchesPlayed = Math.max(0, (mem.matchesPlayed || 1) - 1);
+        if (team1Won) {
+          mem.wins = Math.max(0, (mem.wins || 1) - 1);
+        } else {
+          mem.losses = Math.max(0, (mem.losses || 1) - 1);
+        }
+      }
+    });
+
+    // Hoàn trả thông số cho Team 2
+    const t2Ids = matchToDelete.team2 || [];
+    t2Ids.forEach(playerId => {
+      const mem = memberMap.get(playerId);
+      if (mem) {
+        mem.elo = Math.max(500, (mem.elo || 1000) - delta2);
+        mem.matchesPlayed = Math.max(0, (mem.matchesPlayed || 1) - 1);
+        if (!team1Won) {
+          mem.wins = Math.max(0, (mem.wins || 1) - 1);
+        } else {
+          mem.losses = Math.max(0, (mem.losses || 1) - 1);
+        }
+      }
+    });
+
+    // Xóa trận đấu khỏi danh sách matches
     matches = matches.filter(m => m.id !== id);
     this.saveLocalMatches(matches);
 
+    // Tính toán lại streak chuẩn xác từ các trận đấu còn lại
+    const allInvolvedIds = [...t1Ids, ...t2Ids];
+    allInvolvedIds.forEach(playerId => {
+      const mem = memberMap.get(playerId);
+      if (mem) {
+        let streak = 0;
+        const playerRemainingMatches = matches
+          .filter(m => (m.team1 && m.team1.includes(playerId)) || (m.team2 && m.team2.includes(playerId)))
+          .sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+
+        playerRemainingMatches.forEach(m => {
+          const isTeam1 = m.team1 && m.team1.includes(playerId);
+          const won = isTeam1 ? (m.score1 > m.score2) : (m.score2 > m.score1);
+          if (won) {
+            streak = streak > 0 ? streak + 1 : 1;
+          } else {
+            streak = streak < 0 ? streak - 1 : -1;
+          }
+        });
+        mem.streak = streak;
+      }
+    });
+
+    // Lưu lại danh sách members (tự động sync sang Supabase)
+    this.saveMembers(members);
+
+    // Giảm số trận hôm nay trong điểm danh nếu có
+    this.decrementGamePlayedToday(allInvolvedIds);
+
+    // Xóa trên Supabase Cloud
     if (supabaseService.isConfigured()) {
       supabaseService.deleteMatch(id);
     }
+
     return matchToDelete;
+  },
+
+  deleteMatch(id) {
+    return this.undoMatch(id);
+  },
+
+  resetAllMemberStats() {
+    const members = this.getMembers();
+    members.forEach(m => {
+      m.elo = 1000;
+      m.matchesPlayed = 0;
+      m.wins = 0;
+      m.losses = 0;
+      m.streak = 0;
+    });
+    this.saveMembers(members);
+    return members;
   },
 
   // --- ATTENDANCE ---
@@ -401,6 +502,18 @@ export const StorageService = {
     if (!attendance.gamesPlayedToday) attendance.gamesPlayedToday = {};
     playerIds.forEach(id => {
       attendance.gamesPlayedToday[id] = (attendance.gamesPlayedToday[id] || 0) + 1;
+    });
+    this.saveAttendance(attendance);
+    return attendance;
+  },
+
+  decrementGamePlayedToday(playerIds) {
+    const attendance = this.getAttendance();
+    if (!attendance.gamesPlayedToday) attendance.gamesPlayedToday = {};
+    playerIds.forEach(id => {
+      if (attendance.gamesPlayedToday[id]) {
+        attendance.gamesPlayedToday[id] = Math.max(0, attendance.gamesPlayedToday[id] - 1);
+      }
     });
     this.saveAttendance(attendance);
     return attendance;

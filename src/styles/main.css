@@ -985,6 +985,128 @@ button {
   color: var(--volt);
 }
 
+/* Nút Đổi / Tùy chỉnh Cầu thủ trên Sân */
+.btn-swap-player-slot {
+  flex-shrink: 0;
+  background: rgba(255, 255, 255, 0.16);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  color: #ffffff;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  font-size: 0.72rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  transition: all 0.18s ease;
+}
+
+.btn-swap-player-slot:hover {
+  background: #ffffff;
+  color: #0f172a;
+  border-color: #ffffff;
+  transform: scale(1.05);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
+}
+
+.btn-swap-player-slot:active {
+  transform: scale(0.96);
+}
+
+/* Danh sách chọn cầu thủ thay thế (Swap Player Modal) */
+.swap-player-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 12px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 0.16s ease;
+  position: relative;
+}
+
+.swap-player-item:hover:not(.is-current) {
+  background: var(--bg-card-hover);
+  border-color: #059669;
+  transform: translateX(3px);
+  box-shadow: var(--shadow-sm);
+}
+
+.swap-player-item.is-current {
+  border-color: var(--border-glass);
+  opacity: 0.65;
+  cursor: default;
+  background: rgba(0, 0, 0, 0.03);
+}
+
+.swap-player-item.is-on-court {
+  border-color: rgba(59, 130, 246, 0.4);
+  background: rgba(59, 130, 246, 0.04);
+}
+
+.swap-player-avatar {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex-shrink: 0;
+  border: 2px solid var(--border-glass);
+}
+
+.swap-player-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.swap-player-name {
+  font-size: 0.88rem;
+  font-weight: 700;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.swap-player-meta {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 2px;
+}
+
+.swap-action-badge {
+  font-size: 0.68rem;
+  font-weight: 700;
+  padding: 3px 8px;
+  border-radius: var(--radius-full);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.swap-badge-switch {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.35);
+}
+
+.swap-badge-in {
+  background: rgba(16, 185, 129, 0.15);
+  color: #059669;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.swap-badge-current {
+  background: rgba(148, 163, 184, 0.2);
+  color: #64748b;
+}
+
 /* =========================================================================
    7. KHUNG THÔNG BÁO SÂN TRỐNG (EMPTY STATE OVERLAY) - TƯƠNG PHẢN CAO 100%
    ========================================================================= */

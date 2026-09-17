@@ -686,6 +686,22 @@ function setupEventListeners() {
     });
   }
 
+  // --- TÙY CHỈNH / ĐỔI CẦU THỦ TRÊN SÂN EVENTS ---
+  const inputSearchSwap = document.getElementById('input-search-swap-player');
+  if (inputSearchSwap) {
+    inputSearchSwap.addEventListener('input', (e) => {
+      renderSwapPlayerList(e.target.value);
+    });
+  }
+
+  const btnCloseSwap = document.getElementById('btn-close-swap-modal');
+  if (btnCloseSwap) {
+    btnCloseSwap.addEventListener('click', () => {
+      document.getElementById('modal-swap-court-player')?.classList.remove('open');
+      state.swapTarget = null;
+    });
+  }
+
   // --- SUPABASE CLOUD EVENTS ---
   const btnCloudStatus = document.getElementById('btn-cloud-status');
   if (btnCloudStatus) {
@@ -902,14 +918,14 @@ function renderCourt() {
 
   // Render Team 1
   if (team1Grid) {
-    team1Grid.innerHTML = t1.map(p => renderCourtPlayerCard(p)).join('');
+    team1Grid.innerHTML = t1.map((p, idx) => renderCourtPlayerCard(p, 'team1', idx)).join('');
   }
   const elo1 = Math.round((t1[0].elo + t1[1].elo) / 2);
   if (t1AvgLabel) t1AvgLabel.textContent = `Elo TB: ${elo1}`;
 
   // Render Team 2
   if (team2Grid) {
-    team2Grid.innerHTML = t2.map(p => renderCourtPlayerCard(p)).join('');
+    team2Grid.innerHTML = t2.map((p, idx) => renderCourtPlayerCard(p, 'team2', idx)).join('');
   }
   const elo2 = Math.round((t2[0].elo + t2[1].elo) / 2);
   if (t2AvgLabel) t2AvgLabel.textContent = `Elo TB: ${elo2}`;
@@ -918,7 +934,7 @@ function renderCourt() {
   renderEloPrediction();
 }
 
-function renderCourtPlayerCard(player) {
+function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
   const tier = getTierByElo(player.elo);
   const avatarUrl = getAvatarUrl(player);
   const isMale = player.gender === 'male';
@@ -941,6 +957,9 @@ function renderCourtPlayerCard(player) {
           <span class="elo-pill">${player.elo}</span>
         </div>
       </div>
+      <button type="button" class="btn-swap-player-slot" onclick="window.appOpenSwapPlayerModal('${teamKey}', ${slotIndex})" title="Bấm để đổi người khác vào vị trí này">
+        <span>🔄</span> Đổi
+      </button>
     </div>
   `;
 }
@@ -1208,6 +1227,8 @@ function finishMatch() {
     team2: team2.map(p => p.id),
     score1: state.score1,
     score2: state.score2,
+    deltaTeam1: result.deltaTeam1,
+    deltaTeam2: result.deltaTeam2,
     eloChange: Math.abs(result.deltaTeam1),
     isDeuce: result.isDeuce
   });
@@ -1744,14 +1765,188 @@ function renderHistory() {
   }).join('');
 }
 
-// Global hook để Hoàn tác / Xóa trận đấu
+// Global hook để Hoàn tác / Xóa trận đấu (Khôi phục toàn diện điểm số & số trận)
 window.appDeleteMatch = function(matchId) {
-  if (confirm('Bạn có chắc muốn hoàn tác và xóa trận đấu này?')) {
-    StorageService.deleteMatch(matchId);
-    showToast('Đã hoàn tác trận đấu');
-    renderHistory();
-    renderBadges();
+  if (confirm('Bạn có chắc muốn hoàn tác và xóa trận đấu này? Điểm Elo và số trận của cả 4 người sẽ được khôi phục nguyên vẹn về trước trận đấu.')) {
+    const reverted = StorageService.undoMatch(matchId);
+    if (reverted) {
+      showToast('Đã hoàn tác trận đấu & khôi phục thông số!');
+      renderHistory();
+      renderLeaderboard();
+      renderMembers();
+      renderCourt();
+      renderBadges();
+      updateSessionStatusBadge();
+    } else {
+      showToast('Không tìm thấy trận đấu cần hoàn tác', 'error');
+    }
   }
+};
+
+/**
+ * =========================================================================
+ * TÙY CHỈNH / ĐỔI CẦU THỦ TRÊN SÂN (CUSTOMIZE MATCH PLAYERS)
+ * =========================================================================
+ */
+state.swapTarget = null; // { teamKey: 'team1'|'team2', slotIndex: 0|1, currentMemberId: string }
+
+window.appOpenSwapPlayerModal = function(teamKey, slotIndex) {
+  if (!state.activeMatch || !state.activeMatch[teamKey]) return;
+  const currentTeam = state.activeMatch[teamKey];
+  const currentPlayer = currentTeam[slotIndex];
+  if (!currentPlayer) return;
+
+  state.swapTarget = { teamKey, slotIndex, currentMemberId: currentPlayer.id };
+
+  const targetLabel = document.getElementById('swap-target-label');
+  if (targetLabel) {
+    const teamName = teamKey === 'team1' ? '🔵 Đội 1' : '🟠 Đội 2';
+    targetLabel.innerHTML = `${teamName} (Vị trí ${slotIndex + 1}) — Hiện tại: <strong>${currentPlayer.name}</strong> (${currentPlayer.elo} Elo)`;
+  }
+
+  const searchInput = document.getElementById('input-search-swap-player');
+  if (searchInput) searchInput.value = '';
+
+  renderSwapPlayerList();
+
+  const modal = document.getElementById('modal-swap-court-player');
+  if (modal) modal.classList.add('open');
+};
+
+function renderSwapPlayerList(query = '') {
+  const container = document.getElementById('swap-player-list-container');
+  if (!container || !state.swapTarget) return;
+
+  const allMembers = StorageService.getMembers();
+  const attendance = StorageService.getAttendance();
+  const presentIds = attendance.presentIds || [];
+  const gamesPlayedToday = attendance.gamesPlayedToday || {};
+
+  // Lấy ID của 4 người đang trên sân
+  const onCourtIds = [
+    ...(state.activeMatch?.team1?.map(p => p.id) || []),
+    ...(state.activeMatch?.team2?.map(p => p.id) || [])
+  ];
+
+  const q = query.trim().toLowerCase();
+  let filtered = allMembers;
+  if (q) {
+    filtered = allMembers.filter(m => 
+      m.name.toLowerCase().includes(q) || 
+      (m.nickname && m.nickname.toLowerCase().includes(q))
+    );
+  }
+
+  // Sắp xếp:
+  // 1. Người có mặt hôm nay lên trước
+  // 2. Trong số người có mặt, người đang nghỉ ngoài sân ưu tiên hơn
+  // 3. Trong số người nghỉ, người chơi ít trận hơn hôm nay lên trước
+  filtered.sort((a, b) => {
+    const aPres = presentIds.includes(a.id) ? 1 : 0;
+    const bPres = presentIds.includes(b.id) ? 1 : 0;
+    if (aPres !== bPres) return bPres - aPres;
+
+    const aOnCourt = onCourtIds.includes(a.id) ? 1 : 0;
+    const bOnCourt = onCourtIds.includes(b.id) ? 1 : 0;
+    if (aOnCourt !== bOnCourt) return aOnCourt - bOnCourt;
+
+    const aGames = gamesPlayedToday[a.id] || 0;
+    const bGames = gamesPlayedToday[b.id] || 0;
+    if (aGames !== bGames) return aGames - bGames;
+
+    return b.elo - a.elo;
+  });
+
+  if (filtered.length === 0) {
+    container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 20px;">Không tìm thấy thành viên nào phù hợp</div>`;
+    return;
+  }
+
+  container.innerHTML = filtered.map(m => {
+    const isCurrent = m.id === state.swapTarget.currentMemberId;
+    const isOnCourt = onCourtIds.includes(m.id);
+    const isPresent = presentIds.includes(m.id);
+    const tier = getTierByElo(m.elo);
+    const avatarUrl = getAvatarUrl(m);
+    const games = gamesPlayedToday[m.id] || 0;
+
+    let badgeHtml = '';
+    let itemClass = 'swap-player-item';
+
+    if (isCurrent) {
+      itemClass += ' is-current';
+      badgeHtml = `<span class="swap-action-badge swap-badge-current">Đang ở vị trí này</span>`;
+    } else if (isOnCourt) {
+      itemClass += ' is-on-court';
+      badgeHtml = `<span class="swap-action-badge swap-badge-switch">🔄 Đổi chỗ</span>`;
+    } else {
+      badgeHtml = `<span class="swap-action-badge swap-badge-in">➕ Vào sân</span>`;
+    }
+
+    const presentTag = isPresent 
+      ? `<span style="color: #10b981; font-weight: 700;">● Có mặt (${games} trận)</span>` 
+      : `<span style="color: var(--text-dim);">Chưa điểm danh</span>`;
+
+    return `
+      <div class="${itemClass}" onclick="window.appApplySwapPlayer('${m.id}')">
+        <img class="swap-player-avatar" src="${avatarUrl}" alt="${m.name}" onerror="this.src='${generateDefaultAvatar(m.name, m.gender)}'">
+        <div class="swap-player-info">
+          <div class="swap-player-name">${m.name} ${m.nickname ? `(${m.nickname})` : ''}</div>
+          <div class="swap-player-meta">
+            <span style="color: ${tier.color}; font-weight: 700;">${tier.icon} ${m.elo} Elo</span>
+            <span>•</span>
+            ${presentTag}
+          </div>
+        </div>
+        ${badgeHtml}
+      </div>
+    `;
+  }).join('');
+}
+
+window.appApplySwapPlayer = function(newMemberId) {
+  if (!state.activeMatch || !state.swapTarget) return;
+  const { teamKey, slotIndex, currentMemberId } = state.swapTarget;
+
+  if (newMemberId === currentMemberId) {
+    document.getElementById('modal-swap-court-player')?.classList.remove('open');
+    return;
+  }
+
+  const allMembers = StorageService.getMembers();
+  const newMember = allMembers.find(m => m.id === newMemberId);
+  const currentMember = allMembers.find(m => m.id === currentMemberId);
+  if (!newMember || !currentMember) return;
+
+  const t1 = state.activeMatch.team1;
+  const t2 = state.activeMatch.team2;
+
+  let existingSlot = null;
+  if (t1[0]?.id === newMemberId) existingSlot = { teamKey: 'team1', slotIndex: 0 };
+  else if (t1[1]?.id === newMemberId) existingSlot = { teamKey: 'team1', slotIndex: 1 };
+  else if (t2[0]?.id === newMemberId) existingSlot = { teamKey: 'team2', slotIndex: 0 };
+  else if (t2[1]?.id === newMemberId) existingSlot = { teamKey: 'team2', slotIndex: 1 };
+
+  if (existingSlot) {
+    state.activeMatch[existingSlot.teamKey][existingSlot.slotIndex] = currentMember;
+    state.activeMatch[teamKey][slotIndex] = newMember;
+    showToast(`Đã đổi chỗ ${currentMember.name} 🔁 ${newMember.name}!`);
+  } else {
+    state.activeMatch[teamKey][slotIndex] = newMember;
+    showToast(`Đã đưa ${newMember.name} vào sân thay cho ${currentMember.name}!`);
+  }
+
+  const elo1 = Math.round((state.activeMatch.team1[0].elo + state.activeMatch.team1[1].elo) / 2);
+  const elo2 = Math.round((state.activeMatch.team2[0].elo + state.activeMatch.team2[1].elo) / 2);
+  state.activeMatch.diffElo = Math.abs(elo1 - elo2);
+
+  StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+
+  document.getElementById('modal-swap-court-player')?.classList.remove('open');
+  state.swapTarget = null;
+
+  SoundService.playClick();
+  renderCourt();
 };
 
 /**
