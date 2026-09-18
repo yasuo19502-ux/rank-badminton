@@ -36,7 +36,7 @@ function assert(condition, message) {
 console.log('\n=== BẮT ĐẦU KIỂM THỬ GIAI ĐOẠN 3 ===\n');
 
 // 1. Kiểm tra cấu hình SHOP_ITEMS
-assert(SHOP_ITEMS.length === 11, `SHOP_ITEMS có đủ 11 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
+assert(SHOP_ITEMS.length === 12, `SHOP_ITEMS có đủ 12 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
 const gripDef = SHOP_ITEMS.find(i => i.id === 'grip');
 assert(gripDef && gripDef.price === 120 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 120 xu, type consumable');
 
@@ -44,13 +44,16 @@ const shieldDef = SHOP_ITEMS.find(i => i.id === 'elo_shield');
 assert(shieldDef && shieldDef.price === 100 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 100 xu, type perk');
 
 const frames = SHOP_ITEMS.filter(i => i.type === 'frame');
-assert(frames.length === 9, `Có đủ 9 Khung Avatar (hiện có: ${frames.length})`);
+assert(frames.length === 10, `Có đủ 10 Khung Avatar (hiện có: ${frames.length})`);
 
 const waterFrame = frames.find(f => f.id === 'frame_water');
 assert(waterFrame && waterFrame.hasAnimation === true, 'Có khung Thủy Triều Đại Dương (Nước) kèm hoạt ảnh');
 
 const fireFrame = frames.find(f => f.id === 'frame_fire');
 assert(fireFrame && fireFrame.hasAnimation === true, 'Có khung Hỏa Phụng Chiến Thần (Lửa) kèm hoạt ảnh');
+
+const wingsFrame = frames.find(f => f.id === 'frame_glory_wings');
+assert(wingsFrame && wingsFrame.hasAnimation === true && wingsFrame.price === 550, 'Có khung Thần Thoại Thách Đấu (Game Art Cánh Vàng) 550 xu');
 
 // Setup Mock Data
 const testMember = {
@@ -120,6 +123,12 @@ assert(htmlWithFrame.includes('frame-fire'), 'Markup renderAvatarHtml chứa cla
 assert(!htmlWithFrame.includes('frame-crest'), 'Markup renderAvatarHtml KHÔNG chứa frame-crest (đã bỏ icon đỉnh đầu)');
 assert(!htmlWithFrame.includes('frame-deco-badge'), 'Markup renderAvatarHtml KHÔNG chứa frame-deco-badge');
 assert(htmlWithFrame.includes('frame-fx-layer'), 'Markup renderAvatarHtml chứa lớp frame-fx-layer hoạt ảnh nguyên tố');
+
+// Test đeo khung Game Art Cánh Vàng Thần Thoại (frame_glory_wings)
+const memWithWings = { ...updatedMem, activeFrame: 'frame_glory_wings' };
+const htmlWithWings = renderAvatarHtml(memWithWings, { size: 'md' });
+assert(htmlWithWings.includes('frame-glory_wings'), 'Markup renderAvatarHtml chứa class frame-glory_wings');
+assert(htmlWithWings.includes('frame-art-asset'), 'Markup renderAvatarHtml chứa lớp frame-art-asset ảnh trong suốt MOBA');
 
 // Tháo khung
 equipRes = StorageService.equipAvatarFrame(testMember.id, '');

@@ -120,6 +120,7 @@ export function renderAvatarHtml(member, options = {}) {
   }
 
   const frameType = activeFrame.replace(/^frame_/, '');
+  const isArtFrame = frameType === 'glory_wings';
 
   return `
     <div class="avatar-container avatar-${size} avatar-frame-wrap frame-${frameType} ${extraClass}" data-frame="${activeFrame}" style="${wrapStyle}">
@@ -128,6 +129,7 @@ export function renderAvatarHtml(member, options = {}) {
       <div class="frame-spin-ring"></div>
       <div class="frame-inner-ring"></div>
       <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
+      ${isArtFrame ? `<img src="/images/frame_glory_wings.webp" class="frame-art-asset" alt="Frame Art" loading="eager">` : ''}
     </div>
   `;
 }

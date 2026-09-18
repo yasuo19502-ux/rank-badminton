@@ -159,6 +159,19 @@ export const SHOP_ITEMS = [
     badge: 'Nam / Unisex',
     tierBadge: 'Vô Địch Tối Thượng 👑',
     description: '👑 Hoạt ảnh Hoàng Gia VIP: Vòng kim quang dát vàng xoay tròn 360°, hào quang Rồng Vàng tỏa sáng uy nghiêm tối thượng.'
+  },
+  {
+    id: 'frame_glory_wings',
+    name: 'Khung Thần Thoại Thách Đấu',
+    price: 550,
+    icon: '⚜️',
+    type: 'frame',
+    category: 'male',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Nam / Unisex',
+    tierBadge: 'Thần Thoại Thách Đấu ⚜️',
+    description: '⚜️ Game Art Thần Thoại VIP: Đôi cánh phượng hoàng dát vàng hoàng kim, vương miện khiên ngọc đỏ và xích thạch phát sáng rực rỡ chuẩn MOBA Thách Đấu.'
   }
 ];
 

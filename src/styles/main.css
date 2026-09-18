@@ -3985,6 +3985,23 @@ button {
 .avatar-lg .frame-fx-layer { inset: -7px; }
 .avatar-xl .frame-fx-layer { inset: -10px; }
 
+/* 5. Lớp Khung Game Art Phủ Ngoài (Game Art Overlay Layer) */
+.frame-art-asset {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 170%;
+  height: 170%;
+  max-width: none;
+  max-height: none;
+  pointer-events: none;
+  z-index: 6;
+  object-fit: contain;
+  filter: drop-shadow(0 4px 10px rgba(0, 0, 0, 0.75));
+  transition: transform 0.25s ease;
+}
+
 /* ==========================================================================
    CHI TIẾT CÁC KHUNG NGUYÊN TỐ & ANIMATION ĐỘC BẢN (KHÔNG ICON ĐỈNH ĐẦU)
    ========================================================================== */
@@ -4282,6 +4299,65 @@ button {
 }
 .frame-carbon .frame-aura {
   background: radial-gradient(circle, rgba(148, 163, 184, 0.5) 0%, rgba(30, 41, 59, 0.6) 70%, transparent 85%);
+}
+
+/* 10. KHUNG THẦN THOẠI THÁCH ĐẤU (Ultimate MOBA Game Art - 550 Xu) */
+.frame-glory_wings .frame-spin-ring {
+  background: conic-gradient(
+    from 0deg,
+    #ffd700 0%,
+    #ff1a53 22%,
+    #ffffff 38%,
+    #ff9900 55%,
+    #b91c1c 75%,
+    #ffd700 100%
+  );
+  animation: frameSpin 2.6s linear infinite;
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.9), inset 0 0 4px #ffd700;
+}
+.frame-glory_wings .frame-aura {
+  background: radial-gradient(
+    circle,
+    rgba(255, 215, 0, 0.95) 15%,
+    rgba(255, 0, 85, 0.55) 55%,
+    rgba(255, 140, 0, 0.25) 75%,
+    transparent 88%
+  );
+  animation: gloryAuraBreathe 1.8s ease-in-out infinite alternate;
+  inset: -12px;
+  filter: blur(10px);
+}
+.frame-glory_wings .frame-fx-layer {
+  animation: gloryWingPulse 2.2s ease-in-out infinite alternate;
+}
+.frame-glory_wings .frame-fx-layer::before {
+  inset: -6px;
+  background: conic-gradient(from 45deg, transparent 0%, rgba(255, 255, 255, 0.9) 25%, transparent 50%, rgba(255, 215, 0, 0.85) 75%, transparent 100%);
+  animation: frameSpin 3.2s linear infinite reverse;
+  filter: blur(1.5px);
+  opacity: 0.85;
+}
+.frame-glory_wings .frame-fx-layer::after {
+  inset: -10px;
+  box-shadow:
+    0 -6px 16px rgba(255, 215, 0, 0.85),
+    0 6px 16px rgba(255, 0, 60, 0.8),
+    -8px 0 16px rgba(255, 180, 0, 0.75),
+    8px 0 16px rgba(255, 180, 0, 0.75);
+  animation: glorySparkleBreath 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes gloryAuraBreathe {
+  0% { opacity: 0.7; transform: scale(0.96); filter: blur(8px); }
+  100% { opacity: 1; transform: scale(1.12); filter: blur(14px) drop-shadow(0 0 18px #ffbb00); }
+}
+@keyframes gloryWingPulse {
+  0% { transform: scale(0.98); }
+  100% { transform: scale(1.03); }
+}
+@keyframes glorySparkleBreath {
+  0% { opacity: 0.65; filter: brightness(1); }
+  100% { opacity: 1; filter: brightness(1.35); }
 }
 
 /* Chung cho hiệu ứng xoay tròn */
