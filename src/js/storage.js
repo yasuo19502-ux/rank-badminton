@@ -317,8 +317,13 @@ export const StorageService = {
   },
 
   getMemberById(id) {
+    if (!id) return null;
     const members = this.getMembers();
-    return members.find(m => m.id === id) || null;
+    const found = members.find(m => m.id === id);
+    if (found) return found;
+    // Kiểm tra trong danh sách khách vãng lai nếu có
+    const guests = this.getGuests();
+    return guests.find(g => g.id === id) || null;
   },
 
   addMember(memberData) {
@@ -651,6 +656,7 @@ export const StorageService = {
         const parsed = JSON.parse(data);
         const todayStr = getLocalDateStr();
         if (parsed.date === todayStr) {
+          if (!Array.isArray(parsed.guests)) parsed.guests = [];
           return parsed;
         }
       }
@@ -665,10 +671,79 @@ export const StorageService = {
     const defaultAttendance = {
       date: todayStr,
       presentIds: defaultPresentIds,
-      gamesPlayedToday: {}
+      gamesPlayedToday: {},
+      guests: []
     };
     this.saveLocalAttendance(defaultAttendance);
     return defaultAttendance;
+  },
+
+  // --- GUEST MANAGEMENT (KHÁCH VÃNG LAI) ---
+  getGuests() {
+    const attendance = this.getAttendance();
+    return Array.isArray(attendance.guests) ? attendance.guests : [];
+  },
+
+  addGuest(guestData) {
+    const attendance = this.getAttendance();
+    if (!Array.isArray(attendance.guests)) attendance.guests = [];
+    if (!Array.isArray(attendance.presentIds)) attendance.presentIds = [];
+
+    const newGuest = {
+      id: 'guest_' + Date.now() + '_' + Math.random().toString(36).substring(2, 6),
+      name: (guestData.name || 'Khách').trim(),
+      gender: guestData.gender || 'male',
+      elo: Number(guestData.elo) || 1000,
+      matchesPlayed: 0,
+      wins: 0,
+      losses: 0,
+      streak: 0,
+      isGuest: true,
+      role: 'guest',
+      avatar: guestData.avatar || '',
+      createdAt: new Date().toISOString()
+    };
+
+    attendance.guests.push(newGuest);
+    if (!attendance.presentIds.includes(newGuest.id)) {
+      attendance.presentIds.push(newGuest.id);
+    }
+
+    this.saveAttendance(attendance);
+    return newGuest;
+  },
+
+  removeGuest(guestId) {
+    const attendance = this.getAttendance();
+    if (attendance.guests) {
+      attendance.guests = attendance.guests.filter(g => g.id !== guestId);
+    }
+    if (attendance.presentIds) {
+      attendance.presentIds = attendance.presentIds.filter(id => id !== guestId);
+    }
+    if (attendance.gamesPlayedToday && attendance.gamesPlayedToday[guestId]) {
+      delete attendance.gamesPlayedToday[guestId];
+    }
+    this.saveAttendance(attendance);
+    return attendance;
+  },
+
+  updateGuestElo(guestId, delta, won) {
+    const attendance = this.getAttendance();
+    if (!attendance.guests) return;
+    const guest = attendance.guests.find(g => g.id === guestId);
+    if (guest) {
+      guest.elo = Math.max(500, (guest.elo || 1000) + delta);
+      guest.matchesPlayed = (guest.matchesPlayed || 0) + 1;
+      if (won) {
+        guest.wins = (guest.wins || 0) + 1;
+        guest.streak = guest.streak > 0 ? guest.streak + 1 : 1;
+      } else {
+        guest.losses = (guest.losses || 0) + 1;
+        guest.streak = guest.streak < 0 ? guest.streak - 1 : -1;
+      }
+      this.saveAttendance(attendance);
+    }
   },
 
   saveLocalAttendance(attendance) {

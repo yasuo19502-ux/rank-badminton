@@ -114,60 +114,161 @@
             </button>
           </div>
 
-          <div class="court-dual-spin-wrap">
-            <button id="btn-spin-dual-courts" class="btn-dual-spin" title="Tự động bốc 8 người chia đều cho cả 2 sân">
-              <span>⚡⚡</span> Ghép Cả 2 Sân (8 Người)
+          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
+          <div id="court-bench-container" class="court-bench-container">
+            <div class="bench-gender-row male-row">
+              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
+              <div id="bench-male-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+            <div class="bench-gender-row female-row">
+              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
+              <div id="bench-female-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- THANH CÔNG CỤ TRỌNG TÀI & SÂN ĐẤU -->
+        <div class="court-top-toolbar">
+          <div class="court-venue-badge">
+            <span class="court-venue-icon">🏸</span>
+            <span id="court-venue-label"><span class="court-venue-short">SÂN 1</span><span class="court-venue-full"> - LƯỚI THÁI THỊNH</span></span>
+            <span id="court-match-status-badge" class="court-status-tag ready">Sẵn sàng</span>
+          </div>
+
+          <div class="court-referee-actions">
+            <button type="button" id="btn-undo-score" class="btn-referee-tool" title="Hoàn tác điểm vừa ghi">
+              <span>↩️</span> <span class="tool-btn-text">Hoàn Tác</span>
+            </button>
+            <button type="button" id="btn-swap-court-sides" class="btn-referee-tool" title="Đổi bên hiển thị Trái / Phải khi 2 đội đổi sân">
+              <span>🔄</span> <span class="tool-btn-text">Đổi Sân</span>
+            </button>
+            <button type="button" id="btn-clear-court" class="btn-referee-tool danger" title="Xóa nhanh người chơi trên sân hiện tại để chọn mới">
+              <span>🗑️</span> <span class="tool-btn-text">Dọn Sân</span>
             </button>
           </div>
         </div>
 
-        <div class="court-container">
-          <!-- Badminton Visualizer Court -->
-          <div class="badminton-court-card">
-            <div class="court-lines-wrap">
-              <div class="court-net-line">
-                <span class="net-badge">LƯỚI THÁI THỊNH</span>
+        <!-- KHUNG SÂN CẦU NẰM NGANG & BẢNG ĐIỂM TRỰC TIẾP -->
+        <div class="badminton-court-card court-landscape" id="badminton-court-view">
+          <!-- Vạch kẻ sân ngang -->
+          <div class="court-lines-wrap landscape-lines">
+            <div class="court-line-center-h"></div>
+            <div class="court-line-service-left"></div>
+            <div class="court-line-service-right"></div>
+          </div>
+
+          <!-- Lưới dọc chạy từ trên xuống chính giữa -->
+          <div class="court-net-vertical">
+            <div class="net-mesh-vertical"></div>
+            <span class="net-badge-vertical" id="court-net-badge">LƯỚI THÁI THỊNH - SÂN 1</span>
+          </div>
+
+          <!-- Nửa sân TRÁI: Đội 1 -->
+          <div class="court-side side-left" id="court-side-left">
+            <div class="team-header-bar team-1-header">
+              <div class="team-title team-1-title" id="side-left-title">
+                <span>🔵</span> ĐỘI 1
               </div>
+              <div id="team1-avg-elo" class="team-avg-elo">Elo TB: 0</div>
             </div>
 
-            <!-- Team 1 (Phía trên sân) -->
-            <div class="court-half team-1-half">
-              <div class="team-header-bar">
-                <div class="team-title team-1-title">
-                  <span>🔵</span> ĐỘI 1
+            <!-- Bảng điểm trong sân cho bên Trái -->
+            <div class="in-court-score-widget score-side-left" id="widget-score-team1">
+              <button type="button" class="score-adj-btn minus" id="btn-t1-minus" title="-1 điểm">-</button>
+              <div class="score-tap-zone" id="zone-score-t1" title="Chạm để +1 điểm cho Đội 1">
+                <div class="score-led-wrap">
+                  <div id="score-team1-val" class="score-number in-court-led" title="Bấm vào số để tự nhập điểm">0</div>
+                  <span class="score-tap-hint">+1</span>
                 </div>
-                <div id="team1-avg-elo" class="team-avg-elo">Elo TB: 0</div>
               </div>
-              <div id="team1-players-grid" class="court-players-grid">
-                <!-- Injected via JS -->
-              </div>
+              <button type="button" class="score-adj-btn plus" id="btn-t1-plus" title="+1 điểm">+</button>
             </div>
 
-            <!-- Team 2 (Phía dưới sân) -->
-            <div class="court-half team-2-half">
-              <div class="team-header-bar">
-                <div class="team-title team-2-title">
-                  <span>🟠</span> ĐỘI 2
-                </div>
-                <div id="team2-avg-elo" class="team-avg-elo">Elo TB: 0</div>
-              </div>
-              <div id="team2-players-grid" class="court-players-grid">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-
-            <!-- Khung thông báo sân trống (Empty State Overlay) -->
-            <div id="court-empty-overlay" class="court-empty-overlay" style="display: none;">
+            <!-- 2 Thẻ VĐV xếp theo chiều dọc 2 nửa trên dưới -->
+            <div id="team1-players-grid" class="court-players-column">
               <!-- Injected via JS -->
             </div>
           </div>
 
-          <!-- Controls & Scoreboard -->
+          <!-- Khu vực Nút Bắt Đầu Trận Đấu Giữa Sân (khi chưa bắt đầu) -->
+          <div id="court-center-start-overlay" class="court-center-overlay" style="display: none;">
+            <button type="button" id="btn-start-match" class="btn-start-match-pulse">
+              <span>🚀</span> BẮT ĐẦU TRẬN ĐẤU
+            </button>
+            <div class="start-match-hint">Khóa cược & Kích hoạt bảng điểm trong sân</div>
+          </div>
+
+          <!-- Nửa sân PHẢI: Đội 2 -->
+          <div class="court-side side-right" id="court-side-right">
+            <div class="team-header-bar team-2-header">
+              <div class="team-title team-2-title" id="side-right-title">
+                <span>🟠</span> ĐỘI 2
+              </div>
+              <div id="team2-avg-elo" class="team-avg-elo">Elo TB: 0</div>
+            </div>
+
+            <!-- Bảng điểm trong sân cho bên Phải -->
+            <div class="in-court-score-widget score-side-right" id="widget-score-team2">
+              <button type="button" class="score-adj-btn minus" id="btn-t2-minus" title="-1 điểm">-</button>
+              <div class="score-tap-zone" id="zone-score-t2" title="Chạm để +1 điểm cho Đội 2">
+                <div class="score-led-wrap">
+                  <div id="score-team2-val" class="score-number in-court-led" title="Bấm vào số để tự nhập điểm">0</div>
+                  <span class="score-tap-hint">+1</span>
+                </div>
+              </div>
+              <button type="button" class="score-adj-btn plus" id="btn-t2-plus" title="+1 điểm">+</button>
+            </div>
+
+            <!-- 2 Thẻ VĐV xếp theo chiều dọc 2 nửa trên dưới -->
+            <div id="team2-players-grid" class="court-players-column">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+
+          <!-- Khung thông báo sân trống (Empty State Overlay) -->
+          <div id="court-empty-overlay" class="court-empty-overlay" style="display: none;">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- DẢI THAO TÁC NHANH & LƯU KẾT QUẢ NGAY DƯỚI SÂN -->
+        <div class="court-bottom-action-strip">
+          <div class="score-presets-row in-strip">
+            <span class="preset-label">Tỷ số nhanh:</span>
+            <button type="button" class="preset-chip" data-s1="21" data-s2="19">21 - 19</button>
+            <button type="button" class="preset-chip" data-s1="21" data-s2="15">21 - 15</button>
+            <button type="button" class="preset-chip" data-s1="21" data-s2="10">21 - 10</button>
+            <button type="button" class="preset-chip" data-s1="19" data-s2="21">19 - 21</button>
+            <button type="button" class="preset-chip" data-s1="15" data-s2="21">15 - 21</button>
+          </div>
+
+          <!-- Nút Lưu Kết Quả Trận Đấu -->
+          <button type="button" id="btn-finish-match" class="btn-primary btn-save-match-record">
+            <span>🏆</span> XÁC NHẬN KẾT QUẢ & CẬP NHẬT RANK
+          </button>
+        </div>
+
+        <!-- KHU VỰC ĐIỀU KHIỂN GHÉP CẶP & DỰ ĐOÁN TÁCH BIỆT -->
+        <div class="court-lower-grid">
+          <!-- Cột Trái: Chế Độ Xếp Cặp & Vị Trí Sân -->
           <div class="match-controls-card">
             <div class="controls-card-header">
               <h3 class="controls-card-title">
                 <span>⚙️</span> Chế Độ Xếp Cặp
               </h3>
+              <div class="court-pos-wrap">
+                <span class="court-pos-label">Vị trí:</span>
+                <select id="select-active-court" class="court-position-select">
+                  <option value="Sân 1">🏸 Sân 1</option>
+                  <option value="Sân 2">🏸 Sân 2</option>
+                  <option value="Sân 3">🏸 Sân 3</option>
+                  <option value="Sân Giao Hữu">🏸 Sân Giao Hữu</option>
+                </select>
+              </div>
             </div>
 
             <!-- Chọn Mode Ghép Cặp -->
@@ -196,69 +297,17 @@
               </button>
             </div>
 
-            <!-- Bảng Ghi Tỷ Số Trực Tiếp -->
-            <div class="scoreboard-box">
-              <div class="scoreboard-header-row">
-                <div class="scoreboard-header-label">
-                  BẢNG TỶ SỐ TRỰC TIẾP
-                </div>
-                <div class="court-pos-wrap">
-                  <span class="court-pos-label">Vị trí:</span>
-                  <select id="select-active-court" class="court-position-select">
-                    <option value="Sân 1">🏸 Sân 1</option>
-                    <option value="Sân 2">🏸 Sân 2</option>
-                    <option value="Sân 3">🏸 Sân 3</option>
-                    <option value="Sân Giao Hữu">🏸 Sân Giao Hữu</option>
-                  </select>
-                </div>
-              </div>
-
-              <div class="score-display-row">
-                <!-- Team 1 Score -->
-                <div class="score-team-col score-team-1">
-                  <div id="score-team1-val" class="score-number">21</div>
-                  <div class="score-btn-group">
-                    <button class="score-adj-btn" id="btn-t1-minus">-</button>
-                    <button class="score-adj-btn" id="btn-t1-plus">+</button>
-                  </div>
-                </div>
-
-                <div class="score-vs-divider">VS</div>
-
-                <!-- Team 2 Score -->
-                <div class="score-team-col score-team-2">
-                  <div id="score-team2-val" class="score-number">18</div>
-                  <div class="score-btn-group">
-                    <button class="score-adj-btn" id="btn-t2-minus">-</button>
-                    <button class="score-adj-btn" id="btn-t2-plus">+</button>
-                  </div>
-                </div>
-              </div>
-
-              <!-- Presets tỷ số nhanh -->
-              <div class="score-presets-row">
-                <button class="preset-chip" data-s1="21" data-s2="19">21 - 19</button>
-                <button class="preset-chip" data-s1="21" data-s2="15">21 - 15</button>
-                <button class="preset-chip" data-s1="21" data-s2="10">21 - 10</button>
-                <button class="preset-chip" data-s1="19" data-s2="21">19 - 21</button>
-                <button class="preset-chip" data-s1="15" data-s2="21">15 - 21</button>
-              </div>
-
-              <!-- Dự đoán biến động Elo -->
-              <div id="elo-preview-box" class="elo-preview-card">
-                <!-- Injected via JS -->
-              </div>
+            <!-- Dự đoán biến động Elo -->
+            <div id="elo-preview-box" class="elo-preview-card">
+              <!-- Injected via JS -->
             </div>
+          </div>
 
-            <!-- ================= GIAI ĐOẠN 2: DỰ ĐOÁN & CƯỢC VUI BẰNG XU CLB ================= -->
-            <div id="live-betting-card" class="live-betting-card">
+          <!-- Cột Phải: DỰ ĐOÁN & CƯỢC VUI BẰNG XU CLB (TÁCH BIỆT ĐỘC LẬP) -->
+          <div class="betting-section-wrapper">
+            <div id="live-betting-card" class="live-betting-card standalone">
               <!-- Injected dynamically via renderBettingWidget() in app.js -->
             </div>
-
-            <!-- Nút Lưu Kết Quả Trận Đấu -->
-            <button id="btn-finish-match" class="btn-primary" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff;">
-              <span>🏆</span> XÁC NHẬN KẾT QUẢ & CẬP NHẬT RANK
-            </button>
           </div>
         </div>
       </section>
@@ -336,6 +385,19 @@
           </div>
         </div>
 
+        <!-- Gender Filter Bar (Toàn CLB, Nam ♂, Nữ ♀) -->
+        <div class="leaderboard-gender-bar">
+          <button class="lb-gender-btn active" data-gender="all">
+            <span>🌐</span> Toàn CLB
+          </button>
+          <button class="lb-gender-btn" data-gender="male">
+            <span>♂</span> BXH Nam
+          </button>
+          <button class="lb-gender-btn" data-gender="female">
+            <span>♀</span> BXH Nữ
+          </button>
+        </div>
+
         <!-- Filter Sub-tabs -->
         <div class="leaderboard-tabs-bar">
           <button class="lb-subtab-btn active" data-lbsort="elo">
@@ -374,6 +436,9 @@
             <p>Tick chọn người có mặt để máy tự động ghép sân cho những ai đang ở sân</p>
           </div>
           <div class="action-btn-row">
+            <button id="btn-open-add-guest" class="btn-primary" onclick="window.appOpenAddGuestModal()" style="font-size: 0.8rem; padding: 8px 14px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #4f46e5); border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+              ➕ Thêm Khách
+            </button>
             <button id="btn-checkin-regulars" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ⚡ Chọn Nòng Cốt
             </button>
@@ -556,13 +621,18 @@
     <div class="modal-content" style="max-width: 460px;">
       <div class="modal-header">
         <h3 style="display: flex; align-items: center; gap: 8px;">
-          <span>🔄</span> Đổi Cầu Thủ Trên Sân
+          <span>👤</span> Chọn / Đổi VĐV Vào Sân
         </h3>
         <button class="btn-icon btn-close-modal" id="btn-close-swap-modal">✕</button>
       </div>
       <div class="modal-body" style="padding-top: 10px;">
         <div style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 10px; background: var(--bg-surface); border: 1px solid var(--border-glass); padding: 8px 12px; border-radius: var(--radius-sm);">
           Vị trí đang chọn: <strong id="swap-target-label" style="color: var(--emerald-dark);">Đội 1</strong>
+        </div>
+        <div id="swap-unassign-btn-wrap" style="margin-bottom: 10px; display: none;">
+          <button type="button" class="btn-secondary" style="width: 100%; justify-content: center; color: #ef4444; border-color: rgba(239, 68, 68, 0.35); font-weight: 700; font-size: 0.8rem; padding: 6px 12px;" onclick="window.appRemovePlayerFromSlot()">
+            <span>🗑️</span> Để trống vị trí này (Gỡ VĐV ra)
+          </button>
         </div>
         <div class="search-input-wrap" style="margin-bottom: 10px;">
           <span class="search-icon">🔍</span>
@@ -1077,6 +1147,59 @@
           </div>
         </div>
       </div>
+    </div>
+  <!-- Modal Thêm Khách Giao Lưu Tạm Thời -->
+  <div id="modal-add-guest" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 430px;">
+      <div class="modal-header">
+        <div style="display: flex; align-items: center; gap: 8px;">
+          <span style="font-size: 1.25rem;">👤</span>
+          <h3 style="margin: 0; font-size: 1.05rem;">Thêm Khách Giao Lưu</h3>
+        </div>
+        <button type="button" class="btn-icon btn-close-modal" onclick="document.getElementById('modal-add-guest').classList.remove('open')">✕</button>
+      </div>
+      <form id="form-add-guest" onsubmit="window.appSubmitAddGuest(event)">
+        <div class="modal-body">
+          <div class="guest-notice-box">
+            ℹ️ Profile khách chỉ lưu trong buổi hôm nay để điểm danh & xếp sân. <strong>Không xuất hiện</strong> trong danh sách thành viên hay BXH của CLB.
+          </div>
+
+          <div class="form-group">
+            <label class="form-label">Tên Khách *</label>
+            <input type="text" id="field-guest-name" class="form-input" placeholder="Ví dụ: Khách - Tuấn Anh, Bạn Đức..." required autocomplete="off">
+          </div>
+
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 12px;">
+            <div class="form-group">
+              <label class="form-label">Giới Tính *</label>
+              <select id="field-guest-gender" class="form-select">
+                <option value="male">Nam ♂</option>
+                <option value="female">Nữ ♀</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label class="form-label">Điểm Elo Ước Tính</label>
+              <input type="number" id="field-guest-elo" class="form-input" value="1000" min="500" max="3000" step="10">
+            </div>
+          </div>
+
+          <!-- Quick pickers for Elo -->
+          <div class="form-group" style="margin-top: -4px;">
+            <label class="form-label" style="font-size: 0.75rem; color: var(--text-dim); margin-bottom: 6px;">Chọn nhanh trình độ cân kèo:</label>
+            <div class="guest-elo-pills">
+              <button type="button" class="btn-guest-elo" onclick="document.getElementById('field-guest-elo').value=900">🐣 Mới tập (900)</button>
+              <button type="button" class="btn-guest-elo" onclick="document.getElementById('field-guest-elo').value=1050">🏸 Cầu phủi (1050)</button>
+              <button type="button" class="btn-guest-elo" onclick="document.getElementById('field-guest-elo').value=1200">⚡ Đánh khá (1200)</button>
+              <button type="button" class="btn-guest-elo" onclick="document.getElementById('field-guest-elo').value=1350">💥 Đánh cứng (1350)</button>
+            </div>
+          </div>
+        </div>
+        <div class="modal-footer" style="display: flex; gap: 8px; justify-content: flex-end; padding-top: 10px;">
+          <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-add-guest').classList.remove('open')">Hủy</button>
+          <button type="submit" class="btn btn-primary" style="font-weight: 700;">➕ Thêm Khách Vào Sân</button>
+        </div>
+      </form>
     </div>
   </div>
 

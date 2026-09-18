@@ -731,117 +731,682 @@ button {
   color: var(--volt);
 }
 
-/* Nút Ghép Cả 2 Sân (8 Người) */
-.btn-dual-spin {
-  background: linear-gradient(135deg, #0284c7 0%, #0369a1 100%);
-  color: #ffffff !important;
-  border: none;
-  font-family: var(--font-heading);
-  font-size: 0.85rem;
-  font-weight: 800;
-  padding: 9px 16px;
-  border-radius: var(--radius-md);
-  cursor: pointer;
+/* =========================================================================
+   BĂNG GHẾ CHỜ AVATAR 1-CHẠM (LIVE BENCH POOL - THAY NÚT GHÉP SÂN)
+   ========================================================================= */
+.court-bench-container {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  padding: 5px 10px;
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-sm);
+  flex: 1;
+  min-width: 0;
+}
+
+[data-theme="dark"] .court-bench-container {
+  background: rgba(15, 23, 42, 0.75);
+  border-color: rgba(255, 255, 255, 0.12);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.bench-gender-row {
   display: flex;
   align-items: center;
-  gap: 7px;
-  box-shadow: 0 4px 12px rgba(2, 132, 199, 0.3);
-  transition: all 0.2s ease;
+  gap: 8px;
+  min-width: 0;
+}
+
+.bench-gender-tag {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  user-select: none;
+}
+
+.bench-gender-tag.male {
+  background: rgba(14, 165, 233, 0.15);
+  color: #0284c7;
+  border: 1px solid rgba(14, 165, 233, 0.35);
+}
+
+.bench-gender-tag.female {
+  background: rgba(236, 72, 153, 0.15);
+  color: #db2777;
+  border: 1px solid rgba(236, 72, 153, 0.35);
+}
+
+[data-theme="dark"] .bench-gender-tag.male {
+  background: rgba(14, 165, 233, 0.25);
+  color: #38bdf8;
+  border-color: rgba(56, 189, 248, 0.5);
+}
+
+[data-theme="dark"] .bench-gender-tag.female {
+  background: rgba(236, 72, 153, 0.25);
+  color: #f472b6;
+  border-color: rgba(244, 114, 182, 0.5);
+}
+
+.bench-avatars-scroll {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 2px 2px;
+  min-width: 0;
+  flex: 1;
+  scrollbar-width: thin;
+  -webkit-overflow-scrolling: touch;
+}
+
+.bench-avatars-scroll::-webkit-scrollbar {
+  height: 3px;
+}
+
+.bench-avatars-scroll::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 4px;
+}
+
+.bench-empty-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim);
+  font-style: italic;
   white-space: nowrap;
 }
 
-.btn-dual-spin:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 6px 18px rgba(2, 132, 199, 0.45);
+.bench-avatar-btn {
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: pointer;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.2s;
+  flex-shrink: 0;
+  border-radius: 50%;
+  outline: none;
 }
 
-.btn-dual-spin:active {
-  transform: scale(0.97);
+.bench-avatar-btn:hover:not(.is-on-court) {
+  transform: scale(1.18) translateY(-2px);
+  z-index: 10;
+}
+
+.bench-avatar-btn:active:not(.is-on-court) {
+  transform: scale(0.95);
+}
+
+.bench-avatar-btn .avatar-container {
+  width: 32px !important;
+  height: 32px !important;
+  min-width: 32px !important;
+  min-height: 32px !important;
+}
+
+.bench-avatar-btn .avatar-img {
+  width: 32px !important;
+  height: 32px !important;
+}
+
+/* VĐV đang thi đấu trên sân: Mờ nhẹ và có badge sân */
+.bench-avatar-btn.is-on-court {
+  opacity: 0.38;
+  cursor: not-allowed;
+  filter: grayscale(0.45);
+}
+
+.bench-avatar-btn.is-on-court:hover {
+  opacity: 0.55;
+  transform: scale(1.05);
+}
+
+.bench-on-court-tag {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  background: #059669;
+  color: #ffffff;
+  font-size: 7px;
+  font-weight: 800;
+  border-radius: 4px;
+  padding: 0 3px;
+  line-height: 11px;
+  border: 1px solid rgba(255, 255, 255, 0.6);
+  z-index: 5;
+  box-shadow: 0 1px 3px rgba(0,0,0,0.4);
+}
+
+.bench-on-court-tag.court-2 {
+  background: #0284c7;
 }
 
 /* =========================================================================
-   6. BADMINTON COURT CONTAINER & VISUALIZER
+   6. BADMINTON COURT: LANDSCAPE VISUALIZER & IN-COURT SCOREBOARD
    ========================================================================= */
-.court-container {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 18px;
+
+/* 1. Thanh công cụ trọng tài trên sân */
+.court-top-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 8px 14px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+  gap: 10px;
 }
 
-@media (min-width: 920px) {
-  .court-container {
-    grid-template-columns: 1.45fr 1fr;
-  }
+.court-venue-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-family: var(--font-heading);
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-main);
 }
 
-/* Sân Cầu Lông Chuyên Nghiệp */
-.badminton-court-card {
-  background: linear-gradient(180deg, #046a4e 0%, #034d38 50%, #046a4e 100%);
+.court-venue-icon {
+  font-size: 1.1rem;
+}
+
+.court-status-tag {
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.court-status-tag.ready {
+  background: rgba(59, 130, 246, 0.15);
+  color: #2563eb;
+  border: 1px solid rgba(59, 130, 246, 0.3);
+}
+
+.court-status-tag.live {
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  animation: pulseGlow 1.5s infinite;
+}
+
+.court-status-tag.empty {
+  background: rgba(100, 116, 139, 0.15);
+  color: #64748b;
+  border: 1px solid rgba(100, 116, 139, 0.3);
+}
+
+.court-referee-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-referee-tool {
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  color: var(--text-main);
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.btn-referee-tool:hover {
+  background: var(--bg-card-hover);
+  border-color: #10b981;
+  color: #059669;
+  transform: translateY(-1px);
+}
+
+.btn-referee-tool:active {
+  transform: scale(0.96);
+}
+
+.btn-referee-tool.danger:hover {
+  border-color: #ef4444;
+  color: #dc2626;
+  background: rgba(239, 68, 68, 0.08);
+}
+
+/* 2. Sân Cầu Lông Nằm Ngang (Landscape Mode) */
+.badminton-court-card.court-landscape {
+  background: radial-gradient(circle at center, #046a4e 0%, #034834 60%, #023123 100%);
   border: 3px solid #10b981;
   border-radius: var(--radius-lg);
-  padding: 18px 14px;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.16), 0 0 24px rgba(16, 185, 129, 0.15);
+  padding: 14px 16px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.25), 0 0 28px rgba(16, 185, 129, 0.18);
   position: relative;
   overflow: hidden;
   color: #ffffff;
-  min-height: 490px;
-  display: flex;
-  flex-direction: column;
-  justify-content: space-between;
+  min-height: 440px;
+  display: grid;
+  grid-template-columns: 1fr 20px 1fr;
+  gap: 12px;
+  align-items: stretch;
 }
 
-/* Court lines overlay */
-.court-lines-wrap {
+/* Vạch kẻ sân ngang */
+.landscape-lines {
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  border: 2px solid var(--court-lines);
-  margin: 10px;
+  border: 2px solid rgba(255, 255, 255, 0.4);
+  margin: 12px;
   pointer-events: none;
+  z-index: 1;
 }
 
-.court-net-line {
+/* Đường trung tâm ngang */
+.court-line-center-h {
   position: absolute;
   top: 50%;
   left: 0;
   right: 0;
-  height: 3px;
-  background: rgba(255, 255, 255, 0.95);
+  height: 1.5px;
+  background: rgba(255, 255, 255, 0.3);
   transform: translateY(-50%);
-  box-shadow: 0 0 10px rgba(255, 255, 255, 0.75);
+}
+
+/* Vạch giao cầu ngắn 2 bên */
+.court-line-service-left {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 36%;
+  width: 1.5px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.court-line-service-right {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  right: 36%;
+  width: 1.5px;
+  background: rgba(255, 255, 255, 0.25);
+}
+
+/* 3. Lưới Dọc Ngăn Đôi Sân (Vertical Net) */
+.court-net-vertical {
+  grid-column: 2;
+  grid-row: 1;
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 3;
+  z-index: 4;
 }
 
-.net-badge {
+.net-mesh-vertical {
+  width: 4px;
+  height: 100%;
+  background: #ffffff;
+  box-shadow: 0 0 10px rgba(255, 255, 255, 0.8), 0 0 20px rgba(52, 211, 153, 0.5);
+  border-radius: 2px;
+  position: relative;
+}
+
+.net-mesh-vertical::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -4px;
+  right: -4px;
+  background: repeating-linear-gradient(
+    0deg,
+    transparent,
+    transparent 6px,
+    rgba(255, 255, 255, 0.35) 6px,
+    rgba(255, 255, 255, 0.35) 8px
+  );
+  pointer-events: none;
+}
+
+.net-badge-vertical {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%) rotate(-90deg);
+  white-space: nowrap;
   background: #0f172a;
   color: #34d399;
   font-family: var(--font-heading);
-  font-size: 0.7rem;
+  font-size: 0.68rem;
   font-weight: 800;
   padding: 3px 12px;
   border-radius: var(--radius-full);
   border: 1px solid #10b981;
   text-transform: uppercase;
   letter-spacing: 0.08em;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.45);
+  z-index: 5;
 }
 
-[data-theme="dark"] .net-badge {
+[data-theme="dark"] .net-badge-vertical {
   color: var(--volt);
   border-color: var(--volt);
 }
 
-/* Teams inside Court */
-.court-half {
+/* 4. Hai Nửa Sân Trái & Phải */
+.court-side {
   position: relative;
   z-index: 2;
-  padding: 4px 0;
-  transition: opacity 0.25s ease;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+  gap: 8px;
+  min-width: 0;
+  height: 100%;
+}
+
+.court-side.side-left {
+  grid-column: 1;
+  grid-row: 1;
+}
+
+.court-side.side-right {
+  grid-column: 3;
+  grid-row: 1;
+}
+
+.court-players-column {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  flex: 1;
+  justify-content: center;
+  min-width: 0;
+}
+
+/* 5. Bảng Điểm Trong Sân (In-Court Scoreboard) */
+.in-court-score-widget {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.85);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border-radius: var(--radius-md);
+  padding: 8px 12px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  transition: all 0.2s ease;
+}
+
+.score-side-left .in-court-score-widget {
+  border-color: rgba(56, 189, 248, 0.4);
+}
+
+.score-side-right .in-court-score-widget {
+  border-color: rgba(251, 146, 60, 0.4);
+}
+
+.score-tap-zone {
+  flex: 1;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  padding: 4px 8px;
+  transition: all 0.18s ease;
+  user-select: none;
+}
+
+.score-tap-zone:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.score-tap-zone:active {
+  transform: scale(0.96);
+}
+
+.score-led-wrap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+}
+
+.score-number.in-court-led {
+  font-family: var(--font-heading);
+  font-size: 3.2rem;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -0.02em;
+  text-shadow: 0 2px 10px rgba(0, 0, 0, 0.5);
+  transition: transform 0.15s ease, color 0.15s ease;
+}
+
+.score-side-left .score-number.in-court-led {
+  color: #38bdf8;
+  text-shadow: 0 0 16px rgba(56, 189, 248, 0.45);
+}
+
+.score-side-right .score-number.in-court-led {
+  color: #fb923c;
+  text-shadow: 0 0 16px rgba(251, 146, 60, 0.45);
+}
+
+.score-number.in-court-led.score-pulse {
+  transform: scale(1.2);
+  color: #ffffff !important;
+}
+
+.score-tap-hint {
+  display: none;
+}
+
+.in-court-score-widget .score-adj-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px solid rgba(255, 255, 255, 0.25);
+  color: #ffffff;
+  font-size: 1.3rem;
+  font-weight: 800;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: all 0.18s ease;
+  flex-shrink: 0;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
+}
+
+.in-court-score-widget .score-adj-btn.plus {
+  background: rgba(16, 185, 129, 0.22);
+  border-color: rgba(52, 211, 153, 0.5);
+  color: #34d399;
+}
+
+.in-court-score-widget .score-adj-btn.plus:hover {
+  background: #10b981;
+  color: #ffffff;
+  transform: scale(1.1);
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.6);
+}
+
+.in-court-score-widget .score-adj-btn.minus {
+  background: rgba(239, 68, 68, 0.15);
+  border-color: rgba(248, 113, 113, 0.4);
+  color: #f87171;
+}
+
+.in-court-score-widget .score-adj-btn.minus:hover {
+  background: #ef4444;
+  color: #ffffff;
+  transform: scale(1.1);
+  box-shadow: 0 0 14px rgba(239, 68, 68, 0.5);
+}
+
+.in-court-score-widget .score-adj-btn:active {
+  transform: scale(0.92);
+}
+
+/* 6. Nút Bắt Đầu Trận Đấu Giữa Sân (Pulsing Start Button) */
+.court-center-overlay {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 8;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  text-align: center;
+}
+
+.btn-start-match-pulse {
+  background: linear-gradient(135deg, #10b981 0%, #059669 50%, #047857 100%);
+  color: #ffffff;
+  border: 2px solid #34d399;
+  font-family: var(--font-heading);
+  font-size: 1.05rem;
+  font-weight: 900;
+  padding: 14px 28px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  box-shadow: 0 8px 24px rgba(5, 150, 105, 0.5), 0 0 20px rgba(52, 211, 153, 0.4);
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  letter-spacing: 0.02em;
+  animation: startPulse 2s infinite ease-in-out;
+}
+
+@keyframes startPulse {
+  0%, 100% {
+    transform: scale(1);
+    box-shadow: 0 8px 24px rgba(5, 150, 105, 0.5), 0 0 20px rgba(52, 211, 153, 0.4);
+  }
+  50% {
+    transform: scale(1.05);
+    box-shadow: 0 10px 30px rgba(5, 150, 105, 0.7), 0 0 30px rgba(52, 211, 153, 0.6);
+  }
+}
+
+.btn-start-match-pulse:hover {
+  transform: scale(1.08);
+  filter: brightness(1.1);
+}
+
+.btn-start-match-pulse:active {
+  transform: scale(0.97);
+}
+
+.start-match-hint {
+  font-size: 0.76rem;
+  color: #e2e8f0;
+  background: rgba(15, 23, 42, 0.75);
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+/* 7. Dải Thao Tác Nhanh & Nút Lưu Dưới Sân */
+.court-bottom-action-strip {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-surface);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 16px;
+  margin-top: 12px;
+  box-shadow: var(--shadow-sm);
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.score-presets-row.in-strip {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.preset-label {
+  font-size: 0.78rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  margin-right: 2px;
+}
+
+.btn-save-match-record {
+  background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%);
+  color: #ffffff !important;
+  font-size: 0.92rem;
+  font-weight: 800;
+  padding: 10px 20px;
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 14px rgba(34, 197, 94, 0.35);
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.btn-save-match-record:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 18px rgba(34, 197, 94, 0.5);
+  filter: brightness(1.05);
+}
+
+/* 8. Khu vực Điều Khiển & Dự Đoán Tách Biệt */
+.court-lower-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-top: 14px;
+}
+
+@media (max-width: 900px) {
+  .court-lower-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.live-betting-card.standalone {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-card);
+  height: 100%;
 }
 
 .team-header-bar {
@@ -889,55 +1454,104 @@ button {
 
 /* Player Court Card */
 .court-player-card {
-  background: rgba(15, 23, 42, 0.88);
+  background: rgba(15, 23, 42, 0.86);
   backdrop-filter: blur(10px);
   -webkit-backdrop-filter: blur(10px);
   border: 1px solid rgba(255, 255, 255, 0.2);
   border-radius: var(--radius-md);
-  padding: 10px 12px;
+  padding: 8px 10px;
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 8px;
   position: relative;
   transition: transform 0.2s, border-color 0.2s;
   color: #ffffff;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.25);
+  min-width: 0;
 }
 
 .court-player-card:hover {
   transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.4);
+  border-color: rgba(255, 255, 255, 0.45);
 }
 
-.player-avatar-wrap {
+.court-player-card .player-avatar-wrap {
   position: relative;
-  width: 48px;
-  height: 48px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  max-width: 38px;
   flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: transform 0.18s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.player-avatar {
-  width: 100%;
-  height: 100%;
-  border-radius: 50%;
-  object-fit: cover;
-  border: 2px solid #ffffff;
+.court-player-card .player-avatar-wrap:hover {
+  transform: scale(1.15);
 }
 
-.gender-badge-dot {
+.court-player-card .player-avatar-wrap:hover::after {
+  content: '✕';
   position: absolute;
-  bottom: -1px;
-  right: -1px;
-  width: 17px;
-  height: 17px;
+  top: -3px;
+  right: -3px;
+  background: #ef4444;
+  color: #ffffff;
+  font-size: 8px;
+  font-weight: 900;
+  width: 15px;
+  height: 15px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 9px;
+  border: 1.5px solid #ffffff;
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  line-height: 1;
+}
+
+.court-player-card .player-avatar-wrap:active {
+  transform: scale(0.95);
+}
+
+.court-player-card .player-avatar-wrap .avatar-container,
+.court-player-card .player-avatar-wrap .avatar-container.avatar-sm,
+.court-player-card .player-avatar-wrap .avatar-container.avatar-md {
+  width: 38px !important;
+  height: 38px !important;
+  min-width: 38px !important;
+  max-width: 38px !important;
+  display: block;
+}
+
+.court-player-card .player-avatar-wrap .avatar-img {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid #ffffff;
+  box-sizing: border-box;
+}
+
+.court-player-card .gender-badge-dot {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 8px;
   color: #ffffff;
-  border: 2px solid #0f172a;
+  border: 1.5px solid #0f172a;
   font-weight: 800;
+  z-index: 10;
 }
 
 .gender-male {
@@ -948,65 +1562,72 @@ button {
   background: #ec4899;
 }
 
-.player-info {
+.court-player-card .player-info {
   flex: 1;
   min-width: 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 2px;
 }
 
-.player-name {
-  font-weight: 800;
-  font-size: 0.92rem;
+.court-player-card .player-name {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  line-height: 1.2;
+}
+
+.court-player-card .player-name-text {
+  font-weight: 700;
+  font-size: 0.85rem;
   color: #ffffff;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  line-height: 1.2;
 }
 
-.player-nickname {
-  font-size: 0.74rem;
-  color: #cbd5e1;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  margin-top: 1px;
-}
-
-.player-meta-row {
+.court-player-card .player-meta-row {
   display: flex;
   align-items: center;
-  gap: 6px;
-  margin-top: 4px;
+  gap: 5px;
+  min-width: 0;
+  line-height: 1;
 }
 
-.tier-pill {
-  font-size: 0.65rem;
-  font-weight: 800;
+.court-player-card .tier-pill {
+  font-size: 0.62rem;
+  font-weight: 700;
   padding: 1px 6px;
   border-radius: var(--radius-full);
   display: inline-flex;
   align-items: center;
-  gap: 2px;
+  gap: 3px;
+  white-space: nowrap;
+  max-width: 110px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
-.elo-pill {
-  font-size: 0.78rem;
-  font-weight: 900;
+.court-player-card .elo-pill {
+  font-size: 0.75rem;
+  font-weight: 800;
   color: #34d399;
   font-family: var(--font-heading);
 }
 
-[data-theme="dark"] .elo-pill {
+[data-theme="dark"] .court-player-card .elo-pill {
   color: var(--volt);
 }
 
 /* Nút Đổi / Tùy chỉnh Cầu thủ trên Sân */
-.btn-swap-player-slot {
+.court-player-card .btn-swap-player-slot {
   flex-shrink: 0;
-  background: rgba(255, 255, 255, 0.16);
+  background: rgba(255, 255, 255, 0.14);
   backdrop-filter: blur(4px);
   -webkit-backdrop-filter: blur(4px);
-  border: 1px solid rgba(255, 255, 255, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.35);
   color: #ffffff;
   border-radius: var(--radius-sm);
   padding: 4px 8px;
@@ -1017,18 +1638,94 @@ button {
   align-items: center;
   gap: 3px;
   transition: all 0.18s ease;
+  margin-left: auto;
 }
 
-.btn-swap-player-slot:hover {
-  background: #ffffff;
-  color: #0f172a;
-  border-color: #ffffff;
+.court-player-card .btn-swap-player-slot:hover {
+  background: rgba(255, 255, 255, 0.28);
+  border-color: #10b981;
+  color: #ffffff;
   transform: scale(1.05);
-  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.25);
 }
 
-.btn-swap-player-slot:active {
+.court-player-card .btn-swap-player-slot:active {
   transform: scale(0.96);
+}
+
+/* Card vị trí trống (Có dấu + để thêm người theo yêu cầu) */
+.court-player-card.court-slot-empty {
+  background: rgba(15, 23, 42, 0.5);
+  border: 1.5px dashed rgba(255, 255, 255, 0.38);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  box-shadow: none;
+  transition: all 0.2s ease;
+  user-select: none;
+}
+
+.court-player-card.court-slot-empty:hover {
+  background: rgba(16, 185, 129, 0.16);
+  border-color: #10b981;
+  border-style: solid;
+  transform: translateY(-2px);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.28);
+}
+
+.court-player-card.court-slot-empty:active {
+  transform: scale(0.98);
+}
+
+.slot-empty-plus-wrap {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1.5px dashed rgba(255, 255, 255, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.05rem;
+  color: #a7f3d0;
+  flex-shrink: 0;
+  transition: all 0.22s ease;
+}
+
+.court-player-card.court-slot-empty:hover .slot-empty-plus-wrap {
+  background: #10b981;
+  border-color: #10b981;
+  border-style: solid;
+  color: #ffffff;
+  transform: rotate(90deg) scale(1.05);
+}
+
+.slot-empty-info {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.slot-empty-title {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #e2e8f0;
+  letter-spacing: 0.2px;
+}
+
+.court-player-card.court-slot-empty:hover .slot-empty-title {
+  color: #ffffff;
+}
+
+.slot-empty-hint {
+  font-size: 0.72rem;
+  color: var(--text-dim, #94a3b8);
+}
+
+.court-player-card.court-slot-occupied {
+  cursor: pointer;
 }
 
 /* Danh sách chọn cầu thủ thay thế (Swap Player Modal) */
@@ -1966,6 +2663,92 @@ button {
 /* =========================================================================
    10. TAB: BẢNG XẾP HẠNG (LEADERBOARD)
    ========================================================================= */
+.leaderboard-gender-bar {
+  display: inline-flex;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  padding: 4px;
+  border-radius: var(--radius-full);
+  gap: 4px;
+  margin-bottom: 12px;
+  box-shadow: var(--shadow-sm);
+  max-width: 100%;
+}
+
+.lb-gender-btn {
+  background: transparent;
+  border: 1px solid transparent;
+  color: var(--text-muted);
+  font-family: var(--font-heading);
+  font-size: 0.82rem;
+  font-weight: 700;
+  padding: 7px 18px;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.lb-gender-btn:hover {
+  color: var(--text-main);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.lb-gender-btn.active {
+  background: var(--bg-surface);
+  color: var(--text-main);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.18);
+}
+
+.lb-gender-btn[data-gender="all"].active {
+  color: #059669;
+  border-color: rgba(5, 150, 105, 0.45);
+  background: rgba(5, 150, 105, 0.12);
+  box-shadow: 0 0 12px rgba(5, 150, 105, 0.25);
+}
+
+[data-theme="dark"] .lb-gender-btn[data-gender="all"].active {
+  color: var(--volt);
+  border-color: rgba(204, 255, 0, 0.45);
+  background: rgba(204, 255, 0, 0.12);
+  box-shadow: 0 0 12px var(--volt-glow);
+}
+
+.lb-gender-btn[data-gender="male"].active {
+  color: #0284c7;
+  border-color: rgba(2, 132, 199, 0.45);
+  background: rgba(2, 132, 199, 0.12);
+  box-shadow: 0 0 12px rgba(2, 132, 199, 0.25);
+}
+
+.lb-gender-btn[data-gender="female"].active {
+  color: #ec4899;
+  border-color: rgba(236, 72, 153, 0.45);
+  background: rgba(236, 72, 153, 0.12);
+  box-shadow: 0 0 12px rgba(236, 72, 153, 0.25);
+}
+
+@media (max-width: 600px) {
+  .leaderboard-gender-bar {
+    width: 100%;
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    padding: 3px;
+    gap: 3px;
+    margin-bottom: 10px;
+  }
+
+  .lb-gender-btn {
+    padding: 6px 6px;
+    font-size: 0.76rem;
+    justify-content: center;
+    gap: 4px;
+  }
+}
+
 .leaderboard-tabs-bar {
   display: flex;
   gap: 6px;
@@ -2820,40 +3603,189 @@ button {
   100% { transform: rotate(360deg) scale(1); }
 }
 
-/* Toast Notification Container */
+/* =========================================================================
+   Toast Notification Container (Top Floating Dynamic Island Pill)
+   ========================================================================= */
 .toast-container {
   position: fixed;
-  bottom: 80px;
-  right: 20px;
-  z-index: 300;
+  top: 16px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 99999;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  align-items: center;
   pointer-events: none;
+  width: max-content;
+  max-width: min(450px, calc(100vw - 32px));
+  margin: 0 auto;
 }
 
 .toast {
-  background: rgba(15, 23, 42, 0.95);
-  color: #ffffff;
-  padding: 10px 16px;
-  border-radius: var(--radius-md);
-  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.25);
-  font-size: 0.85rem;
+  background: rgba(15, 23, 42, 0.94);
+  color: #f8fafc;
+  padding: 8px 18px;
+  border-radius: 9999px; /* Floating Island Pill */
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.38), 0 2px 8px rgba(0, 0, 0, 0.2);
+  font-size: 0.82rem;
   font-weight: 700;
-  display: flex;
+  display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
   pointer-events: auto;
-  animation: toastIn 0.22s ease-out;
+  cursor: pointer;
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  animation: toastPillIn 0.22s cubic-bezier(0.16, 1, 0.3, 1);
+  white-space: normal;
+  text-align: center;
+  line-height: 1.35;
+  user-select: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
 }
 
-.toast.toast-error {
-  background: #e11d48;
+.toast:hover {
+  transform: scale(1.02);
 }
 
-@keyframes toastIn {
-  from { opacity: 0; transform: translateY(12px); }
-  to { opacity: 1; transform: translateY(0); }
+.toast:active {
+  transform: scale(0.97);
+}
+
+.toast.toast-exit {
+  opacity: 0;
+  transform: translateY(-8px) scale(0.95);
+  pointer-events: none;
+}
+
+.toast .toast-icon {
+  font-size: 1rem;
+  display: inline-flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.toast .toast-msg {
+  flex: 1;
+}
+
+/* Toast types */
+.toast.toast-error,
+.toast.error {
+  background: rgba(225, 29, 72, 0.94);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.toast.toast-info,
+.toast.info {
+  background: rgba(2, 132, 199, 0.92);
+  border-color: rgba(255, 255, 255, 0.22);
+}
+
+.toast.toast-success,
+.toast.success {
+  background: rgba(15, 23, 42, 0.94);
+  border-color: rgba(16, 185, 129, 0.4);
+}
+
+@keyframes toastPillIn {
+  0% {
+    opacity: 0;
+    transform: translateY(-14px) scale(0.92);
+  }
+  100% {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+/* =========================================================================
+   GUEST PROFILES & UNRANKED LEADERBOARD STYLING
+   ========================================================================= */
+.guest-notice-box {
+  background: rgba(14, 165, 233, 0.09);
+  border: 1px solid rgba(14, 165, 233, 0.28);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  margin-bottom: 14px;
+  font-size: 0.78rem;
+  color: #0284c7;
+  line-height: 1.4;
+}
+
+.guest-elo-pills {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.btn-guest-elo {
+  background: rgba(255, 255, 255, 0.06);
+  border: 1px solid var(--border-color);
+  border-radius: 9999px;
+  padding: 4px 10px;
+  font-size: 0.74rem;
+  font-weight: 600;
+  color: var(--text-main);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-guest-elo:hover {
+  background: rgba(14, 165, 233, 0.15);
+  border-color: #0284c7;
+  color: #0284c7;
+}
+
+.attendance-card.is-guest {
+  border-color: rgba(99, 102, 241, 0.35);
+  background: rgba(99, 102, 241, 0.04);
+}
+
+.badge-guest {
+  display: inline-flex;
+  align-items: center;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 0.68rem;
+  font-weight: 700;
+  background: linear-gradient(135deg, rgba(14, 165, 233, 0.2), rgba(99, 102, 241, 0.25));
+  color: #6366f1;
+  border: 1px solid rgba(99, 102, 241, 0.3);
+  margin-left: 4px;
+}
+
+.btn-remove-guest {
+  background: transparent;
+  border: none;
+  color: var(--text-dim);
+  font-size: 0.85rem;
+  cursor: pointer;
+  padding: 4px 6px;
+  border-radius: 4px;
+  transition: all 0.15s ease;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.btn-remove-guest:hover {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+}
+
+.unranked-badge {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 8px;
+  border-radius: 9999px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  background: rgba(148, 163, 184, 0.12);
+  color: #94a3b8;
+  border: 1px solid rgba(148, 163, 184, 0.25);
+  margin-left: 6px;
 }
 
 /* =========================================================================
@@ -3017,50 +3949,253 @@ button {
     font-size: 0.7rem;
   }
 
-  .btn-dual-spin {
+  .court-bench-container {
     width: 100%;
-    justify-content: center;
-    font-size: 0.82rem;
-    padding: 8px 12px;
-  }
-
-  /* Court on Mobile */
-  .badminton-court-card {
-    min-height: 400px;
-    padding: 12px 8px;
-    border-width: 2px;
+    padding: 4px 8px;
+    gap: 4px;
     border-radius: var(--radius-md);
   }
 
-  .court-lines-wrap {
-    margin: 6px;
+  .bench-gender-tag {
+    width: 18px;
+    height: 18px;
+    font-size: 0.65rem;
   }
 
-  .court-player-card {
-    padding: 6px 8px;
+  .bench-avatars-scroll {
+    gap: 5px;
+  }
+
+  .bench-avatar-btn .avatar-container {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    min-height: 28px !important;
+  }
+
+  .bench-avatar-btn .avatar-img {
+    width: 28px !important;
+    height: 28px !important;
+  }
+
+  /* Court on Mobile (Landscape Layout) */
+  .badminton-court-card.court-landscape {
+    min-height: 315px;
+    padding: 8px 8px;
+    border-width: 2px;
+    border-radius: var(--radius-md);
+    grid-template-columns: 1fr 12px 1fr;
     gap: 6px;
   }
 
-  .player-avatar-wrap {
-    width: 38px;
-    height: 38px;
+  .landscape-lines {
+    margin: 5px;
   }
 
-  .player-name {
-    font-size: 0.8rem;
+  .net-badge-vertical {
+    font-size: 0.54rem;
+    padding: 2px 6px;
   }
 
-  .player-nickname {
+  .court-side {
+    gap: 6px;
+  }
+
+  .team-header-bar {
+    padding: 0 2px;
+    margin-bottom: 2px;
+  }
+
+  .team-title {
+    font-size: 0.82rem;
+    gap: 4px;
+  }
+
+  .team-avg-elo {
+    font-size: 0.65rem;
+    padding: 1px 5px;
+    border-width: 1px;
+  }
+
+  .elo-tb-prefix {
+    display: none;
+  }
+
+  .in-court-score-widget {
+    padding: 3px 6px;
+    gap: 4px;
+    border-radius: 10px;
+    margin-bottom: 2px;
+  }
+
+  .in-court-score-widget .score-adj-btn {
+    width: 28px;
+    height: 28px;
+    font-size: 1.05rem;
+  }
+
+  .score-number.in-court-led {
+    font-size: 2.1rem;
+  }
+
+  .court-players-column {
+    gap: 6px;
+  }
+
+  .court-player-card {
+    padding: 5px 6px;
+    gap: 6px;
+    border-radius: 8px;
+  }
+
+  .court-player-card .player-avatar-wrap {
+    width: 32px;
+    height: 32px;
+    min-width: 32px;
+    max-width: 32px;
+  }
+
+  .court-player-card .player-avatar-wrap .avatar-container,
+  .court-player-card .player-avatar-wrap .avatar-container.avatar-sm,
+  .court-player-card .player-avatar-wrap .avatar-container.avatar-md {
+    width: 32px !important;
+    height: 32px !important;
+    min-width: 32px !important;
+    max-width: 32px !important;
+  }
+
+  .court-player-card .player-avatar-wrap .avatar-img {
+    width: 32px !important;
+    height: 32px !important;
+  }
+
+  .court-player-card .gender-badge-dot {
+    width: 12px;
+    height: 12px;
+    font-size: 7px;
+  }
+
+  .court-player-card .player-name-text {
+    font-size: 0.74rem;
+  }
+
+  .court-player-card .tier-name-text {
+    display: none;
+  }
+
+  .court-player-card .tier-pill {
+    font-size: 0.6rem;
+    padding: 1px 4px;
+    max-width: 36px;
+  }
+
+  .court-player-card .elo-pill {
     font-size: 0.68rem;
   }
 
-  .tier-pill {
-    font-size: 0.58rem;
-    padding: 1px 3px;
+  .court-player-card .btn-swap-player-slot {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    padding: 0;
+    font-size: 0.7rem;
+    border-radius: 6px;
   }
 
-  .elo-pill {
+  .btn-swap-label {
+    display: none;
+  }
+
+  .court-player-card.court-slot-empty {
+    padding: 4px 6px;
+    gap: 6px;
+  }
+
+  .slot-empty-plus-wrap {
+    width: 26px;
+    height: 26px;
+    min-width: 26px;
+    font-size: 0.8rem;
+  }
+
+  .slot-empty-title {
     font-size: 0.72rem;
+  }
+
+  .slot-empty-hint {
+    font-size: 0.62rem;
+  }
+
+  .btn-start-match-pulse {
+    font-size: 0.88rem;
+    padding: 10px 16px;
+  }
+
+  .court-bottom-action-strip {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 10px;
+  }
+
+  .score-presets-row.in-strip {
+    justify-content: center;
+  }
+
+  .btn-save-match-record {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .court-top-toolbar {
+    padding: 6px 8px;
+    margin-bottom: 8px;
+    flex-wrap: nowrap;
+    gap: 6px;
+  }
+
+  .court-venue-badge {
+    font-size: 0.82rem;
+    font-weight: 800;
+    gap: 6px;
+    min-width: 0;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    white-space: nowrap;
+  }
+
+  .court-venue-badge #court-venue-label {
+    white-space: nowrap;
+  }
+
+  .court-venue-full {
+    display: none;
+  }
+
+  .court-status-tag {
+    font-size: 0.64rem;
+    padding: 2px 7px;
+    flex-shrink: 0;
+  }
+
+  .court-referee-actions {
+    gap: 5px;
+    flex-shrink: 0;
+  }
+
+  .btn-referee-tool {
+    width: 32px;
+    height: 32px;
+    padding: 0;
+    font-size: 0.95rem;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 8px;
+  }
+
+  .tool-btn-text {
+    display: none;
   }
 
   /* Khung thông báo sân trống trên điện thoại */
@@ -3278,11 +4413,14 @@ button {
     padding-bottom: calc(75px + env(safe-area-inset-bottom, 12px));
   }
 
-  /* Toast Container on Mobile */
+  /* Toast Container on Mobile - Top Centered Compact Pill */
   .toast-container {
-    bottom: 68px;
-    left: 10px;
-    right: 10px;
+    top: 10px;
+    bottom: auto;
+    left: 50%;
+    right: auto;
+    transform: translateX(-50%);
+    max-width: calc(100vw - 24px);
   }
 }
 
