@@ -554,6 +554,88 @@ class SupabaseService {
     }
   }
 
+  // --- API DỰ ĐOÁN & CƯỢC VUI (BETS - GIAI ĐOẠN 2) ---
+  async fetchBets(courtId = null) {
+    if (!this.isConfigured()) return null;
+    try {
+      let query = this.client
+        .from('bets')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (courtId) {
+        query = query.eq('court_id', courtId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data.map(b => ({
+        id: b.id,
+        courtId: b.court_id,
+        matchId: b.match_id || '',
+        memberId: b.member_id,
+        predictedTeam: b.predicted_team,
+        amount: Number(b.amount) || 10,
+        odds: Number(b.odds) || 1.9,
+        potentialPayout: Number(b.potential_payout) || 19,
+        status: b.status || 'pending',
+        createdAt: b.created_at
+      }));
+    } catch (err) {
+      console.error('[Supabase] Lỗi fetchBets:', err);
+      return null;
+    }
+  }
+
+  async insertBet(bet) {
+    if (!this.isConfigured()) return false;
+    try {
+      const payload = {
+        id: bet.id,
+        court_id: bet.courtId,
+        match_id: bet.matchId || null,
+        member_id: bet.memberId,
+        predicted_team: bet.predictedTeam,
+        amount: Number(bet.amount),
+        odds: Number(bet.odds),
+        potential_payout: Number(bet.potentialPayout),
+        status: bet.status || 'pending',
+        created_at: bet.createdAt || new Date().toISOString()
+      };
+
+      const { error } = await this.client
+        .from('bets')
+        .insert(payload);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[Supabase] Lỗi insertBet:', err);
+      return false;
+    }
+  }
+
+  async updateBet(betId, updates) {
+    if (!this.isConfigured()) return false;
+    try {
+      const payload = {};
+      if (updates.status !== undefined) payload.status = updates.status;
+      if (updates.matchId !== undefined) payload.match_id = updates.matchId;
+
+      const { error } = await this.client
+        .from('bets')
+        .update(payload)
+        .eq('id', betId);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[Supabase] Lỗi updateBet:', err);
+      return false;
+    }
+  }
+
   // --- REALTIME SUBSCRIPTIONS (TỰ ĐỘNG ĐỒNG BỘ CÁC BẢNG DỮ LIỆU) ---
   subscribeToChanges(onChangeCallback) {
     if (!this.isConfigured()) return;
@@ -584,6 +666,9 @@ class SupabaseService {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'coin_transactions' }, (payload) => {
         onChangeCallback('coin_transactions', payload);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, (payload) => {
+        onChangeCallback('bets', payload);
       })
       .subscribe((status) => {
         console.log('[Supabase Realtime] Trạng thái kênh đồng bộ realtime:', status);

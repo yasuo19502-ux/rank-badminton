@@ -1,16 +1,19 @@
 import confetti from 'canvas-confetti';
 import { StorageService, getLocalDateStr } from './storage.js';
-import { calculateDoublesElo, calculateBadges, getTierByElo, getNextTier, getPlayerDetailedStats, TIERS } from './elo.js';
+import { calculateDoublesElo, calculateBadges, getTierByElo, getNextTier, getPlayerDetailedStats, calculateBettingOdds, TIERS } from './elo.js';
 import { processImageFile, generateDefaultAvatar, getAvatarUrl } from './avatar.js';
 import { MatchmakerService } from './matchmaker.js';
 import { SoundService } from './sound.js';
 import { supabaseService } from './supabase.js';
 
 // Trạng thái ứng dụng (Application State)
-// Trạng thái ứng dụng (Application State)
 const state = {
   currentTab: 'court',
   currentCourtId: 'court_1', // 'court_1' | 'court_2'
+  betting: {
+    selectedTeam: 'team1', // 'team1' | 'team2'
+    selectedAmount: 20 // 10 | 20 | 30
+  },
   courtMatches: {
     court_1: {
       activeMatch: null,
@@ -268,6 +271,7 @@ function setupEventListeners() {
   if (btnSwap) {
     btnSwap.addEventListener('click', () => {
       if (state.activeMatch && state.activeMatch.team1 && state.activeMatch.team2) {
+        StorageService.refundMatchBets(state.currentCourtId, 'Đổi đội hình thi đấu');
         const swapped = MatchmakerService.swapPlayers(state.activeMatch.team1, state.activeMatch.team2, 0, 0);
         state.activeMatch.team1 = swapped.team1;
         state.activeMatch.team2 = swapped.team2;
@@ -276,7 +280,7 @@ function setupEventListeners() {
         SoundService.playClick();
         renderCourt();
         updateCourtTabStatusPills();
-        showToast('Đã đổi người giữa 2 đội!');
+        showToast('Đã đổi người giữa 2 đội! Các vé cược cũ đã được hoàn lại.');
       }
     });
   }
@@ -308,6 +312,7 @@ function setupEventListeners() {
       SoundService.playSmash();
       updateScoreboardDisplay();
       renderEloPrediction();
+      renderBettingWidget();
       debouncedSyncLiveScore();
     });
   };
@@ -325,6 +330,7 @@ function setupEventListeners() {
       SoundService.playClick();
       updateScoreboardDisplay();
       renderEloPrediction();
+      renderBettingWidget();
       debouncedSyncLiveScore();
     });
   });
@@ -920,6 +926,7 @@ function renderCourt() {
 
     updateScoreboardDisplay();
     renderEloPrediction();
+    renderBettingWidget();
     return;
   }
 
@@ -951,6 +958,7 @@ function renderCourt() {
 
   updateScoreboardDisplay();
   renderEloPrediction();
+  renderBettingWidget();
 }
 
 function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
@@ -1027,6 +1035,352 @@ function renderEloPrediction() {
 }
 
 /**
+ * =========================================================================
+ * RENDER WIDGET DỰ ĐOÁN & CƯỢC VUI (LIVE MINI-BETTING - GIAI ĐOẠN 2)
+ * =========================================================================
+ */
+function renderBettingWidget() {
+  const container = document.getElementById('live-betting-card');
+  if (!container) return;
+
+  if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2 ||
+      state.activeMatch.team1.length < 2 || state.activeMatch.team2.length < 2) {
+    container.innerHTML = `
+      <div style="display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); font-size: 0.82rem; padding: 4px 0;">
+        <span style="display: flex; align-items: center; gap: 6px;">
+          <span>🎯</span> Kèo cược vui bằng Xu sẽ mở ngay khi có trận đấu trên sân
+        </span>
+        <span style="font-size: 0.72rem; color: var(--text-dim);">Chờ xếp trận</span>
+      </div>
+    `;
+    return;
+  }
+
+  const courtId = state.currentCourtId;
+  const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+  const t1 = state.activeMatch.team1;
+  const t2 = state.activeMatch.team2;
+
+  const t1Ids = t1.map(p => p.id);
+  const t2Ids = t2.map(p => p.id);
+  const currentUser = StorageService.getCurrentUser();
+  const isOnCourt = currentUser && (t1Ids.includes(currentUser.id) || t2Ids.includes(currentUser.id));
+
+  // Tỷ số và kiểm tra khóa cược (khóa khi score1 >= 10 || score2 >= 10)
+  const isLocked = state.score1 >= 10 || state.score2 >= 10;
+
+  // Tính tỷ lệ Odds (Kèo dưới kẹp tối đa 1 ăn 3.00, kèo trên tối thiểu 1.20)
+  const oddsData = calculateBettingOdds(t1, t2);
+
+  // Lấy các vé cược đang chờ cho sân này
+  const activeBets = StorageService.getBets(courtId, 'pending');
+  const t1Bets = activeBets.filter(b => b.predictedTeam === 'team1');
+  const t2Bets = activeBets.filter(b => b.predictedTeam === 'team2');
+  const totalBets = activeBets.length;
+
+  // Tính % thanh đo cộng đồng
+  let t1Percent = 50;
+  let t2Percent = 50;
+  if (totalBets > 0) {
+    t1Percent = Math.round((t1Bets.length / totalBets) * 100);
+    t2Percent = 100 - t1Percent;
+  }
+
+  // Vé cược của người dùng hiện tại (nếu có)
+  const myBet = currentUser ? StorageService.getUserActiveBet(courtId, currentUser.id) : null;
+
+  // Tên hiển thị 2 đội
+  const t1Names = t1.map(p => p.name).join(' & ');
+  const t2Names = t2.map(p => p.name).join(' & ');
+
+  // 1. Header widget
+  const headerHtml = `
+    <div class="live-betting-header">
+      <div class="live-betting-title">
+        <span>🎯</span> Dự Đoán Trận Đấu (${courtName})
+        ${isLocked ? `
+          <span class="live-locked-badge">
+            <span>🔒</span> ĐÃ ĐÓNG (≥10đ)
+          </span>
+        ` : `
+          <span class="live-pulse-badge">
+            <span class="live-pulse-dot"></span> ĐANG MỞ
+          </span>
+        `}
+      </div>
+      <button class="btn-view-all-bets" onclick="window.appOpenCourtBetsModal()">
+        <span>👁️</span> Kèo Cả Sân (${totalBets})
+      </button>
+    </div>
+  `;
+
+  // 2. Crowd Meter bar
+  const crowdMeterHtml = `
+    <div class="crowd-meter-wrap">
+      <div class="crowd-meter-labels">
+        <span class="crowd-meter-t1">${t1Names} (${t1Percent}%)</span>
+        <span class="crowd-meter-t2">(${t2Percent}%) ${t2Names}</span>
+      </div>
+      <div class="crowd-meter-bar">
+        <div class="crowd-meter-fill-t1" style="width: ${t1Percent}%;"></div>
+      </div>
+    </div>
+  `;
+
+  let bodyHtml = '';
+
+  if (!currentUser) {
+    // Chưa đăng nhập
+    bodyHtml = `
+      <div class="bet-notice-box" style="justify-content: space-between;">
+        <span style="display: flex; align-items: center; gap: 8px;">
+          <span>🪙</span> <span>Đăng nhập mã PIN để tham gia cược vui nhận Xu!</span>
+        </span>
+        <button class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem;" onclick="window.appOpenAuthModal()">
+          Đăng Nhập
+        </button>
+      </div>
+    `;
+  } else if (isOnCourt) {
+    // Là 1 trong 4 VĐV đang đánh trên sân
+    bodyHtml = `
+      <div class="bet-notice-box">
+        <span style="font-size: 1.3rem;">🏸</span>
+        <div>
+          <strong>Bạn đang trực tiếp thi đấu trên sân này!</strong>
+          <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+            Hệ thống khóa cược với 4 VĐV trên sân để giữ trọn vẹn tinh thần Fair-play. Tập trung thi đấu giành chiến thắng nhé!
+          </div>
+        </div>
+      </div>
+    `;
+  } else if (myBet) {
+    // Đã đặt cược thành công cho trận này
+    const pickedTeamName = myBet.predictedTeam === 'team1' ? t1Names : t2Names;
+    const pickedTeamTag = myBet.predictedTeam === 'team1' ? 'ĐỘI 1' : 'ĐỘI 2';
+    const tagClass = myBet.predictedTeam === 'team1' ? 'team-1-tag' : 'team-2-tag';
+
+    bodyHtml = `
+      <div class="user-bet-ticket">
+        <div class="ticket-header">
+          <div class="ticket-badge">
+            <span>🎟️</span> VÉ CƯỢC CỦA BẠN
+          </div>
+          <span style="font-size: 0.72rem; color: var(--emerald); font-weight: 700;">
+            ${isLocked ? '🔒 ĐÃ KHÓA' : '⏳ ĐANG DIỄN RA'}
+          </span>
+        </div>
+        <div class="ticket-team-title">
+          <span class="bet-team-tag ${tagClass}">[${pickedTeamTag}]</span> ${pickedTeamName}
+        </div>
+        <div class="ticket-details-row">
+          <div>Cược: <strong style="color: var(--text-primary);">${myBet.amount} Xu</strong></div>
+          <div>Tỷ lệ: <strong style="color: #facc15;">${myBet.odds}x</strong></div>
+          <div>Thắng nhận: <strong class="ticket-payout-val">+${myBet.potentialPayout} Xu</strong></div>
+        </div>
+      </div>
+    `;
+  } else if (isLocked) {
+    // Chưa cược và tỷ số đã chạm mốc 10 điểm
+    bodyHtml = `
+      <div class="bet-notice-box">
+        <span style="font-size: 1.3rem;">🔒</span>
+        <div>
+          <strong>Đã đóng nhận cược cho trận đấu này!</strong>
+          <div style="font-size: 0.76rem; color: var(--text-dim); margin-top: 2px;">
+            Tỷ số đã chạm mốc 10 điểm (${state.score1} - ${state.score2}). Hãy cổ vũ cho các tuyển thủ và chờ kèo trận tiếp theo nhé!
+          </div>
+        </div>
+      </div>
+    `;
+  } else {
+    // Đang mở cược và người dùng chưa cược
+    const selTeam = state.betting.selectedTeam || 'team1';
+    const selAmt = state.betting.selectedAmount || 20;
+    const curOdds = selTeam === 'team1' ? oddsData.oddsTeam1 : oddsData.oddsTeam2;
+    const potentialPayout = Math.round(selAmt * curOdds);
+    const profit = potentialPayout - selAmt;
+
+    bodyHtml = `
+      <!-- Chọn Đội -->
+      <div class="bet-teams-grid">
+        <div class="bet-team-card team-1-card ${selTeam === 'team1' ? 'selected' : ''}" onclick="window.appSelectBetTeam('team1')">
+          <div class="bet-team-tag team-1-tag">ĐỘI 1</div>
+          <div class="bet-team-names" title="${t1Names}">${t1Names}</div>
+          <div class="bet-odds-badge">Ăn ${oddsData.oddsTeam1}x</div>
+        </div>
+        <div class="bet-team-card team-2-card ${selTeam === 'team2' ? 'selected' : ''}" onclick="window.appSelectBetTeam('team2')">
+          <div class="bet-team-tag team-2-tag">ĐỘI 2</div>
+          <div class="bet-team-names" title="${t2Names}">${t2Names}</div>
+          <div class="bet-odds-badge">Ăn ${oddsData.oddsTeam2}x</div>
+        </div>
+      </div>
+
+      <!-- Chọn Mức Cược (Chỉ 10, 20, 30 Xu) -->
+      <div class="bet-amounts-row">
+        <button class="btn-bet-amt ${selAmt === 10 ? 'active' : ''}" onclick="window.appSelectBetAmount(10)">
+          🪙 10 Xu
+        </button>
+        <button class="btn-bet-amt ${selAmt === 20 ? 'active' : ''}" onclick="window.appSelectBetAmount(20)">
+          🪙 20 Xu
+        </button>
+        <button class="btn-bet-amt ${selAmt === 30 ? 'active' : ''}" onclick="window.appSelectBetAmount(30)">
+          🪙 30 Xu
+        </button>
+      </div>
+
+      <!-- Tóm tắt cược -->
+      <div class="bet-summary-box">
+        <div class="bet-summary-left">
+          Cược <strong>${selAmt} Xu</strong> vào <strong>${selTeam === 'team1' ? 'Đội 1' : 'Đội 2'}</strong>
+        </div>
+        <div class="bet-summary-right">
+          Thắng nhận: 🪙 ${potentialPayout} Xu (+${profit} Xu)
+        </div>
+      </div>
+
+      <!-- Nút Chốt Kèo -->
+      <button class="btn-confirm-bet" onclick="window.appConfirmBet()">
+        <span>🎯</span> XÁC NHẬN CƯỢC ${selAmt} XU
+      </button>
+    `;
+  }
+
+  container.innerHTML = `${headerHtml}${crowdMeterHtml}${bodyHtml}`;
+}
+
+window.appSelectBetTeam = function(teamKey) {
+  state.betting.selectedTeam = teamKey;
+  SoundService.playClick();
+  renderBettingWidget();
+};
+
+window.appSelectBetAmount = function(amt) {
+  state.betting.selectedAmount = amt;
+  SoundService.playClick();
+  renderBettingWidget();
+};
+
+window.appConfirmBet = function() {
+  if (!state.currentUser) {
+    showToast('Vui lòng đăng nhập để tham gia dự đoán nhận Xu!', 'error');
+    openAuthModal();
+    return;
+  }
+
+  if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2) {
+    showToast('Chưa có trận đấu trên sân để đặt cược!', 'error');
+    return;
+  }
+
+  const t1Ids = state.activeMatch.team1.map(p => p.id);
+  const t2Ids = state.activeMatch.team2.map(p => p.id);
+  if (t1Ids.includes(state.currentUser.id) || t2Ids.includes(state.currentUser.id)) {
+    showToast('Bạn đang thi đấu trên sân này! Không được đặt cược.', 'error');
+    return;
+  }
+
+  if (state.score1 >= 10 || state.score2 >= 10) {
+    showToast('Trận đấu đã chạm mốc 10 điểm! Kèo cược đã bị khóa.', 'error');
+    renderBettingWidget();
+    return;
+  }
+
+  const oddsData = calculateBettingOdds(state.activeMatch.team1, state.activeMatch.team2);
+  const selectedOdds = state.betting.selectedTeam === 'team1' ? oddsData.oddsTeam1 : oddsData.oddsTeam2;
+
+  const res = StorageService.placeBet(
+    state.currentCourtId,
+    state.currentUser.id,
+    state.betting.selectedTeam,
+    state.betting.selectedAmount,
+    selectedOdds
+  );
+
+  if (!res.success) {
+    showToast(res.message || 'Không thể đặt cược!', 'error');
+    return;
+  }
+
+  SoundService.playClick();
+  showToast(`🎉 Đặt cược ${state.betting.selectedAmount} Xu thành công! Chúc bạn may mắn!`, 'success');
+  state.currentUser = StorageService.getCurrentUser();
+  renderUserAuthHeader();
+  renderBettingWidget();
+};
+
+window.appOpenCourtBetsModal = function() {
+  const modal = document.getElementById('modal-court-bets');
+  if (!modal) return;
+
+  const courtId = state.currentCourtId;
+  const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+  const t1 = state.activeMatch?.team1 || [];
+  const t2 = state.activeMatch?.team2 || [];
+
+  const oddsData = calculateBettingOdds(t1, t2);
+
+  const headerBox = document.getElementById('modal-court-bets-match-header');
+  if (headerBox) {
+    if (t1.length > 0 && t2.length > 0) {
+      headerBox.innerHTML = `
+        <div style="font-size: 0.78rem; color: var(--cyan); font-weight: 800; text-transform: uppercase;">
+          🏸 ${courtName} • TỶ SỐ HIỆN TẠI: ${state.score1} - ${state.score2}
+        </div>
+        <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 4px;">
+          <span style="color: #38bdf8;">${t1.map(p => p.name).join(' & ')}</span>
+          <span style="color: var(--text-muted); font-size: 0.8rem; margin: 0 8px;">VS</span>
+          <span style="color: #f43f5e;">${t2.map(p => p.name).join(' & ')}</span>
+        </div>
+      `;
+    } else {
+      headerBox.innerHTML = `<div style="color: var(--text-muted);">Chưa có trận đấu trên sân</div>`;
+    }
+  }
+
+  const activeBets = StorageService.getBets(courtId, 'pending');
+  const members = StorageService.getMembers();
+  const memberMap = new Map(members.map(m => [m.id, m]));
+
+  const t1Bets = activeBets.filter(b => b.predictedTeam === 'team1');
+  const t2Bets = activeBets.filter(b => b.predictedTeam === 'team2');
+
+  const t1Title = document.getElementById('bets-modal-t1-title');
+  const t2Title = document.getElementById('bets-modal-t2-title');
+  if (t1Title) t1Title.innerHTML = `Đội 1 (${oddsData.oddsTeam1}x) • ${t1Bets.length} vé`;
+  if (t2Title) t2Title.innerHTML = `Đội 2 (${oddsData.oddsTeam2}x) • ${t2Bets.length} vé`;
+
+  const renderBetList = (bets) => {
+    if (bets.length === 0) {
+      return `<div style="text-align: center; color: var(--text-muted); font-size: 0.78rem; padding: 16px 0;">Chưa ai cược cửa này</div>`;
+    }
+    return bets.map(b => {
+      const mem = memberMap.get(b.memberId);
+      const name = mem ? mem.name : 'Thành viên';
+      const avatarUrl = mem ? getAvatarUrl(mem) : generateDefaultAvatar(name);
+      return `
+        <div class="modal-bet-item">
+          <div class="modal-bet-user">
+            <img src="${avatarUrl}" style="width: 22px; height: 22px; border-radius: 50%; object-fit: cover;" alt="">
+            <span>${name}</span>
+          </div>
+          <div class="modal-bet-amount">
+            🪙 ${b.amount} Xu <span style="font-size: 0.7rem; color: var(--text-muted); font-weight: 500;">(Ăn ${b.potentialPayout})</span>
+          </div>
+        </div>
+      `;
+    }).join('');
+  };
+
+  const t1List = document.getElementById('bets-modal-t1-list');
+  const t2List = document.getElementById('bets-modal-t2-list');
+  if (t1List) t1List.innerHTML = renderBetList(t1Bets);
+  if (t2List) t2List.innerHTML = renderBetList(t2Bets);
+
+  modal.classList.add('open');
+};
+
+/**
  * Tạo trận mới cho sân hiện tại với hiệu ứng xốc đĩa quay số
  */
 function generateNewMatch(withAnimation = true) {
@@ -1079,6 +1433,7 @@ function generateNewMatch(withAnimation = true) {
 
     setTimeout(() => {
       try {
+        StorageService.refundMatchBets(state.currentCourtId, 'Tạo trận mới');
         const match = MatchmakerService.createMatch(
           presentMembers,
           attendance.gamesPlayedToday,
@@ -1103,6 +1458,7 @@ function generateNewMatch(withAnimation = true) {
     }, 600);
   } else {
     try {
+      StorageService.refundMatchBets(state.currentCourtId, 'Tạo trận mới');
       const match = MatchmakerService.createMatch(
         presentMembers,
         attendance.gamesPlayedToday,
@@ -1146,6 +1502,9 @@ function spinBothCourts() {
 
   setTimeout(() => {
     try {
+      StorageService.refundMatchBets('court_1', 'Ghép lại đồng thời cả 2 sân');
+      StorageService.refundMatchBets('court_2', 'Ghép lại đồng thời cả 2 sân');
+
       // 1. Ghép Sân 1
       const match1 = MatchmakerService.createMatch(
         presentMembers,
@@ -1240,7 +1599,7 @@ function finishMatch() {
 
   // Lưu trận đấu vào lịch sử
   const activeCourt = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
-  StorageService.addMatch({
+  const savedMatch = StorageService.addMatch({
     courtNumber: activeCourt,
     team1: team1.map(p => p.id),
     team2: team2.map(p => p.id),
@@ -1265,9 +1624,31 @@ function finishMatch() {
   losingTeam.forEach(p => {
     StorageService.addCoins(p.id, 5, 'match_loss', `Hoàn thành trận ${activeCourt} (${state.score1}-${state.score2})`);
   });
+
+  // Quyết toán vé cược Giai đoạn 2
+  const winningTeamKey = team1Won ? 'team1' : 'team2';
+  const betResults = StorageService.settleMatchBets(state.currentCourtId, winningTeamKey, savedMatch?.id || '');
+
   if (state.currentUser) {
     state.currentUser = StorageService.getCurrentUser();
     renderUserAuthHeader();
+
+    const myWonBet = betResults.wonBets.find(b => b.memberId === state.currentUser.id);
+    const myLostBet = betResults.lostBets.find(b => b.memberId === state.currentUser.id);
+
+    if (myWonBet) {
+      setTimeout(() => {
+        SoundService.playLevelUp();
+        confetti({
+          particleCount: 100,
+          spread: 80,
+          origin: { y: 0.5 }
+        });
+        showToast(`🎯 CHÚC MỪNG BẠN ĐÃ ĐOÁN ĐÚNG! Thắng cược nhận +${myWonBet.potentialPayout} Xu!`, 'success');
+      }, 500);
+    } else if (myLostBet) {
+      showToast(`Tiếc quá, bạn đoán sai trận này! Chúc bạn may mắn ở trận sau nhé.`, 'info');
+    }
   }
 
   // Hiệu ứng ăn mừng: Kèn fanfare + pháo giấy
@@ -2237,6 +2618,27 @@ async function initCloudSyncAndRealtime() {
           updateScoreboardDisplay();
           renderEloPrediction();
         }
+      }
+      return;
+    }
+
+    if (table === 'bets') {
+      const cloudBets = await supabaseService.fetchBets();
+      if (cloudBets) StorageService.saveLocalBets(cloudBets);
+      renderBettingWidget();
+      const modalBets = document.getElementById('modal-court-bets');
+      if (modalBets && modalBets.classList.contains('open')) {
+        window.appOpenCourtBetsModal();
+      }
+      return;
+    }
+
+    if (table === 'coin_transactions') {
+      const cloudTx = await supabaseService.fetchCoinTransactions();
+      if (cloudTx) StorageService.saveLocalCoinTransactions(cloudTx);
+      if (state.currentUser) {
+        state.currentUser = StorageService.getCurrentUser();
+        renderUserAuthHeader();
       }
       return;
     }

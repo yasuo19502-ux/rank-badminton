@@ -402,3 +402,48 @@ export function getPlayerDetailedStats(memberId, members, matches = []) {
   };
 }
 
+/**
+ * Tính toán tỷ lệ ăn cược (Odds) tự động theo trình độ Elo cho Giai đoạn 2
+ * Quy tắc: Kèo dưới ăn tối đa 1 ăn 3.00, kèo trên tối thiểu 1.20, kèo cân 1.90
+ * @param {Array} team1 - Danh sách người chơi đội 1
+ * @param {Array} team2 - Danh sách người chơi đội 2
+ * @returns {Object} { oddsTeam1, oddsTeam2, probTeam1, probTeam2, avgElo1, avgElo2 }
+ */
+export function calculateBettingOdds(team1, team2) {
+  if (!team1 || !team2 || team1.length === 0 || team2.length === 0) {
+    return {
+      oddsTeam1: 1.90,
+      oddsTeam2: 1.90,
+      probTeam1: 50,
+      probTeam2: 50,
+      avgElo1: 1000,
+      avgElo2: 1000
+    };
+  }
+
+  const avgElo1 = team1.reduce((sum, p) => sum + (Number(p.elo) || 1000), 0) / team1.length;
+  const avgElo2 = team2.reduce((sum, p) => sum + (Number(p.elo) || 1000), 0) / team2.length;
+
+  // Xác suất kỳ vọng theo công thức FIDE Elo
+  const exponent = (avgElo2 - avgElo1) / 400;
+  const prob1 = 1 / (1 + Math.pow(10, exponent));
+  const prob2 = 1 - prob1;
+
+  // Tỷ lệ ăn cơ sở: 0.95 / xác suất
+  // Kẹp trần tối đa 3.00 cho kèo dưới (yêu cầu người dùng), tối thiểu 1.20 cho kèo trên
+  let rawOdds1 = 0.95 / Math.max(0.01, prob1);
+  let rawOdds2 = 0.95 / Math.max(0.01, prob2);
+
+  let oddsTeam1 = Math.min(3.00, Math.max(1.20, Math.round(rawOdds1 * 100) / 100));
+  let oddsTeam2 = Math.min(3.00, Math.max(1.20, Math.round(rawOdds2 * 100) / 100));
+
+  return {
+    oddsTeam1,
+    oddsTeam2,
+    probTeam1: Math.round(prob1 * 100),
+    probTeam2: Math.round(prob2 * 100),
+    avgElo1: Math.round(avgElo1),
+    avgElo2: Math.round(avgElo2)
+  };
+}
+

@@ -13,7 +13,8 @@ const STORAGE_KEYS = {
   ACTIVE_MATCH_2: 'cbb_thai_thinh_active_match_court_2',
   SETTINGS: 'cbb_thai_thinh_settings_v2',
   CURRENT_USER_ID: 'cbb_thai_thinh_current_user_id_v1',
-  COIN_TRANSACTIONS: 'cbb_thai_thinh_coin_transactions_v1'
+  COIN_TRANSACTIONS: 'cbb_thai_thinh_coin_transactions_v1',
+  BETS: 'cbb_thai_thinh_bets_v1'
 };
 
 // Dọn dẹp cache dữ liệu mẫu cũ nếu còn tồn tại trong trình duyệt
@@ -44,14 +45,15 @@ export const StorageService = {
 
     try {
       console.log('[Sync] Bắt đầu đồng bộ từ Supabase Cloud...');
-      const [cloudMembers, cloudMatches, cloudSessions, cloudSettings, liveCourt1, liveCourt2, cloudCoinTx] = await Promise.all([
+      const [cloudMembers, cloudMatches, cloudSessions, cloudSettings, liveCourt1, liveCourt2, cloudCoinTx, cloudBets] = await Promise.all([
         supabaseService.fetchMembers(),
         supabaseService.fetchMatches(),
         supabaseService.fetchSessions(),
         supabaseService.fetchClubSettings(),
         supabaseService.fetchLiveCourt('court_1'),
         supabaseService.fetchLiveCourt('court_2'),
-        supabaseService.fetchCoinTransactions()
+        supabaseService.fetchCoinTransactions(),
+        supabaseService.fetchBets()
       ]);
 
       if (cloudMembers && cloudMembers.length > 0) {
@@ -68,6 +70,9 @@ export const StorageService = {
       }
       if (cloudCoinTx && cloudCoinTx.length > 0) {
         this.saveLocalCoinTransactions(cloudCoinTx);
+      }
+      if (cloudBets) {
+        this.saveLocalBets(cloudBets);
       }
 
       const todayStr = getLocalDateStr();
@@ -431,6 +436,26 @@ export const StorageService = {
     // Giảm số trận hôm nay trong điểm danh nếu có
     this.decrementGamePlayedToday(allInvolvedIds);
 
+    // Hoàn tác các vé cược gắn với trận đấu này nếu có
+    const allBets = this.getLocalBets();
+    allBets.forEach(bet => {
+      if (bet.matchId === id) {
+        if (bet.status === 'won') {
+          const netWin = bet.potentialPayout - bet.amount;
+          if (netWin > 0) {
+            this.addCoins(bet.memberId, -netWin, 'bet_refund', `Hoàn tác trận đấu: Điều chỉnh lại tiền cược`);
+          }
+        } else if (bet.status === 'lost') {
+          this.addCoins(bet.memberId, bet.amount, 'bet_refund', `Hoàn tác trận đấu: Hoàn lại ${bet.amount} Xu cược`);
+        }
+        bet.status = 'refunded';
+        if (supabaseService.isConfigured()) {
+          supabaseService.updateBet(bet.id, { status: 'refunded' });
+        }
+      }
+    });
+    this.saveLocalBets(allBets);
+
     // Xóa trên Supabase Cloud
     if (supabaseService.isConfigured()) {
       supabaseService.deleteMatch(id);
@@ -781,5 +806,166 @@ export const StorageService = {
     const dateToCheck = targetDate || getLocalDateStr();
     const sessions = this.getSessions();
     return sessions.find(s => s.date === dateToCheck) || null;
+  },
+
+  // --- QUẢN LÝ DỰ ĐOÁN & CƯỢC VUI (BETS - GIAI ĐOẠN 2) ---
+  getLocalBets() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.BETS);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  saveLocalBets(bets) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.BETS, JSON.stringify(bets));
+    } catch (e) {}
+  },
+
+  getBets(courtId = null, status = null) {
+    let bets = this.getLocalBets();
+    if (courtId) {
+      bets = bets.filter(b => b.courtId === courtId);
+    }
+    if (status) {
+      bets = bets.filter(b => b.status === status);
+    }
+    return bets;
+  },
+
+  getUserActiveBet(courtId, memberId) {
+    if (!courtId || !memberId) return null;
+    const bets = this.getBets(courtId, 'pending');
+    return bets.find(b => b.memberId === memberId) || null;
+  },
+
+  placeBet(courtId, memberId, predictedTeam, amount, odds) {
+    const numAmount = Number(amount);
+    if (![10, 20, 30].includes(numAmount)) {
+      return { success: false, message: 'Mức cược không hợp lệ (chỉ chấp nhận 10, 20 hoặc 30 xu)!' };
+    }
+
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (!mem) {
+      return { success: false, message: 'Không tìm thấy tài khoản thành viên!' };
+    }
+
+    const userCoins = Number(mem.coins !== undefined ? mem.coins : 100);
+    if (userCoins < numAmount) {
+      return { success: false, message: `Số dư không đủ! Bạn có ${userCoins} Xu, cần ${numAmount} Xu.` };
+    }
+
+    // Kiểm tra xem đã đặt cược trận này chưa
+    const existingBet = this.getUserActiveBet(courtId, memberId);
+    if (existingBet) {
+      return { success: false, message: 'Bạn đã đặt cược cho trận này rồi!' };
+    }
+
+    const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+    const teamName = predictedTeam === 'team1' ? 'Đội 1' : 'Đội 2';
+
+    // Trừ xu ví ngay khi chốt cược
+    const deductRes = this.addCoins(
+      memberId,
+      -numAmount,
+      'bet_placed',
+      `Đặt cược ${numAmount} Xu cho ${teamName} (${courtName}, Kèo ${odds}x)`
+    );
+
+    if (!deductRes || !deductRes.success) {
+      return { success: false, message: 'Lỗi khi trừ xu đặt cược!' };
+    }
+
+    const potentialPayout = Math.round(numAmount * Number(odds));
+    const bet = {
+      id: 'bet_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      courtId,
+      matchId: '',
+      memberId,
+      predictedTeam,
+      amount: numAmount,
+      odds: Number(odds),
+      potentialPayout,
+      status: 'pending',
+      createdAt: new Date().toISOString()
+    };
+
+    const allBets = this.getLocalBets();
+    allBets.unshift(bet);
+    this.saveLocalBets(allBets);
+
+    if (supabaseService.isConfigured()) {
+      supabaseService.insertBet(bet);
+    }
+
+    return { success: true, bet, balanceAfter: deductRes.balanceAfter };
+  },
+
+  settleMatchBets(courtId, winningTeam, matchId = '') {
+    const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+    const allBets = this.getLocalBets();
+    const wonBets = [];
+    const lostBets = [];
+
+    allBets.forEach(bet => {
+      if (bet.courtId === courtId && bet.status === 'pending') {
+        bet.matchId = matchId || bet.matchId || '';
+        if (bet.predictedTeam === winningTeam) {
+          bet.status = 'won';
+          wonBets.push(bet);
+          // Cộng tiền thưởng (hoàn cược + tiền thắng)
+          this.addCoins(
+            bet.memberId,
+            bet.potentialPayout,
+            'bet_win',
+            `Thắng cược trận ${courtName}: +${bet.potentialPayout} Xu (Tỷ lệ ${bet.odds}x)`
+          );
+        } else {
+          bet.status = 'lost';
+          lostBets.push(bet);
+        }
+
+        if (supabaseService.isConfigured()) {
+          supabaseService.updateBet(bet.id, { status: bet.status, matchId: bet.matchId });
+        }
+      }
+    });
+
+    this.saveLocalBets(allBets);
+    return { wonBets, lostBets };
+  },
+
+  refundMatchBets(courtId, reason = 'Trận đấu bị hủy hoặc làm lại') {
+    const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+    const allBets = this.getLocalBets();
+    const refundedBets = [];
+
+    allBets.forEach(bet => {
+      if (bet.courtId === courtId && bet.status === 'pending') {
+        bet.status = 'refunded';
+        refundedBets.push(bet);
+        // Hoàn trả 100% xu đã cược
+        this.addCoins(
+          bet.memberId,
+          bet.amount,
+          'bet_refund',
+          `Hoàn cược ${courtName} (+${bet.amount} Xu): ${reason}`
+        );
+
+        if (supabaseService.isConfigured()) {
+          supabaseService.updateBet(bet.id, { status: 'refunded' });
+        }
+      }
+    });
+
+    this.saveLocalBets(allBets);
+    return refundedBets;
   }
 };

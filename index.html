@@ -244,6 +244,11 @@
               </div>
             </div>
 
+            <!-- ================= GIAI ĐOẠN 2: DỰ ĐOÁN & CƯỢC VUI BẰNG XU CLB ================= -->
+            <div id="live-betting-card" class="live-betting-card">
+              <!-- Injected dynamically via renderBettingWidget() in app.js -->
+            </div>
+
             <!-- Nút Lưu Kết Quả Trận Đấu -->
             <button id="btn-finish-match" class="btn-primary" style="background: linear-gradient(135deg, #22c55e 0%, #16a34a 100%); color: #fff;">
               <span>🏆</span> XÁC NHẬN KẾT QUẢ & CẬP NHẬT RANK
@@ -932,6 +937,44 @@
         <div style="margin-top: 20px; text-align: center; border-top: 1px solid var(--border-glass); padding-top: 14px;">
           <button class="btn-text-coral" onclick="window.appLogout()" style="font-size: 0.85rem; font-weight: 700; background: none; border: none; cursor: pointer; color: var(--coral);">
             🚪 Đăng Xuất Khỏi Thiết Bị Này
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 12: Bảng Kèo Trận Đấu - Xem Ai Đang Cược Ai (Giai đoạn 2) -->
+  <div id="modal-court-bets" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 500px;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>🎯</span> Bảng Dự Đoán Trận Đấu
+        </h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 8px;">
+        <div id="modal-court-bets-match-header" class="modal-bets-match-header">
+          <!-- Injected via JS: Match teams + score -->
+        </div>
+
+        <div class="modal-bets-columns">
+          <div class="modal-bets-col team1-col">
+            <div class="modal-bets-col-title" id="bets-modal-t1-title">Đội 1</div>
+            <div class="modal-bets-list" id="bets-modal-t1-list">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+          <div class="modal-bets-col team2-col">
+            <div class="modal-bets-col-title" id="bets-modal-t2-title">Đội 2</div>
+            <div class="modal-bets-list" id="bets-modal-t2-list">
+              <!-- Injected via JS -->
+            </div>
+          </div>
+        </div>
+
+        <div style="margin-top: 14px; text-align: center;">
+          <button class="btn-secondary btn-close-modal" style="width: 100%; justify-content: center;">
+            Đóng
           </button>
         </div>
       </div>

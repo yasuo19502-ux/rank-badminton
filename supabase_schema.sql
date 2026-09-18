@@ -251,6 +251,30 @@ create policy "coin_tx_all_access" on public.coin_transactions for all using (tr
 alter table public.coin_transactions replica identity full;
 
 -- ====================================================================
+-- 8. BẢNG DỰ ĐOÁN & CƯỢC VUI TRẬN ĐẤU (BETS - GIAI ĐOẠN 2)
+-- Quản lý vé cược vui bằng xu của thành viên cho các trận đấu đang diễn ra
+-- ====================================================================
+create table if not exists public.bets (
+    id text primary key,
+    court_id text not null,                -- 'court_1' hoặc 'court_2'
+    match_id text,                         -- ID trận đấu
+    member_id text not null references public.members(id) on delete cascade,
+    predicted_team text not null check (predicted_team in ('team1', 'team2')),
+    amount integer not null check (amount in (10, 20, 30)),
+    odds numeric(4,2) not null check (odds >= 1.20 and odds <= 3.00),
+    potential_payout integer not null,     -- Số xu nhận về nếu đoán đúng = round(amount * odds)
+    status text not null default 'pending' check (status in ('pending', 'won', 'lost', 'refunded')),
+    created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+create index if not exists idx_bets_court_status on public.bets (court_id, status);
+create index if not exists idx_bets_member on public.bets (member_id);
+alter table public.bets enable row level security;
+drop policy if exists "bets_all_access" on public.bets;
+create policy "bets_all_access" on public.bets for all using (true) with check (true);
+alter table public.bets replica identity full;
+
+-- ====================================================================
 -- BẬT SUPABASE REALTIME (TỰ ĐỘNG PHÁT SỰ KIỆN TỚI MỌI TRÌNH DUYỆT WEB)
 -- ====================================================================
 begin;
@@ -265,12 +289,14 @@ alter publication supabase_realtime add table public.attendance;
 alter publication supabase_realtime add table public.live_court;
 alter publication supabase_realtime add table public.club_settings;
 alter publication supabase_realtime add table public.coin_transactions;
+alter publication supabase_realtime add table public.bets;
 
 -- ====================================================================
 -- SCRIPT NÂNG CẤP NHANH CHO DATABASE ĐÃ CÓ TỪ TRƯỚC (CHẠY TRONG SQL EDITOR)
 -- ====================================================================
 /*
 -- Copy đoạn dưới đây dán vào Supabase SQL Editor nếu bạn đang chạy database cũ:
+-- 1. Nâng cấp Giai đoạn 1:
 alter table public.members add column if not exists pin_code text default '';
 alter table public.members add column if not exists coins integer default 100 check (coins >= 0);
 alter table public.members add column if not exists role text default 'member' check (role in ('admin', 'member'));
@@ -289,6 +315,28 @@ alter table public.coin_transactions enable row level security;
 drop policy if exists "coin_tx_all_access" on public.coin_transactions;
 create policy "coin_tx_all_access" on public.coin_transactions for all using (true) with check (true);
 alter table public.coin_transactions replica identity full;
+
+-- 2. Nâng cấp Giai đoạn 2 (Dự đoán & Cược vui):
+create table if not exists public.bets (
+    id text primary key,
+    court_id text not null,
+    match_id text,
+    member_id text not null references public.members(id) on delete cascade,
+    predicted_team text not null check (predicted_team in ('team1', 'team2')),
+    amount integer not null check (amount in (10, 20, 30)),
+    odds numeric(4,2) not null check (odds >= 1.20 and odds <= 3.00),
+    potential_payout integer not null,
+    status text not null default 'pending' check (status in ('pending', 'won', 'lost', 'refunded')),
+    created_at timestamp with time zone default timezone('utc'::text, now())
+);
+create index if not exists idx_bets_court_status on public.bets (court_id, status);
+create index if not exists idx_bets_member on public.bets (member_id);
+alter table public.bets enable row level security;
+drop policy if exists "bets_all_access" on public.bets;
+create policy "bets_all_access" on public.bets for all using (true) with check (true);
+alter table public.bets replica identity full;
+
 alter publication supabase_realtime add table public.coin_transactions;
+alter publication supabase_realtime add table public.bets;
 */
 
