@@ -345,8 +345,9 @@ export const StorageService = {
       delta2 = Number(matchToDelete.deltaTeam2);
     } else {
       const eloChange = Number(matchToDelete.eloChange) || 16;
-      delta1 = team1Won ? eloChange : -eloChange;
-      delta2 = -delta1;
+      const lossPenalty = Math.max(1, Math.round(eloChange * 0.8));
+      delta1 = team1Won ? eloChange : -lossPenalty;
+      delta2 = team1Won ? -lossPenalty : eloChange;
     }
 
     // Hoàn trả thông số cho Team 1

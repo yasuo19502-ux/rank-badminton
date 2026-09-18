@@ -123,20 +123,33 @@ export function calculateDoublesElo(team1Players, team2Players, score1, score2) 
   const k1 = getTeamK(team1Players);
   const k2 = getTeamK(team2Players);
 
-  // Lượng điểm thay đổi
-  let deltaTeam1 = Math.round(k1 * (actual1 - expected1) * marginMultiplier);
+  // Lượng điểm thay đổi cơ bản
+  let deltaTeam1 = 0;
+  let deltaTeam2 = 0;
 
-  // Giới hạn biên độ cân bằng thể thao:
-  // - Trần tối đa: Tránh trận bất thường gây biến động quá mức (max ~30 cho người cũ, ~45 cho người mới)
-  // - Sàn tối thiểu: Đảm bảo thắng luôn được ít nhất +5 điểm để khích lệ người chơi
-  const maxDelta = Math.round(Math.max(k1, k2) * 1.2);
-  if (deltaTeam1 > maxDelta) deltaTeam1 = maxDelta;
-  if (deltaTeam1 < -maxDelta) deltaTeam1 = -maxDelta;
+  if (actual1 === 1) {
+    // Đội 1 thắng
+    let winDelta = Math.round(k1 * (1 - expected1) * marginMultiplier);
+    const maxDelta = Math.round(k1 * 1.2);
+    if (winDelta > maxDelta) winDelta = maxDelta;
+    if (winDelta < 5) winDelta = 5;
 
-  if (actual1 === 1 && deltaTeam1 < 5) deltaTeam1 = 5;
-  if (actual1 === 0 && deltaTeam1 > -5) deltaTeam1 = -5;
+    deltaTeam1 = winDelta;
+    // Đội 2 thua: Giảm 20% mức phạt so với thắng (chỉ trừ 80%), làm tròn số nguyên không có số thập phân
+    const lossPenalty = Math.max(1, Math.round(winDelta * 0.8));
+    deltaTeam2 = -lossPenalty;
+  } else {
+    // Đội 2 thắng
+    let winDelta = Math.round(k2 * (1 - expected2) * marginMultiplier);
+    const maxDelta = Math.round(k2 * 1.2);
+    if (winDelta > maxDelta) winDelta = maxDelta;
+    if (winDelta < 5) winDelta = 5;
 
-  const deltaTeam2 = -deltaTeam1;
+    deltaTeam2 = winDelta;
+    // Đội 1 thua: Giảm 20% mức phạt so với thắng (chỉ trừ 80%), làm tròn số nguyên không có số thập phân
+    const lossPenalty = Math.max(1, Math.round(winDelta * 0.8));
+    deltaTeam1 = -lossPenalty;
+  }
 
   return {
     team1Elo: Math.round(elo1),
@@ -331,6 +344,16 @@ export function getPlayerDetailedStats(memberId, members, matches = []) {
         if (isWin) partnerStats[partnerId].won++;
       }
 
+      let myEloDelta;
+      if (inTeam1 && m.deltaTeam1 !== undefined) {
+        myEloDelta = Number(m.deltaTeam1);
+      } else if (inTeam2 && m.deltaTeam2 !== undefined) {
+        myEloDelta = Number(m.deltaTeam2);
+      } else {
+        const baseChange = Number(m.eloChange) || 16;
+        myEloDelta = isWin ? baseChange : -Math.max(1, Math.round(baseChange * 0.8));
+      }
+
       personalMatches.push({
         id: m.id,
         timestamp: m.timestamp,
@@ -340,7 +363,7 @@ export function getPlayerDetailedStats(memberId, members, matches = []) {
         opponents: oppTeam.map(id => memberMap.get(id)).filter(Boolean),
         myScore,
         oppScore,
-        eloDelta: isWin ? +(m.eloChange || 16) : -(m.eloChange || 16),
+        eloDelta: myEloDelta,
         isDeuce: m.isDeuce
       });
     }

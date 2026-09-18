@@ -1229,7 +1229,7 @@ function finishMatch() {
     score2: state.score2,
     deltaTeam1: result.deltaTeam1,
     deltaTeam2: result.deltaTeam2,
-    eloChange: Math.abs(result.deltaTeam1),
+    eloChange: team1Won ? result.deltaTeam1 : result.deltaTeam2,
     isDeuce: result.isDeuce
   });
 
@@ -1754,7 +1754,9 @@ function renderHistory() {
           <div style="font-weight: 800; color: var(--cyan); margin-bottom: 2px;">🏸 ${m.courtNumber || 'Sân 1'}</div>
           <div>${dateStr}</div>
           <div style="color: var(--volt); font-weight: 700; margin-top: 2px;">
-            ±${m.eloChange || 16} Elo ${m.isDeuce ? '• Deuce' : ''}
+            ${m.deltaTeam1 !== undefined && m.deltaTeam2 !== undefined
+              ? (team1Won ? `+${m.deltaTeam1} / ${m.deltaTeam2}` : `+${m.deltaTeam2} / ${m.deltaTeam1}`)
+              : `±${m.eloChange || 16}`} Elo ${m.isDeuce ? '• Deuce' : ''}
           </div>
           <button onclick="window.appDeleteMatch('${m.id}')" style="background: none; border: none; color: var(--coral); cursor: pointer; font-size: 0.75rem; margin-top: 4px;">
             Hoàn tác trận
