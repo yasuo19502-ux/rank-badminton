@@ -49,6 +49,11 @@
 
       <!-- Header Quick Actions -->
       <div class="header-actions">
+        <!-- 0. Widget Người Dùng & Ví Xu (Giai đoạn 1) -->
+        <div id="header-user-container" class="header-user-container">
+          <!-- Render tự động: nút đăng nhập hoặc avatar + xu -->
+        </div>
+
         <!-- 1. Nút Quỹ Cầu Lông MoMo / VietQR -->
         <button id="btn-open-club-fund" class="btn-fund-chip" title="Góp Quỹ Sân & Cầu MoMo">
           <span class="fund-chip-icon">💰</span>
@@ -491,10 +496,21 @@
           </div>
 
           <div class="form-group">
-            <label class="form-label">Điểm Elo Khởi Điểm</label>
-            <input type="number" id="field-member-elo" class="form-input" value="1000" min="500" max="2500">
+            <label class="form-label">Mã PIN Đăng Nhập (4 Số Bảo Mật) *</label>
+            <input type="password" id="field-member-pin" class="form-input" placeholder="Ví dụ: 1234" maxlength="4" pattern="[0-9]{4}" inputmode="numeric">
             <div style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
+              Dùng để đăng nhập nhanh và bảo vệ ví xu của bạn (4 chữ số). Mặc định là <strong>1234</strong> nếu để trống.
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label class="form-label" id="label-member-elo">Điểm Elo Khởi Điểm</label>
+            <input type="number" id="field-member-elo" class="form-input" value="1000" min="500" max="2500">
+            <div id="member-elo-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 4px;">
               Mặc định: 1000 Elo (Bậc Chặt Cầu Phủi)
+            </div>
+            <div id="member-elo-locked-msg" style="display: none; font-size: 0.78rem; color: var(--amber); margin-top: 6px; font-weight: 600; line-height: 1.4;">
+              🔒 Bạn đã thi đấu <span id="member-locked-matches-count">0</span> trận. Điểm Elo do hệ thống tự động cập nhật theo kết quả thi đấu, không thể tự sửa.
             </div>
           </div>
         </div>
@@ -813,6 +829,111 @@
       </div>
       <div class="modal-footer" style="justify-content: center;">
         <button type="button" class="btn-primary btn-close-modal" style="width: 100%; font-size: 0.95rem;">Đã Hiểu & Đóng</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 10: Đăng Nhập Bằng Mã PIN 4 Số (Giai đoạn 1) -->
+  <div id="modal-auth-pin" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 440px;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>🔑</span> Đăng Nhập Thành Viên
+        </h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 10px;">
+        <p style="font-size: 0.85rem; color: var(--text-muted); margin-bottom: 16px; line-height: 1.5;">
+          Chọn tài khoản của bạn để vào app, điểm danh nhận xu, quản lý ví xu cá nhân và chỉnh sửa hồ sơ.
+        </p>
+
+        <div class="form-group">
+          <label class="form-label">Chọn Tên Bạn Trong CLB</label>
+          <select id="select-auth-member" class="form-select" style="font-size: 0.95rem; font-weight: 700;">
+            <!-- Render danh sách thành viên -->
+          </select>
+        </div>
+
+        <div class="form-group" style="margin-top: 16px;">
+          <label class="form-label" style="display: flex; justify-content: space-between;">
+            <span>Mã PIN 4 Số</span>
+            <span id="auth-pin-status-tag" style="font-size: 0.72rem; color: var(--cyan);">Tài khoản bảo mật</span>
+          </label>
+          <input type="password" id="input-auth-pin" class="form-input" maxlength="4" pattern="[0-9]{4}" inputmode="numeric" placeholder="••••" style="font-size: 1.5rem; letter-spacing: 12px; text-align: center; font-weight: 800; padding: 10px;">
+          <div id="auth-pin-hint" style="font-size: 0.75rem; color: var(--text-muted); margin-top: 6px; text-align: center;">
+            Nếu chưa từng đặt PIN, hãy nhập 4 số bất kỳ để đặt mã PIN mới cho tài khoản.
+          </div>
+        </div>
+
+        <div style="margin-top: 22px;">
+          <button id="btn-submit-auth-pin" class="btn btn-primary" style="width: 100%; justify-content: center; font-size: 1rem; padding: 12px; font-weight: 800;">
+            Vào Tài Khoản 🚀
+          </button>
+        </div>
+
+        <div style="text-align: center; margin-top: 18px; border-top: 1px dashed var(--border-glass); padding-top: 14px;">
+          <span style="font-size: 0.82rem; color: var(--text-muted);">Bạn là thành viên mới chưa có tên?</span>
+          <br>
+          <button type="button" class="btn-text-cyan" onclick="window.appOpenRegisterNewMember()" style="margin-top: 6px; font-weight: 800; font-size: 0.9rem; background: none; border: none; cursor: pointer; color: var(--cyan);">
+            ➕ Đăng Ký Thành Viên Mới
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 11: Ví Xu & Hồ Sơ Cá Nhân (Giai đoạn 1) -->
+  <div id="modal-user-wallet" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 480px;">
+      <div class="modal-header">
+        <h3 style="display: flex; align-items: center; gap: 8px;">
+          <span>🪙</span> Ví Xu & Cá Nhân
+        </h3>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 8px;">
+        <!-- Card tổng quan User -->
+        <div class="wallet-user-card">
+          <img id="wallet-user-avatar" class="wallet-user-avatar" src="" alt="Avatar">
+          <div style="flex: 1; min-width: 0;">
+            <div id="wallet-user-name" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tên bạn</div>
+            <div id="wallet-user-tier" style="font-size: 0.8rem; color: var(--cyan); font-weight: 600; margin-top: 2px;">⚡ Bậc Rank</div>
+          </div>
+          <button class="btn-mini-action" onclick="window.appEditMyProfile()" title="Chỉnh sửa thông tin của tôi" style="background: rgba(255,255,255,0.08); font-size: 0.82rem; padding: 6px 12px; border-radius: 8px; border: 1px solid var(--border-glass); font-weight: 700; color: var(--text-primary); cursor: pointer;">
+            ✎ Sửa Hồ Sơ
+          </button>
+        </div>
+
+        <!-- Số dư Xu to nổi bật -->
+        <div class="wallet-balance-box">
+          <div style="font-size: 0.78rem; color: var(--text-muted); text-transform: uppercase; letter-spacing: 1px; font-weight: 700;">
+            Số Dư Xu Hiện Có
+          </div>
+          <div class="wallet-balance-val">
+            🪙 <span id="wallet-coins-amount">100</span> <span style="font-size: 1.1rem; font-weight: 700; color: var(--volt);">Xu</span>
+          </div>
+          <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
+            Dùng để mua vật phẩm, cược trận đấu vui và đổi quà CLB
+          </div>
+        </div>
+
+        <!-- Tiêu đề Sổ cái giao dịch -->
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 20px; margin-bottom: 10px;">
+          <h4 style="font-size: 0.92rem; font-weight: 800; margin: 0; color: var(--text-primary);">📜 Lịch Sử Biến Động Xu</h4>
+          <span style="font-size: 0.72rem; color: var(--text-muted);">Sổ cái minh bạch</span>
+        </div>
+
+        <!-- Danh sách giao dịch -->
+        <div id="wallet-tx-list" class="wallet-tx-list">
+          <!-- Render danh sách giao dịch -->
+        </div>
+
+        <!-- Nút Đăng Xuất -->
+        <div style="margin-top: 20px; text-align: center; border-top: 1px solid var(--border-glass); padding-top: 14px;">
+          <button class="btn-text-coral" onclick="window.appLogout()" style="font-size: 0.85rem; font-weight: 700; background: none; border: none; cursor: pointer; color: var(--coral);">
+            🚪 Đăng Xuất Khỏi Thiết Bị Này
+          </button>
+        </div>
       </div>
     </div>
   </div>

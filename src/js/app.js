@@ -65,7 +65,8 @@ const state = {
   calendarViewMode: 'grid', // 'grid' | 'list'
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(), // 0 - 11
-  calendarSelectedDate: getLocalDateStr()
+  calendarSelectedDate: getLocalDateStr(),
+  currentUser: null
 };
 
 // Khởi chạy khi DOM sẵn sàng
@@ -77,6 +78,8 @@ function initApp() {
   initTheme();
   setupEventListeners();
   loadInitialState();
+  state.currentUser = StorageService.getCurrentUser();
+  renderUserAuthHeader();
   const urlTab = new URLSearchParams(window.location.search).get('tab') || window.location.hash.replace('#', '');
   if (['court', 'sessions', 'leaderboard', 'attendance', 'members', 'history'].includes(urlTab)) {
     switchTab(urlTab);
@@ -413,6 +416,22 @@ function setupEventListeners() {
   const formMember = document.getElementById('form-member');
   if (formMember) {
     formMember.addEventListener('submit', handleMemberFormSubmit);
+  }
+
+  // Xử lý Đăng nhập bằng mã PIN
+  const btnSubmitAuthPin = document.getElementById('btn-submit-auth-pin');
+  if (btnSubmitAuthPin) {
+    btnSubmitAuthPin.addEventListener('click', () => window.appSubmitAuthPin());
+  }
+
+  const inputAuthPin = document.getElementById('input-auth-pin');
+  if (inputAuthPin) {
+    inputAuthPin.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        window.appSubmitAuthPin();
+      }
+    });
   }
 
   // Mở Modal Thêm Buổi Đánh
@@ -1237,6 +1256,20 @@ function finishMatch() {
   const allIds = [...team1.map(p => p.id), ...team2.map(p => p.id)];
   StorageService.recordGamePlayedToday(allIds);
 
+  // Thưởng xu thi đấu (Giai đoạn 1): Thắng +20 Xu, Thua +5 Xu
+  const winningTeam = team1Won ? team1 : team2;
+  const losingTeam = team1Won ? team2 : team1;
+  winningTeam.forEach(p => {
+    StorageService.addCoins(p.id, 20, 'match_win', `Thắng trận ${activeCourt} (${state.score1}-${state.score2})`);
+  });
+  losingTeam.forEach(p => {
+    StorageService.addCoins(p.id, 5, 'match_loss', `Hoàn thành trận ${activeCourt} (${state.score1}-${state.score2})`);
+  });
+  if (state.currentUser) {
+    state.currentUser = StorageService.getCurrentUser();
+    renderUserAuthHeader();
+  }
+
   // Hiệu ứng ăn mừng: Kèn fanfare + pháo giấy
   SoundService.playFanfare();
   confetti({
@@ -1434,10 +1467,35 @@ function renderAttendance() {
 
 // Global hook để gọi từ HTML onclick
 window.appToggleAttendance = function(memberId) {
+  // QUY TẮC: Chỉ buổi đánh CÓ LỊCH TRÊN APP mới được điểm danh
+  if (!StorageService.hasScheduledSessionToday()) {
+    showToast('⛔ Hôm nay CLB không có lịch đánh nào được tạo trên app! Vui lòng tạo lịch trong tab Lịch Sân trước khi điểm danh.', 'error');
+    return;
+  }
+
+  const attendanceBefore = StorageService.getAttendance();
+  const wasPresent = attendanceBefore.presentIds?.includes(memberId);
+
   StorageService.toggleAttendance(memberId);
   SoundService.playClick();
   renderAttendance();
   updateSessionStatusBadge();
+
+  // Thưởng xu điểm danh buổi đánh: +50 Xu (mỗi người 1 lần / ngày có lịch)
+  if (!wasPresent) {
+    const todayStr = getLocalDateStr();
+    const existingTxs = StorageService.getCoinTransactions(memberId);
+    const alreadyRewarded = existingTxs.some(t => t.type === 'session_checkin' && t.createdAt?.startsWith(todayStr));
+    if (!alreadyRewarded) {
+      StorageService.addCoins(memberId, 50, 'session_checkin', `Điểm danh buổi đánh ngày ${todayStr}`);
+      const mem = StorageService.getMemberById(memberId);
+      showToast(`✅ ${mem ? mem.name : 'Thành viên'} đã có mặt tại sân! (+50 Xu)`);
+      if (state.currentUser && state.currentUser.id === memberId) {
+        state.currentUser = StorageService.getCurrentUser();
+        renderUserAuthHeader();
+      }
+    }
+  }
 };
 
 /**
@@ -1531,21 +1589,48 @@ function renderMembers() {
     const tier = getTierByElo(m.elo);
     const avatarUrl = getAvatarUrl(m);
     const winRate = m.matchesPlayed > 0 ? Math.round((m.wins / m.matchesPlayed) * 100) : 0;
+    const isMe = state.currentUser && state.currentUser.id === m.id;
+    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+
+    let actionsHtml = '';
+    if (isMe) {
+      actionsHtml = `
+        <div class="card-top-actions">
+          <button class="btn-mini-action" onclick="window.appEditMember('${m.id}')" title="Chỉnh sửa thông tin của tôi" style="background: rgba(6,182,212,0.15); color: var(--cyan); border-color: rgba(6,182,212,0.4); font-size: 0.76rem; font-weight: 700; padding: 3px 8px; width: auto; border-radius: 6px;">
+            ✎ Sửa của tôi
+          </button>
+        </div>
+      `;
+    } else if (isAdmin) {
+      actionsHtml = `
+        <div class="card-top-actions">
+          <button class="btn-mini-action" onclick="window.appEditMember('${m.id}')" title="Quản trị: Sửa thành viên">✎</button>
+          <button class="btn-mini-action btn-mini-danger" onclick="window.appDeleteMember('${m.id}')" title="Quản trị: Xóa thành viên">✕</button>
+        </div>
+      `;
+    } else {
+      actionsHtml = `
+        <div class="card-top-actions">
+          <span style="font-size: 0.76rem; color: #f59e0b; font-weight: 700; background: rgba(245,158,11,0.1); padding: 2px 7px; border-radius: 9999px; border: 1px solid rgba(245,158,11,0.25);">
+            🪙 ${m.coins !== undefined ? m.coins : 100}
+          </span>
+        </div>
+      `;
+    }
 
     return `
-      <div class="member-management-card">
-        <div class="card-top-actions">
-          <button class="btn-mini-action" onclick="window.appEditMember('${m.id}')" title="Sửa thông tin">✎</button>
-          <button class="btn-mini-action btn-mini-danger" onclick="window.appDeleteMember('${m.id}')" title="Xóa thành viên">✕</button>
-        </div>
+      <div class="member-management-card" style="${isMe ? 'border-color: var(--cyan); box-shadow: 0 0 0 1.5px rgba(6,182,212,0.3);' : ''}">
+        ${actionsHtml}
 
         <div class="member-card-profile" onclick="window.appViewPlayerProfile('${m.id}')" style="cursor: pointer;" title="Bấm để xem hồ sơ chi tiết">
-          <div class="member-card-avatar-wrap" onclick="event.stopPropagation(); window.appTriggerAvatarUpload('${m.id}')" title="Bấm để đổi ảnh đại diện">
+          <div class="member-card-avatar-wrap" onclick="event.stopPropagation(); ${isMe || isAdmin ? `window.appTriggerAvatarUpload('${m.id}')` : `window.appViewPlayerProfile('${m.id}')`}" title="${isMe || isAdmin ? 'Bấm để đổi ảnh đại diện' : 'Xem hồ sơ'}">
             <img class="member-card-avatar" src="${avatarUrl}" alt="${m.name}" onerror="this.src='${generateDefaultAvatar(m.name, m.gender)}'">
-            <div class="camera-overlay-badge">📷</div>
+            ${isMe || isAdmin ? `<div class="camera-overlay-badge">📷</div>` : ''}
           </div>
           <div style="min-width: 0; flex: 1;">
-            <div style="font-weight: 800; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${m.name}</div>
+            <div style="font-weight: 800; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
+              ${m.name} ${isMe ? '<span style="font-size: 0.7rem; color: var(--cyan); background: rgba(6,182,212,0.12); padding: 1px 6px; border-radius: 4px; margin-left: 4px;">Tôi</span>' : ''}
+            </div>
             <div style="font-size: 0.78rem; color: var(--text-muted);">${m.nickname || 'Chưa có biệt danh'}</div>
             <div style="margin-top: 4px;">
               <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
@@ -1589,13 +1674,24 @@ window.appSwitchTab = function(tabName) {
   switchTab(tabName);
 };
 
-// Global hook để Sửa Thành Viên
+// Global hook để Sửa Thành Viên (Chỉ sửa được của chính mình hoặc nếu là admin)
 window.appEditMember = function(memberId) {
+  const isMe = state.currentUser && state.currentUser.id === memberId;
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  if (!isMe && !isAdmin) {
+    showToast('⛔ Bạn chỉ có thể chỉnh sửa thông tin của chính bản thân!', 'error');
+    return;
+  }
   openMemberModal(memberId);
 };
 
-// Global hook để Xóa Thành Viên
+// Global hook để Xóa Thành Viên (Chỉ Admin mới có quyền xóa)
 window.appDeleteMember = function(memberId) {
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  if (!isAdmin) {
+    showToast('⛔ Chỉ Quản trị viên (Admin) mới có quyền xóa thành viên!', 'error');
+    return;
+  }
   const mem = StorageService.getMemberById(memberId);
   if (!mem) return;
   if (confirm(`Bạn có chắc muốn xóa thành viên "${mem.name}" khỏi CLB Thái Thịnh?`)) {
@@ -1610,6 +1706,12 @@ window.appDeleteMember = function(memberId) {
 
 // Global hook để kích hoạt Upload Avatar nhanh cho thành viên
 window.appTriggerAvatarUpload = function(memberId) {
+  const isMe = state.currentUser && state.currentUser.id === memberId;
+  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  if (!isMe && !isAdmin) {
+    showToast('⛔ Bạn chỉ có thể đổi ảnh đại diện của chính mình!', 'error');
+    return;
+  }
   openMemberModal(memberId);
   setTimeout(() => {
     const fileInput = document.getElementById('input-avatar-file');
@@ -1628,7 +1730,11 @@ function openMemberModal(memberId = null) {
   const genderSelect = document.getElementById('field-member-gender');
   const freqSelect = document.getElementById('field-member-frequency');
   const eloInput = document.getElementById('field-member-elo');
+  const pinInput = document.getElementById('field-member-pin');
   const previewImg = document.getElementById('preview-avatar-img');
+  const eloLockedMsg = document.getElementById('member-elo-locked-msg');
+  const eloHint = document.getElementById('member-elo-hint');
+  const lockedMatchesCount = document.getElementById('member-locked-matches-count');
 
   if (memberId) {
     const mem = StorageService.getMemberById(memberId);
@@ -1638,8 +1744,26 @@ function openMemberModal(memberId = null) {
       if (nickInput) nickInput.value = mem.nickname || '';
       if (genderSelect) genderSelect.value = mem.gender || 'male';
       if (freqSelect) freqSelect.value = mem.frequency || 'regular';
-      if (eloInput) eloInput.value = mem.elo || 1000;
+      if (pinInput) pinInput.value = mem.pinCode || '';
       if (previewImg) previewImg.src = getAvatarUrl(mem);
+
+      // QUY TẮC ELO:
+      // Nếu đã thi đấu > 0 trận: KHÓA CHẶT ô điểm Elo, không cho sửa
+      // Nếu chưa thi đấu trận nào (0 trận): cho phép chỉnh sửa điểm khởi điểm
+      const matchesPlayed = Number(mem.matchesPlayed) || 0;
+      if (eloInput) {
+        eloInput.value = mem.elo || 1000;
+        if (matchesPlayed > 0) {
+          eloInput.disabled = true;
+          if (eloLockedMsg) eloLockedMsg.style.display = 'block';
+          if (lockedMatchesCount) lockedMatchesCount.textContent = matchesPlayed;
+          if (eloHint) eloHint.style.display = 'none';
+        } else {
+          eloInput.disabled = false;
+          if (eloLockedMsg) eloLockedMsg.style.display = 'none';
+          if (eloHint) eloHint.style.display = 'block';
+        }
+      }
     }
   } else {
     if (title) title.textContent = 'Thêm Thành Viên Mới';
@@ -1647,8 +1771,14 @@ function openMemberModal(memberId = null) {
     if (nickInput) nickInput.value = '';
     if (genderSelect) genderSelect.value = 'male';
     if (freqSelect) freqSelect.value = 'regular';
-    if (eloInput) eloInput.value = 1000;
+    if (pinInput) pinInput.value = '1234';
     if (previewImg) previewImg.src = generateDefaultAvatar('Mới', 'male');
+    if (eloInput) {
+      eloInput.value = 1000;
+      eloInput.disabled = false;
+      if (eloLockedMsg) eloLockedMsg.style.display = 'none';
+      if (eloHint) eloHint.style.display = 'block';
+    }
   }
 
   if (genderSelect) {
@@ -1670,6 +1800,8 @@ function handleMemberFormSubmit(e) {
   const gender = document.getElementById('field-member-gender').value;
   const frequency = document.getElementById('field-member-frequency').value;
   const elo = parseInt(document.getElementById('field-member-elo').value, 10) || 1000;
+  const pinInput = document.getElementById('field-member-pin');
+  const pinCode = pinInput ? pinInput.value.trim() : '';
 
   if (!name) {
     showToast('Vui lòng nhập họ và tên', 'error');
@@ -1677,11 +1809,26 @@ function handleMemberFormSubmit(e) {
   }
 
   if (state.editingMemberId) {
-    const updateData = { name, nickname, gender, frequency, elo };
+    const mem = StorageService.getMemberById(state.editingMemberId);
+    const matchesPlayed = Number(mem?.matchesPlayed) || 0;
+    // QUY TẮC ELO: Nếu đã có trận đấu, giữ nguyên Elo, không cho sửa
+    const finalElo = matchesPlayed > 0 ? (mem?.elo || 1000) : elo;
+    const updateData = {
+      name,
+      nickname,
+      gender,
+      frequency,
+      elo: finalElo,
+      pinCode: pinCode || mem?.pinCode || ''
+    };
     if (state.tempAvatarBase64) {
       updateData.avatar = state.tempAvatarBase64;
     }
     StorageService.updateMember(state.editingMemberId, updateData);
+    if (state.currentUser && state.currentUser.id === state.editingMemberId) {
+      state.currentUser = StorageService.getCurrentUser();
+      renderUserAuthHeader();
+    }
     showToast(`Đã cập nhật thông tin ${name}`);
   } else {
     const newMember = StorageService.addMember({
@@ -1690,11 +1837,22 @@ function handleMemberFormSubmit(e) {
       gender,
       frequency,
       elo,
+      pinCode: pinCode || '1234',
       avatar: state.tempAvatarBase64 || ''
     });
-    // Tự động thêm vào điểm danh hôm nay
-    StorageService.toggleAttendance(newMember.id);
-    showToast(`Đã thêm thành viên ${name}`);
+
+    // Nếu chưa đăng nhập ai thì tự động đăng nhập luôn thành viên mới
+    if (!state.currentUser) {
+      StorageService.setCurrentUser(newMember.id);
+      state.currentUser = StorageService.getCurrentUser();
+      renderUserAuthHeader();
+    }
+
+    // Tự động thêm vào điểm danh hôm nay NẾU CÓ LỊCH SÂN HỢP LỆ
+    if (StorageService.hasScheduledSessionToday()) {
+      StorageService.toggleAttendance(newMember.id);
+    }
+    showToast(`Đã thêm thành viên: ${name} (+100 Xu tân thủ)`);
   }
 
   closeAllModals();
@@ -2656,5 +2814,193 @@ window.appViewPlayerProfile = function(memberId) {
 
   modal.classList.add('open');
   SoundService.playClick();
+};
+
+// =========================================================================
+// 8. ĐỊNH DANH NGƯỜI DÙNG, MÃ PIN & VÍ XU (GIAI ĐOẠN 1)
+// =========================================================================
+
+function renderUserAuthHeader() {
+  const container = document.getElementById('header-user-container');
+  if (!container) return;
+
+  const currentUser = StorageService.getCurrentUser();
+  state.currentUser = currentUser;
+
+  if (currentUser) {
+    const avatarUrl = getAvatarUrl(currentUser);
+    const coins = currentUser.coins !== undefined ? currentUser.coins : 100;
+    container.innerHTML = `
+      <div id="header-user-widget" class="header-user-pill" onclick="window.appOpenUserWallet()" title="Xem ví xu & hồ sơ cá nhân">
+        <img class="header-user-avatar" src="${avatarUrl}" alt="${currentUser.name}" onerror="this.src='${generateDefaultAvatar(currentUser.name, currentUser.gender)}'">
+        <span class="header-user-name">${currentUser.name}</span>
+        <span class="header-coin-badge">🪙 <span id="header-user-coins">${coins}</span></span>
+      </div>
+    `;
+  } else {
+    container.innerHTML = `
+      <button class="btn-header-login" onclick="window.appOpenLoginModal()" title="Đăng nhập để nhận xu & quản lý hồ sơ">
+        🔑 Đăng Nhập
+      </button>
+    `;
+  }
+}
+
+window.appOpenLoginModal = function() {
+  const modal = document.getElementById('modal-auth-pin');
+  const select = document.getElementById('select-auth-member');
+  const inputPin = document.getElementById('input-auth-pin');
+  if (!modal || !select) return;
+
+  const members = StorageService.getMembers();
+  if (members.length === 0) {
+    showToast('Chưa có thành viên nào trong CLB! Hãy tạo thành viên mới trước.', 'error');
+    window.appOpenAddMember();
+    return;
+  }
+
+  select.innerHTML = members.map(m => `
+    <option value="${m.id}" ${state.currentUser?.id === m.id ? 'selected' : ''}>
+      ${m.name} ${m.nickname ? `(${m.nickname})` : ''} • Elo ${m.elo} ${m.pinCode ? '🔒' : '🆕 (Chưa đặt PIN)'}
+    </option>
+  `).join('');
+
+  const updatePinHint = () => {
+    const memId = select.value;
+    const mem = StorageService.getMemberById(memId);
+    const hint = document.getElementById('auth-pin-hint');
+    const tag = document.getElementById('auth-pin-status-tag');
+    if (mem && !mem.pinCode) {
+      if (hint) hint.innerHTML = '✨ <strong>Tài khoản mới:</strong> Hãy nhập 4 số bất kỳ để đặt mã PIN đăng nhập lần đầu.';
+      if (tag) { tag.textContent = 'Chưa đặt PIN'; tag.style.color = 'var(--volt)'; }
+    } else {
+      if (hint) hint.textContent = 'Nhập mã PIN 4 số của bạn để mở khóa tài khoản.';
+      if (tag) { tag.textContent = 'Đã bảo mật PIN'; tag.style.color = 'var(--cyan)'; }
+    }
+  };
+
+  select.onchange = updatePinHint;
+  updatePinHint();
+
+  if (inputPin) {
+    inputPin.value = '';
+    setTimeout(() => inputPin.focus(), 200);
+  }
+
+  modal.classList.add('open');
+};
+
+window.appSubmitAuthPin = function() {
+  const select = document.getElementById('select-auth-member');
+  const inputPin = document.getElementById('input-auth-pin');
+  if (!select || !inputPin) return;
+
+  const memberId = select.value;
+  const pin = inputPin.value.trim();
+
+  if (!pin || pin.length !== 4 || !/^\d{4}$/.test(pin)) {
+    showToast('Vui lòng nhập đúng 4 chữ số mã PIN!', 'error');
+    inputPin.focus();
+    return;
+  }
+
+  const result = StorageService.verifyPin(memberId, pin);
+  if (!result.success) {
+    showToast(result.message || 'Mã PIN không đúng!', 'error');
+    inputPin.value = '';
+    inputPin.focus();
+    return;
+  }
+
+  StorageService.setCurrentUser(memberId);
+  state.currentUser = StorageService.getCurrentUser();
+  closeAllModals();
+
+  if (result.isNewPin) {
+    showToast(`🎉 Đã thiết lập mã PIN và đăng nhập: ${state.currentUser.name}!`);
+  } else {
+    showToast(`👋 Chào mừng trở lại, ${state.currentUser.name}!`);
+  }
+
+  renderUserAuthHeader();
+  renderMembers();
+};
+
+window.appOpenUserWallet = function() {
+  const user = StorageService.getCurrentUser();
+  if (!user) {
+    window.appOpenLoginModal();
+    return;
+  }
+
+  const modal = document.getElementById('modal-user-wallet');
+  const avatar = document.getElementById('wallet-user-avatar');
+  const name = document.getElementById('wallet-user-name');
+  const tier = document.getElementById('wallet-user-tier');
+  const coins = document.getElementById('wallet-coins-amount');
+  const txList = document.getElementById('wallet-tx-list');
+
+  if (avatar) avatar.src = getAvatarUrl(user);
+  if (name) name.textContent = user.name;
+  if (tier) {
+    const t = getTierByElo(user.elo);
+    tier.innerHTML = `${t.icon} ${t.name} (Elo ${user.elo})`;
+  }
+  if (coins) coins.textContent = user.coins !== undefined ? user.coins : 100;
+
+  if (txList) {
+    const txs = StorageService.getCoinTransactions(user.id);
+    if (txs.length === 0) {
+      txList.innerHTML = `
+        <div style="text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 0.85rem;">
+          Chưa có giao dịch xu nào được ghi nhận.
+        </div>
+      `;
+    } else {
+      txList.innerHTML = txs.map(tx => {
+        const isPos = tx.amount > 0;
+        const dateStr = new Date(tx.createdAt || Date.now()).toLocaleDateString('vi-VN', {
+          day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
+        });
+        return `
+          <div class="wallet-tx-item">
+            <div style="min-width: 0; flex: 1; padding-right: 8px;">
+              <div class="wallet-tx-desc">${tx.description || 'Giao dịch xu'}</div>
+              <div class="wallet-tx-date">${dateStr} • Số dư sau: ${tx.balanceAfter} Xu</div>
+            </div>
+            <div class="${isPos ? 'tx-amount-pos' : 'tx-amount-neg'}">
+              ${isPos ? '+' : ''}${tx.amount} 🪙
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+  }
+
+  if (modal) modal.classList.add('open');
+};
+
+window.appLogout = function() {
+  StorageService.clearCurrentUser();
+  state.currentUser = null;
+  closeAllModals();
+  showToast('Đã đăng xuất tài khoản');
+  renderUserAuthHeader();
+  renderMembers();
+};
+
+window.appEditMyProfile = function() {
+  const user = StorageService.getCurrentUser();
+  if (!user) {
+    window.appOpenLoginModal();
+    return;
+  }
+  closeAllModals();
+  openMemberModal(user.id);
+};
+
+window.appOpenRegisterNewMember = function() {
+  closeAllModals();
+  openMemberModal(null);
 };
 

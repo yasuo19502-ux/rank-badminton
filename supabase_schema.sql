@@ -25,6 +25,9 @@ create table if not exists public.members (
     avatar text default '',
     phone text default '',
     joined_date text,
+    pin_code text default '',
+    coins integer default 100 check (coins >= 0),
+    role text default 'member' check (role in ('admin', 'member')),
     created_at timestamp with time zone default timezone('utc'::text, now()),
     updated_at timestamp with time zone default timezone('utc'::text, now())
 );
@@ -228,6 +231,26 @@ alter table public.live_court replica identity full;
 alter table public.club_settings replica identity full;
 
 -- ====================================================================
+-- 7. BẢNG SỔ CÁI GIAO DỊCH XU (COIN_TRANSACTIONS - GIAI ĐOẠN 1)
+-- Phân tách riêng: quản lý lịch sử biến động xu của từng thành viên
+-- ====================================================================
+create table if not exists public.coin_transactions (
+    id text primary key,
+    member_id text not null references public.members(id) on delete cascade,
+    amount integer not null,
+    balance_after integer not null check (balance_after >= 0),
+    type text not null, -- 'welcome', 'session_checkin', 'match_win', 'match_loss', 'admin_adjust', 'shop_purchase'
+    description text default '',
+    created_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+create index if not exists idx_coin_tx_member on public.coin_transactions (member_id, created_at desc);
+alter table public.coin_transactions enable row level security;
+drop policy if exists "coin_tx_all_access" on public.coin_transactions;
+create policy "coin_tx_all_access" on public.coin_transactions for all using (true) with check (true);
+alter table public.coin_transactions replica identity full;
+
+-- ====================================================================
 -- BẬT SUPABASE REALTIME (TỰ ĐỘNG PHÁT SỰ KIỆN TỚI MỌI TRÌNH DUYỆT WEB)
 -- ====================================================================
 begin;
@@ -241,8 +264,31 @@ alter publication supabase_realtime add table public.matches;
 alter publication supabase_realtime add table public.attendance;
 alter publication supabase_realtime add table public.live_court;
 alter publication supabase_realtime add table public.club_settings;
+alter publication supabase_realtime add table public.coin_transactions;
 
 -- ====================================================================
--- CƠ SỞ DỮ LIỆU SẠCH 100% (KHÔNG CÓ THÀNH VIÊN GIẢ MẠO)
--- Toàn bộ bảng bắt đầu rỗng để người dùng tự thêm thành viên thật của CLB!
+-- SCRIPT NÂNG CẤP NHANH CHO DATABASE ĐÃ CÓ TỪ TRƯỚC (CHẠY TRONG SQL EDITOR)
 -- ====================================================================
+/*
+-- Copy đoạn dưới đây dán vào Supabase SQL Editor nếu bạn đang chạy database cũ:
+alter table public.members add column if not exists pin_code text default '';
+alter table public.members add column if not exists coins integer default 100 check (coins >= 0);
+alter table public.members add column if not exists role text default 'member' check (role in ('admin', 'member'));
+
+create table if not exists public.coin_transactions (
+    id text primary key,
+    member_id text not null references public.members(id) on delete cascade,
+    amount integer not null,
+    balance_after integer not null check (balance_after >= 0),
+    type text not null,
+    description text default '',
+    created_at timestamp with time zone default timezone('utc'::text, now())
+);
+create index if not exists idx_coin_tx_member on public.coin_transactions (member_id, created_at desc);
+alter table public.coin_transactions enable row level security;
+drop policy if exists "coin_tx_all_access" on public.coin_transactions;
+create policy "coin_tx_all_access" on public.coin_transactions for all using (true) with check (true);
+alter table public.coin_transactions replica identity full;
+alter publication supabase_realtime add table public.coin_transactions;
+*/
+

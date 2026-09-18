@@ -11,7 +11,9 @@ const STORAGE_KEYS = {
   ATTENDANCE: 'cbb_thai_thinh_attendance_v2',
   ACTIVE_MATCH_1: 'cbb_thai_thinh_active_match_court_1',
   ACTIVE_MATCH_2: 'cbb_thai_thinh_active_match_court_2',
-  SETTINGS: 'cbb_thai_thinh_settings_v2'
+  SETTINGS: 'cbb_thai_thinh_settings_v2',
+  CURRENT_USER_ID: 'cbb_thai_thinh_current_user_id_v1',
+  COIN_TRANSACTIONS: 'cbb_thai_thinh_coin_transactions_v1'
 };
 
 // Dọn dẹp cache dữ liệu mẫu cũ nếu còn tồn tại trong trình duyệt
@@ -42,13 +44,14 @@ export const StorageService = {
 
     try {
       console.log('[Sync] Bắt đầu đồng bộ từ Supabase Cloud...');
-      const [cloudMembers, cloudMatches, cloudSessions, cloudSettings, liveCourt1, liveCourt2] = await Promise.all([
+      const [cloudMembers, cloudMatches, cloudSessions, cloudSettings, liveCourt1, liveCourt2, cloudCoinTx] = await Promise.all([
         supabaseService.fetchMembers(),
         supabaseService.fetchMatches(),
         supabaseService.fetchSessions(),
         supabaseService.fetchClubSettings(),
         supabaseService.fetchLiveCourt('court_1'),
-        supabaseService.fetchLiveCourt('court_2')
+        supabaseService.fetchLiveCourt('court_2'),
+        supabaseService.fetchCoinTransactions()
       ]);
 
       if (cloudMembers && cloudMembers.length > 0) {
@@ -62,6 +65,9 @@ export const StorageService = {
       }
       if (cloudSettings) {
         this.saveLocalSettings(cloudSettings);
+      }
+      if (cloudCoinTx && cloudCoinTx.length > 0) {
+        this.saveLocalCoinTransactions(cloudCoinTx);
       }
 
       const todayStr = getLocalDateStr();
@@ -114,11 +120,16 @@ export const StorageService = {
         const parsed = JSON.parse(data);
         // Lọc bỏ triệt để các ID mẫu mem_1 -> mem_16 nếu còn sót trong cache
         const cleaned = parsed.filter(m => !m.id || !m.id.match(/^mem_[0-9]{1,2}$/));
+        const normalized = cleaned.map(m => ({
+          ...m,
+          coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
+          role: m.role || 'member',
+          pinCode: m.pinCode || ''
+        }));
         if (cleaned.length !== parsed.length) {
-          this.saveLocalMembers(cleaned);
-          return cleaned;
+          this.saveLocalMembers(normalized);
         }
-        return parsed;
+        return normalized;
       }
     } catch (e) {}
     this.saveLocalMembers(INITIAL_MEMBERS);
@@ -145,6 +156,7 @@ export const StorageService = {
 
   addMember(memberData) {
     const members = this.getMembers();
+    const initialCoins = memberData.coins !== undefined ? Number(memberData.coins) : 100;
     const newMember = {
       id: 'mem_' + Date.now(),
       name: memberData.name.trim(),
@@ -157,10 +169,16 @@ export const StorageService = {
       losses: 0,
       streak: 0,
       avatar: memberData.avatar || '',
-      joinedDate: getLocalDateStr()
+      joinedDate: getLocalDateStr(),
+      pinCode: memberData.pinCode ? String(memberData.pinCode).trim() : '',
+      coins: initialCoins,
+      role: memberData.role || 'member'
     };
     members.push(newMember);
     this.saveLocalMembers(members);
+
+    // Ghi nhận giao dịch tặng xu tân thủ
+    this.recordCoinTx(newMember.id, initialCoins, initialCoins, 'welcome', 'Chào mừng gia nhập CLB Cầu Lông Thái Thịnh!');
 
     if (supabaseService.isConfigured()) {
       supabaseService.upsertMember(newMember);
@@ -622,6 +640,8 @@ export const StorageService = {
     localStorage.removeItem(STORAGE_KEYS.SESSIONS);
     localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
     localStorage.removeItem(STORAGE_KEYS.ACTIVE_MATCH);
+    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+    localStorage.removeItem(STORAGE_KEYS.COIN_TRANSACTIONS);
     this.saveLocalMembers([]);
     this.saveLocalMatches([]);
     this.saveLocalSessions([]);
@@ -631,5 +651,135 @@ export const StorageService = {
       gamesPlayedToday: {}
     });
     return [];
+  },
+
+  // --- QUẢN LÝ TÀI KHOẢN & PHIÊN ĐĂNG NHẬP (USER AUTH) ---
+  getCurrentUserId() {
+    try {
+      return localStorage.getItem(STORAGE_KEYS.CURRENT_USER_ID) || null;
+    } catch (e) {
+      return null;
+    }
+  },
+
+  getCurrentUser() {
+    const userId = this.getCurrentUserId();
+    if (!userId) return null;
+    return this.getMemberById(userId);
+  },
+
+  setCurrentUser(memberId) {
+    try {
+      if (memberId) {
+        localStorage.setItem(STORAGE_KEYS.CURRENT_USER_ID, memberId);
+      } else {
+        localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
+      }
+    } catch (e) {}
+  },
+
+  clearCurrentUser() {
+    this.setCurrentUser(null);
+  },
+
+  verifyPin(memberId, inputPin) {
+    const mem = this.getMemberById(memberId);
+    if (!mem) return { success: false, message: 'Không tìm thấy thành viên' };
+
+    const cleanInput = String(inputPin).trim();
+    // Nếu chưa từng đặt PIN, chấp nhận mã PIN người dùng vừa nhập và lưu làm PIN mới
+    if (!mem.pinCode) {
+      this.setUserPin(memberId, cleanInput);
+      return { success: true, isNewPin: true, member: mem };
+    }
+
+    if (String(mem.pinCode).trim() === cleanInput) {
+      return { success: true, isNewPin: false, member: mem };
+    }
+
+    return { success: false, message: 'Mã PIN 4 số không chính xác!' };
+  },
+
+  setUserPin(memberId, newPin) {
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (mem) {
+      mem.pinCode = String(newPin).trim();
+      this.saveMembers(members);
+      return true;
+    }
+    return false;
+  },
+
+  // --- QUẢN LÝ VÍ XU & GIAO DỊCH (COINS & WALLET) ---
+  getLocalCoinTransactions() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.COIN_TRANSACTIONS);
+      return data ? JSON.parse(data) : [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  saveLocalCoinTransactions(transactions) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.COIN_TRANSACTIONS, JSON.stringify(transactions));
+    } catch (e) {}
+  },
+
+  getCoinTransactions(memberId = null) {
+    const txs = this.getLocalCoinTransactions();
+    if (memberId) {
+      return txs.filter(t => t.memberId === memberId);
+    }
+    return txs;
+  },
+
+  recordCoinTx(memberId, amount, balanceAfter, type, description) {
+    const tx = {
+      id: 'tx_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+      memberId,
+      amount: Number(amount),
+      balanceAfter: Number(balanceAfter),
+      type: type || 'system',
+      description: description || '',
+      createdAt: new Date().toISOString()
+    };
+
+    const txs = this.getLocalCoinTransactions();
+    txs.unshift(tx);
+    this.saveLocalCoinTransactions(txs);
+
+    if (supabaseService.isConfigured()) {
+      supabaseService.insertCoinTransaction(tx);
+    }
+    return tx;
+  },
+
+  addCoins(memberId, amount, type, description) {
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (!mem) return null;
+
+    const currentCoins = Number(mem.coins !== undefined ? mem.coins : 100);
+    const balanceAfter = Math.max(0, currentCoins + Number(amount));
+    mem.coins = balanceAfter;
+    this.saveMembers(members);
+
+    const tx = this.recordCoinTx(memberId, amount, balanceAfter, type, description);
+    return { success: true, balanceAfter, transaction: tx };
+  },
+
+  // --- KIỂM TRA LỊCH BUỔI ĐÁNH HỢP LỆ (SESSION CHECK) ---
+  hasScheduledSessionToday(targetDate = null) {
+    const dateToCheck = targetDate || getLocalDateStr();
+    const sessions = this.getSessions();
+    return sessions.some(s => s.date === dateToCheck);
+  },
+
+  getScheduledSessionToday(targetDate = null) {
+    const dateToCheck = targetDate || getLocalDateStr();
+    const sessions = this.getSessions();
+    return sessions.find(s => s.date === dateToCheck) || null;
   }
 };

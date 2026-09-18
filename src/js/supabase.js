@@ -107,7 +107,10 @@ class SupabaseService {
         losses: m.losses || 0,
         streak: m.streak || 0,
         avatar: m.avatar || '',
-        joinedDate: m.joined_date || ''
+        joinedDate: m.joined_date || '',
+        pinCode: m.pin_code || '',
+        coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
+        role: m.role || 'member'
       }));
     } catch (err) {
       console.error('[Supabase] Lỗi fetchMembers:', err);
@@ -130,6 +133,9 @@ class SupabaseService {
         losses: member.losses || 0,
         streak: member.streak || 0,
         avatar: member.avatar || '',
+        pin_code: member.pinCode || '',
+        coins: member.coins !== undefined ? Number(member.coins) : 100,
+        role: member.role || 'member',
         joined_date: member.joinedDate || (() => {
           const d = new Date();
           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -137,9 +143,18 @@ class SupabaseService {
         updated_at: new Date().toISOString()
       };
 
-      const { error } = await this.client
+      let { error } = await this.client
         .from('members')
         .upsert(payload);
+
+      // Nếu database Supabase chưa chạy script thêm cột pin_code, coins, role
+      if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role'))) {
+        delete payload.pin_code;
+        delete payload.coins;
+        delete payload.role;
+        const res = await this.client.from('members').upsert(payload);
+        error = res.error;
+      }
 
       if (error) throw error;
       return true;
@@ -485,7 +500,61 @@ class SupabaseService {
     }
   }
 
-  // --- REALTIME SUBSCRIPTIONS (TỰ ĐỘNG ĐỒNG BỘ 6 BẢNG DỮ LIỆU) ---
+  // --- API GIAO DỊCH XU (COIN_TRANSACTIONS - GIAI ĐOẠN 1) ---
+  async fetchCoinTransactions(memberId = null) {
+    if (!this.isConfigured()) return null;
+    try {
+      let query = this.client
+        .from('coin_transactions')
+        .select('*')
+        .order('created_at', { ascending: false });
+
+      if (memberId) {
+        query = query.eq('member_id', memberId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data.map(tx => ({
+        id: tx.id,
+        memberId: tx.member_id,
+        amount: tx.amount,
+        balanceAfter: tx.balance_after,
+        type: tx.type,
+        description: tx.description || '',
+        createdAt: tx.created_at
+      }));
+    } catch (err) {
+      return null;
+    }
+  }
+
+  async insertCoinTransaction(tx) {
+    if (!this.isConfigured()) return false;
+    try {
+      const payload = {
+        id: tx.id,
+        member_id: tx.memberId,
+        amount: tx.amount,
+        balance_after: tx.balanceAfter,
+        type: tx.type,
+        description: tx.description || '',
+        created_at: tx.createdAt || new Date().toISOString()
+      };
+
+      const { error } = await this.client
+        .from('coin_transactions')
+        .insert(payload);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
+  // --- REALTIME SUBSCRIPTIONS (TỰ ĐỘNG ĐỒNG BỘ CÁC BẢNG DỮ LIỆU) ---
   subscribeToChanges(onChangeCallback) {
     if (!this.isConfigured()) return;
 
@@ -513,8 +582,11 @@ class SupabaseService {
       .on('postgres_changes', { event: '*', schema: 'public', table: 'club_settings' }, (payload) => {
         onChangeCallback('club_settings', payload);
       })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coin_transactions' }, (payload) => {
+        onChangeCallback('coin_transactions', payload);
+      })
       .subscribe((status) => {
-        console.log('[Supabase Realtime] Trạng thái kênh đồng bộ 6 bảng:', status);
+        console.log('[Supabase Realtime] Trạng thái kênh đồng bộ realtime:', status);
       });
   }
 }
