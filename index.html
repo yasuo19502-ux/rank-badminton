@@ -908,7 +908,7 @@
       <div class="modal-body" style="padding-top: 8px;">
         <!-- Card tổng quan User -->
         <div class="wallet-user-card">
-          <img id="wallet-user-avatar" class="wallet-user-avatar" src="" alt="Avatar">
+          <div id="wallet-user-avatar-container" style="flex-shrink: 0; display: flex; align-items: center; justify-content: center;"></div>
           <div style="flex: 1; min-width: 0;">
             <div id="wallet-user-name" style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">Tên bạn</div>
             <div id="wallet-user-tier" style="font-size: 0.8rem; color: var(--cyan); font-weight: 600; margin-top: 2px;">⚡ Bậc Rank</div>
@@ -1002,7 +1002,7 @@
             <span>🛒</span> Cửa Hàng
           </button>
           <button class="shop-tab-btn" id="btn-shop-tab-inventory" onclick="window.appSwitchShopTab('inventory')">
-            <span>🎒</span> Túi Đồ Của Tôi <span id="inventory-count-badge" class="badge-mini">0</span>
+            <span>🎒</span> Túi Đồ <span id="inventory-count-badge" class="badge-mini">0</span>
           </button>
           <button class="shop-tab-btn" id="btn-shop-tab-history" onclick="window.appSwitchShopTab('history')">
             <span>📜</span> Lịch Sử Xu
@@ -1019,9 +1019,9 @@
               🪙 <span id="shop-user-coins">100</span> <span style="font-size: 0.85rem; color: var(--volt);">Xu</span>
             </div>
           </div>
-          <button class="btn-mini-action" onclick="window.appSwitchShopTab('history')" style="font-size: 0.78rem;">
-            📜 Xem Lịch Sử Xu
-          </button>
+          <div style="font-size: 0.75rem; color: var(--text-dim); background: var(--bg-card); padding: 4px 10px; border-radius: 9999px; border: 1px solid var(--border-glass); white-space: nowrap;">
+            ✨ Tích lũy điểm danh & trận đấu
+          </div>
         </div>
 
         <!-- 1. TAB CỬA HÀNG (STORE) -->

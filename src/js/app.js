@@ -418,6 +418,24 @@ function setupEventListeners() {
     });
   });
 
+  // Đóng Modal khi click ra ngoài vùng backdrop (trừ khi đang quay spinner)
+  document.querySelectorAll('.modal-backdrop').forEach(backdrop => {
+    backdrop.addEventListener('click', (e) => {
+      if (e.target === backdrop) {
+        if (backdrop.id === 'modal-spinner' && state.isSpinning) return;
+        closeAllModals();
+      }
+    });
+  });
+
+  // Hỗ trợ đóng Modal nhanh bằng phím Escape
+  window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+      if (state.isSpinning) return;
+      closeAllModals();
+    }
+  });
+
   // Xử lý Form Thêm/Sửa Thành Viên
   const formMember = document.getElementById('form-member');
   if (formMember) {
@@ -1879,7 +1897,9 @@ function renderAttendance() {
     return `
       <div class="attendance-card ${isPresent ? 'present' : ''}" onclick="window.appToggleAttendance('${m.id}')">
         <div class="att-left">
-          <img class="att-avatar" src="${avatarUrl}" alt="${m.name}" onerror="this.src='${generateDefaultAvatar(m.name, m.gender)}'">
+          <div style="flex-shrink: 0;">
+            ${renderAvatarHtml(m, { size: 'sm' })}
+          </div>
           <div class="att-info">
             <div class="att-name">${m.name}</div>
             <div class="att-meta">
@@ -3290,7 +3310,7 @@ function renderUserAuthHeader() {
   } else {
     container.innerHTML = `
       <button class="btn-header-login" onclick="window.appOpenLoginModal()" title="Đăng nhập để nhận xu & quản lý hồ sơ">
-        🔑 Đăng Nhập
+        <span>🔑</span> <span class="login-text-full">Đăng Nhập</span><span class="login-text-short">ĐN</span>
       </button>
     `;
   }
@@ -3384,13 +3404,18 @@ window.appOpenUserWallet = function() {
   }
 
   const modal = document.getElementById('modal-user-wallet');
-  const avatar = document.getElementById('wallet-user-avatar');
+  const avatarContainer = document.getElementById('wallet-user-avatar-container');
+  const avatarImg = document.getElementById('wallet-user-avatar');
   const name = document.getElementById('wallet-user-name');
   const tier = document.getElementById('wallet-user-tier');
   const coins = document.getElementById('wallet-coins-amount');
   const txList = document.getElementById('wallet-tx-list');
 
-  if (avatar) avatar.src = getAvatarUrl(user);
+  if (avatarContainer) {
+    avatarContainer.innerHTML = renderAvatarHtml(user, { size: 'lg' });
+  } else if (avatarImg) {
+    avatarImg.src = getAvatarUrl(user);
+  }
   if (name) name.textContent = user.name;
   if (tier) {
     const t = getTierByElo(user.elo);

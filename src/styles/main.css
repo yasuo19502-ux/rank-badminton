@@ -42,8 +42,16 @@
 
   /* Typography Colors (Tương phản cao WCAG AAA trên nền sáng) */
   --text-main: #0f172a;       /* Deep Slate - rõ nét tuyệt đối */
+  --text-primary: #0f172a;
   --text-muted: #334155;      /* Slate 700 - không bị mờ nhạt */
+  --text-secondary: #334155;
   --text-dim: #64748b;        /* Slate 500 - phụ đề rõ ràng */
+
+  /* Extra Brand Colors */
+  --emerald: #10b981;
+  --emerald-dark: #059669;
+  --amber: #f59e0b;
+  --bg-surface-elevated: #ffffff;
 
   /* Mặt sân cầu lông thực tế */
   --court-green: #046a4e;
@@ -75,6 +83,7 @@
 [data-theme="dark"] {
   --bg-base: #090d16;
   --bg-surface: #0f172a;
+  --bg-surface-elevated: #1e293b;
   --bg-card: #131b2e;
   --bg-card-hover: #1e293b;
   --bg-glass: rgba(19, 27, 46, 0.85);
@@ -105,8 +114,14 @@
   --silver: #cbd5e1;
   --bronze: #f59e0b;
 
+  --emerald: #34d399;
+  --emerald-dark: #10b981;
+  --amber: #fbbf24;
+
   --text-main: #f8fafc;
+  --text-primary: #f8fafc;
   --text-muted: #cbd5e1;
+  --text-secondary: #94a3b8;
   --text-dim: #94a3b8;
 
   --court-green: #064e3b;
@@ -2176,6 +2191,10 @@ button {
   font-weight: 800;
   font-size: 0.92rem;
   color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 170px;
 }
 
 .lb-stats-sub {
@@ -2603,8 +2622,10 @@ button {
   border-radius: var(--radius-lg);
   max-width: 480px;
   width: 100%;
-  max-height: 90vh;
+  max-height: 88vh;
   overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  box-sizing: border-box;
   box-shadow: var(--shadow-elevated);
   color: var(--text-main);
   animation: slideUp 0.22s cubic-bezier(0.16, 1, 0.3, 1);
@@ -2628,6 +2649,36 @@ button {
   font-size: 1.15rem;
   font-weight: 800;
   color: var(--text-main);
+}
+
+/* Nút Đóng Modal Chuẩn Chỉnh, Touch Target >= 36px cho Cảm Ứng Di Động */
+.btn-close-modal {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  min-height: 36px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  background: var(--bg-card-hover);
+  color: var(--text-muted);
+  border: 1px solid var(--border-glass);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  flex-shrink: 0;
+}
+
+.btn-close-modal:hover {
+  background: rgba(244, 63, 94, 0.15);
+  color: #f43f5e;
+  border-color: rgba(244, 63, 94, 0.35);
+  transform: scale(1.06);
+}
+
+.btn-close-modal:active {
+  transform: scale(0.94);
 }
 
 .modal-body {
@@ -2678,7 +2729,12 @@ button {
 
 .form-input:focus, .form-select:focus {
   border-color: #059669;
-  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.12);
+  box-shadow: 0 0 0 3px rgba(5, 150, 105, 0.15);
+}
+
+[data-theme="dark"] .form-input:focus, [data-theme="dark"] .form-select:focus {
+  border-color: var(--volt);
+  box-shadow: 0 0 0 3px var(--volt-glow);
 }
 
 /* Avatar Upload Dropzone */
@@ -3217,11 +3273,93 @@ button {
     letter-spacing: -0.02em;
   }
 
+  /* Main content padding bottom to clear fixed mobile nav */
+  #main-content {
+    padding-bottom: calc(75px + env(safe-area-inset-bottom, 12px));
+  }
+
   /* Toast Container on Mobile */
   .toast-container {
     bottom: 68px;
     left: 10px;
     right: 10px;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Scale podium avatars to fit mobile screens perfectly */
+  .podium-card .avatar-xl {
+    width: 62px !important;
+    height: 62px !important;
+  }
+  .podium-card .avatar-lg {
+    width: 48px !important;
+    height: 48px !important;
+  }
+  .podium-card {
+    padding: 10px 4px !important;
+    overflow: visible !important;
+  }
+}
+
+@media (max-width: 480px) {
+  /* Header clean layout on phones */
+  .header-user-name {
+    display: none !important;
+  }
+
+  .header-user-pill {
+    padding: 3px 7px 3px 4px !important;
+    gap: 5px !important;
+    overflow: visible !important;
+  }
+
+  .header-coin-badge {
+    padding: 2px 6px !important;
+    font-size: 0.74rem !important;
+  }
+
+  .btn-header-login {
+    padding: 5px 8px !important;
+    font-size: 0.78rem !important;
+  }
+
+  .btn-header-login .login-text-full {
+    display: none;
+  }
+
+  /* Shop Modal Tabs on narrow phones */
+  .shop-modal-tabs {
+    gap: 3px !important;
+    padding: 3px !important;
+    width: 100%;
+  }
+
+  .shop-tab-btn {
+    padding: 6px 8px !important;
+    font-size: 0.76rem !important;
+    gap: 4px !important;
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Leaderboard row on mobile */
+  .lb-name {
+    max-width: 120px !important;
+  }
+
+  /* Coin history stats bar on mobile */
+  .coin-history-stats-bar {
+    padding: 8px 6px !important;
+    gap: 4px !important;
+  }
+
+  .coin-stat-label {
+    font-size: 0.65rem !important;
+  }
+
+  .coin-stat-val {
+    font-size: 0.82rem !important;
   }
 }
 
@@ -3241,10 +3379,6 @@ button {
 
   .mode-btn span.mode-icon {
     font-size: 0.95rem;
-  }
-
-  .btn-fund-chip .fund-chip-text {
-    font-size: 0.68rem;
   }
 }
 
@@ -3794,7 +3928,7 @@ button {
 
 /* Modal Bảng Kèo Trận Đấu */
 .modal-bets-match-header {
-  background: rgba(15, 23, 42, 0.5);
+  background: var(--bg-card-hover);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);
   padding: 10px 14px;
@@ -3809,7 +3943,7 @@ button {
 }
 
 .modal-bets-col {
-  background: rgba(0, 0, 0, 0.15);
+  background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-sm);
   padding: 10px;
@@ -3840,7 +3974,7 @@ button {
   align-items: center;
   justify-content: space-between;
   padding: 6px 0;
-  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  border-bottom: 1px solid var(--border-glass);
   font-size: 0.8rem;
 }
 
@@ -4395,7 +4529,8 @@ button {
 .shop-modal-tabs {
   display: flex;
   gap: 6px;
-  background: rgba(0, 0, 0, 0.25);
+  background: var(--bg-card-hover);
+  border: 1px solid var(--border-glass);
   padding: 4px;
   border-radius: var(--radius-md);
 }
@@ -4420,9 +4555,10 @@ button {
 }
 
 .shop-tab-btn.active {
-  background: var(--bg-surface-elevated, #24344d);
+  background: var(--bg-surface);
   color: var(--volt);
-  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+  border: 1px solid var(--border-glass);
+  box-shadow: var(--shadow-sm);
 }
 
 .badge-mini {
@@ -4832,11 +4968,12 @@ button {
   display: grid;
   grid-template-columns: repeat(3, 1fr);
   gap: 8px;
-  background: rgba(15, 23, 42, 0.6);
+  background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
   padding: 10px 12px;
   margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
 }
 
 .coin-stat-item {
@@ -4874,16 +5011,17 @@ button {
   border-radius: var(--radius-full);
   font-size: 0.76rem;
   font-weight: 700;
-  background: rgba(255, 255, 255, 0.06);
-  color: var(--text-dim);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: var(--bg-card);
+  color: var(--text-muted);
+  border: 1px solid var(--border-glass);
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .coin-filter-chip:hover {
-  background: rgba(255, 255, 255, 0.12);
+  background: var(--bg-card-hover);
   color: var(--text-primary);
+  border-color: var(--border-subtle);
 }
 
 .coin-filter-chip.active {
@@ -4903,7 +5041,7 @@ button {
   display: flex;
   align-items: center;
   gap: 12px;
-  background: var(--bg-surface, #1e293b);
+  background: var(--bg-card);
   border: 1px solid var(--border-glass);
   border-radius: var(--radius-md);
   padding: 10px 14px;
@@ -4911,7 +5049,8 @@ button {
 }
 
 .coin-history-card:hover {
-  border-color: rgba(255, 255, 255, 0.2);
+  border-color: var(--border-subtle);
+  background: var(--bg-card-hover);
   transform: translateY(-1px);
 }
 
@@ -5000,6 +5139,149 @@ button {
   text-align: center;
   padding: 36px 16px;
   color: var(--text-muted);
+}
+
+/* ==========================================================================
+   21. FINAL MOBILE POLISH & RESPONSIVE PERFECTION
+   ========================================================================== */
+.login-text-short {
+  display: none;
+}
+
+@media (max-width: 600px) {
+  .btn-fund-chip .fund-chip-text,
+  .btn-shop-chip .fund-chip-text {
+    display: none !important;
+  }
+
+  .app-container {
+    padding: 8px 10px !important;
+  }
+
+  .app-header {
+    padding: 6px 8px !important;
+    gap: 6px !important;
+    margin-bottom: 8px !important;
+  }
+
+  .brand-badge {
+    gap: 5px !important;
+  }
+
+  .brand-icon-wrap {
+    width: 28px !important;
+    height: 28px !important;
+    font-size: 14px !important;
+    border-radius: 7px !important;
+  }
+
+  .brand-title {
+    font-size: 0.78rem !important;
+    letter-spacing: -0.02em !important;
+    font-weight: 800 !important;
+  }
+
+  .header-actions {
+    gap: 3px !important;
+    flex-shrink: 0 !important;
+  }
+
+  .header-actions .btn-icon {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    font-size: 13px !important;
+    border-radius: 7px !important;
+  }
+
+  .header-actions .btn-fund-chip,
+  .header-actions .btn-shop-chip {
+    width: 28px !important;
+    height: 28px !important;
+    min-width: 28px !important;
+    padding: 0 !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    border-radius: 7px !important;
+  }
+
+  .header-user-name {
+    display: none !important;
+  }
+
+  .header-user-pill {
+    padding: 2px 6px 2px 3px !important;
+    gap: 4px !important;
+    overflow: visible !important;
+  }
+
+  .header-user-avatar {
+    width: 24px !important;
+    height: 24px !important;
+  }
+
+  .header-coin-badge {
+    padding: 1px 5px !important;
+    font-size: 0.72rem !important;
+  }
+
+  .btn-header-login {
+    padding: 4px 8px !important;
+    font-size: 0.76rem !important;
+    gap: 3px !important;
+  }
+
+  .btn-header-login .login-text-full {
+    display: none !important;
+  }
+
+  .btn-header-login .login-text-short {
+    display: inline !important;
+  }
+
+  /* Shop Modal Tabs on mobile */
+  .shop-modal-tabs {
+    gap: 3px !important;
+    padding: 3px !important;
+    width: 100%;
+  }
+
+  .shop-tab-btn {
+    padding: 6px 8px !important;
+    font-size: 0.76rem !important;
+    gap: 4px !important;
+    flex: 1;
+    justify-content: center;
+  }
+
+  /* Leaderboard row on mobile */
+  .lb-name {
+    max-width: 130px !important;
+  }
+
+  /* Coin history stats bar on mobile */
+  .coin-history-stats-bar {
+    padding: 8px 6px !important;
+    gap: 4px !important;
+  }
+
+  .coin-stat-label {
+    font-size: 0.65rem !important;
+  }
+
+  .coin-stat-val {
+    font-size: 0.82rem !important;
+  }
+}
+
+@media (max-width: 360px) {
+  .brand-title {
+    font-size: 0.7rem !important;
+    max-width: 80px !important;
+    overflow: hidden !important;
+    text-overflow: ellipsis !important;
+  }
 }
 
 
