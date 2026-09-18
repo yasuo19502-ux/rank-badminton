@@ -60,6 +60,12 @@
           <span class="fund-chip-text">Quỹ CLB</span>
         </button>
 
+        <!-- Nút Cửa Hàng & Túi Đồ (Giai đoạn 3) -->
+        <button id="btn-open-shop" class="btn-fund-chip btn-shop-chip" onclick="window.appOpenShopModal()" title="Cửa Hàng Vật Phẩm & Túi Đồ">
+          <span class="fund-chip-icon">🛒</span>
+          <span class="fund-chip-text">Cửa Hàng</span>
+        </button>
+
         <!-- 2. Chuyển đổi Giao diện Sáng / Tối -->
         <button id="btn-toggle-theme" class="btn-icon" title="Đổi giao diện Sáng / Tối">
           ☀️
@@ -343,6 +349,9 @@
           </button>
           <button class="lb-subtab-btn" data-lbsort="winrate">
             <span>🎯</span> Tỷ Lệ Thắng (%)
+          </button>
+          <button class="lb-subtab-btn" data-lbsort="coins">
+            <span>🪙</span> Đại Gia Xu
           </button>
         </div>
 
@@ -920,6 +929,9 @@
           <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
             Dùng để mua vật phẩm, cược trận đấu vui và đổi quà CLB
           </div>
+          <button class="btn-primary" onclick="window.appOpenShopModal()" style="margin-top: 10px; width: 100%; font-size: 0.85rem; padding: 7px 12px; background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);">
+            <span>🛒</span> Vào Cửa Hàng & Túi Đồ
+          </button>
         </div>
 
         <!-- Tiêu đề Sổ cái giao dịch -->
@@ -976,6 +988,59 @@
           <button class="btn-secondary btn-close-modal" style="width: 100%; justify-content: center;">
             Đóng
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal 13: Cửa Hàng Vật Phẩm & Túi Đồ Cá Nhân (Giai đoạn 3) -->
+  <div id="modal-club-shop" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 620px; max-height: 90vh; display: flex; flex-direction: column;">
+      <div class="modal-header">
+        <div class="shop-modal-tabs">
+          <button class="shop-tab-btn active" id="btn-shop-tab-store" onclick="window.appSwitchShopTab('store')">
+            <span>🛒</span> Cửa Hàng
+          </button>
+          <button class="shop-tab-btn" id="btn-shop-tab-inventory" onclick="window.appSwitchShopTab('inventory')">
+            <span>🎒</span> Túi Đồ Của Tôi <span id="inventory-count-badge" class="badge-mini">0</span>
+          </button>
+        </div>
+        <button class="btn-icon btn-close-modal">✕</button>
+      </div>
+      <div class="modal-body" style="overflow-y: auto; flex: 1; padding: 14px 18px;">
+        <!-- Header thông tin số dư -->
+        <div class="shop-balance-banner">
+          <div>
+            <div style="font-size: 0.75rem; color: var(--text-muted); text-transform: uppercase; font-weight: 700;">Ví của bạn</div>
+            <div style="font-size: 1.15rem; font-weight: 800; color: var(--text-primary);">
+              🪙 <span id="shop-user-coins">100</span> <span style="font-size: 0.85rem; color: var(--volt);">Xu</span>
+            </div>
+          </div>
+          <button class="btn-mini-action" onclick="window.appOpenWalletModal()" style="font-size: 0.78rem;">
+            📜 Lịch Sử Xu
+          </button>
+        </div>
+
+        <!-- 1. TAB CỬA HÀNG (STORE) -->
+        <div id="shop-panel-store" class="shop-panel active">
+          <div class="shop-items-grid" id="shop-items-container">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- 2. TAB TÚI ĐỒ (INVENTORY) -->
+        <div id="shop-panel-inventory" class="shop-panel" style="display: none;">
+          <!-- Khung điều khiển nhanh Khiên Elo -->
+          <div class="inventory-perk-banner" id="inventory-elo-shield-box">
+            <!-- Injected via JS -->
+          </div>
+
+          <div class="inventory-section-title">
+            <span>📦</span> Vật Phẩm & Khung Avatar Đã Sở Hữu
+          </div>
+          <div class="inventory-items-grid" id="inventory-items-container">
+            <!-- Injected via JS -->
+          </div>
         </div>
       </div>
     </div>

@@ -110,7 +110,9 @@ class SupabaseService {
         joinedDate: m.joined_date || '',
         pinCode: m.pin_code || '',
         coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
-        role: m.role || 'member'
+        role: m.role || 'member',
+        activeFrame: m.active_frame || '',
+        activeEloShield: !!m.active_elo_shield
       }));
     } catch (err) {
       console.error('[Supabase] Lỗi fetchMembers:', err);
@@ -136,6 +138,8 @@ class SupabaseService {
         pin_code: member.pinCode || '',
         coins: member.coins !== undefined ? Number(member.coins) : 100,
         role: member.role || 'member',
+        active_frame: member.activeFrame || '',
+        active_elo_shield: !!member.activeEloShield,
         joined_date: member.joinedDate || (() => {
           const d = new Date();
           return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -147,11 +151,13 @@ class SupabaseService {
         .from('members')
         .upsert(payload);
 
-      // Nếu database Supabase chưa chạy script thêm cột pin_code, coins, role
-      if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role'))) {
+      // Nếu database Supabase chưa chạy script thêm cột mới
+      if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role') || error.message?.includes('active_frame') || error.message?.includes('active_elo_shield'))) {
         delete payload.pin_code;
         delete payload.coins;
         delete payload.role;
+        delete payload.active_frame;
+        delete payload.active_elo_shield;
         const res = await this.client.from('members').upsert(payload);
         error = res.error;
       }
@@ -636,6 +642,78 @@ class SupabaseService {
     }
   }
 
+  // --- API TÚI ĐỒ & VẬT PHẨM (USER_INVENTORY - GIAI ĐOẠN 3) ---
+  async fetchInventory(memberId = null) {
+    if (!this.isConfigured()) return null;
+    try {
+      let query = this.client
+        .from('user_inventory')
+        .select('*');
+
+      if (memberId) {
+        query = query.eq('member_id', memberId);
+      }
+
+      const { data, error } = await query;
+      if (error) throw error;
+
+      return data.map(item => ({
+        id: item.id,
+        memberId: item.member_id,
+        itemId: item.item_id,
+        itemType: item.item_type,
+        quantity: Number(item.quantity) || 1,
+        status: item.status || 'available',
+        createdAt: item.created_at,
+        updatedAt: item.updated_at
+      }));
+    } catch (err) {
+      console.error('[Supabase] Lỗi fetchInventory:', err);
+      return null;
+    }
+  }
+
+  async upsertInventoryItem(item) {
+    if (!this.isConfigured()) return false;
+    try {
+      const payload = {
+        id: item.id,
+        member_id: item.memberId,
+        item_id: item.itemId,
+        item_type: item.itemType,
+        quantity: Number(item.quantity) || 1,
+        status: item.status || 'available',
+        updated_at: new Date().toISOString()
+      };
+
+      const { error } = await this.client
+        .from('user_inventory')
+        .upsert(payload);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[Supabase] Lỗi upsertInventoryItem:', err);
+      return false;
+    }
+  }
+
+  async deleteInventoryItem(id) {
+    if (!this.isConfigured()) return false;
+    try {
+      const { error } = await this.client
+        .from('user_inventory')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[Supabase] Lỗi deleteInventoryItem:', err);
+      return false;
+    }
+  }
+
   // --- REALTIME SUBSCRIPTIONS (TỰ ĐỘNG ĐỒNG BỘ CÁC BẢNG DỮ LIỆU) ---
   subscribeToChanges(onChangeCallback) {
     if (!this.isConfigured()) return;
@@ -669,6 +747,9 @@ class SupabaseService {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, (payload) => {
         onChangeCallback('bets', payload);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_inventory' }, (payload) => {
+        onChangeCallback('user_inventory', payload);
       })
       .subscribe((status) => {
         console.log('[Supabase Realtime] Trạng thái kênh đồng bộ realtime:', status);

@@ -1,7 +1,7 @@
 import confetti from 'canvas-confetti';
-import { StorageService, getLocalDateStr } from './storage.js';
+import { StorageService, getLocalDateStr, SHOP_ITEMS } from './storage.js';
 import { calculateDoublesElo, calculateBadges, getTierByElo, getNextTier, getPlayerDetailedStats, calculateBettingOdds, TIERS } from './elo.js';
-import { processImageFile, generateDefaultAvatar, getAvatarUrl } from './avatar.js';
+import { processImageFile, generateDefaultAvatar, getAvatarUrl, renderAvatarHtml } from './avatar.js';
 import { MatchmakerService } from './matchmaker.js';
 import { SoundService } from './sound.js';
 import { supabaseService } from './supabase.js';
@@ -963,19 +963,21 @@ function renderCourt() {
 
 function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
   const tier = getTierByElo(player.elo);
-  const avatarUrl = getAvatarUrl(player);
   const isMale = player.gender === 'male';
 
   return `
     <div class="court-player-card">
       <div class="player-avatar-wrap">
-        <img class="player-avatar" src="${avatarUrl}" alt="${player.name}" onerror="this.src='${generateDefaultAvatar(player.name, player.gender)}'">
+        ${renderAvatarHtml(player, { size: 'md' })}
         <span class="gender-badge-dot ${isMale ? 'gender-male' : 'gender-female'}">
           ${isMale ? '♂' : '♀'}
         </span>
       </div>
       <div class="player-info">
-        <div class="player-name">${player.name}</div>
+        <div class="player-name" style="display: flex; align-items: center; gap: 4px;">
+          <span>${player.name}</span>
+          ${player.activeEloShield ? '<span title="Khiên bảo vệ Elo đang BẬT (Giảm 50% điểm trừ nếu thua)" style="font-size: 0.82rem;">🛡️</span>' : ''}
+        </div>
         <div class="player-nickname">${player.nickname || 'Thành viên'}</div>
         <div class="player-meta-row">
           <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
@@ -1572,8 +1574,19 @@ function finishMatch() {
   const updatePlayer = (player, delta, won) => {
     const mem = members.find(m => m.id === player.id);
     if (mem) {
+      let finalDelta = delta;
+      // Giai đoạn 3: Quyền lợi Thẻ Khiên Bảo Vệ Elo
+      if (!won && mem.activeEloShield) {
+        // Giảm 50% số điểm trừ (làm tròn số nguyên)
+        finalDelta = Math.min(-1, Math.round(delta * 0.5));
+        StorageService.consumeEloShield(mem.id);
+        setTimeout(() => {
+          showToast(`🛡️ Khiên bảo vệ Elo của ${mem.name} đã kích hoạt! Giảm 50% điểm trừ (${delta} ➔ ${finalDelta})!`, 'info');
+        }, 500);
+      }
+
       const oldTier = getTierByElo(mem.elo);
-      mem.elo = Math.max(500, mem.elo + delta);
+      mem.elo = Math.max(500, mem.elo + finalDelta);
       const newTier = getTierByElo(mem.elo);
 
       mem.matchesPlayed = (mem.matchesPlayed || 0) + 1;
@@ -1687,6 +1700,8 @@ function renderLeaderboard() {
 
   if (countBadge) countBadge.textContent = `${members.length} Thành Viên`;
 
+  const isCoinSort = state.leaderboardSort === 'coins';
+
   // Sắp xếp danh sách
   const sortedMembers = [...members].sort((a, b) => {
     if (state.leaderboardSort === 'matches') {
@@ -1697,6 +1712,8 @@ function renderLeaderboard() {
       const rateA = a.matchesPlayed > 0 ? a.wins / a.matchesPlayed : 0;
       const rateB = b.matchesPlayed > 0 ? b.wins / b.matchesPlayed : 0;
       return rateB - rateA;
+    } else if (state.leaderboardSort === 'coins') {
+      return (b.coins !== undefined ? b.coins : 100) - (a.coins !== undefined ? a.coins : 100);
     } else {
       // Default: 'elo'
       return b.elo - a.elo;
@@ -1734,20 +1751,40 @@ function renderLeaderboard() {
 
     const renderPodiumItem = (p, rank, badgeClass, isFirst = false) => {
       const tier = getTierByElo(p.elo);
-      const avatarUrl = getAvatarUrl(p);
+      const coins = p.coins !== undefined ? p.coins : 100;
+
+      let richBadgeHtml = '';
+      if (isCoinSort) {
+        if (rank === '1') richBadgeHtml = `<div style="margin-top: 4px;"><span class="rich-title-badge rich-title-1">👑 Vua Xu CLB</span></div>`;
+        else if (rank === '2') richBadgeHtml = `<div style="margin-top: 4px;"><span class="rich-title-badge rich-title-2">🥈 Phú Hộ CLB</span></div>`;
+        else if (rank === '3') richBadgeHtml = `<div style="margin-top: 4px;"><span class="rich-title-badge rich-title-3">🥉 Triệu Phú CLB</span></div>`;
+      }
+
       return `
         <div class="podium-card ${isFirst ? 'podium-first' : ''}" onclick="window.appViewPlayerProfile('${p.id}')" style="cursor: pointer;" title="Bấm để xem hồ sơ chi tiết">
           ${isFirst ? '<div class="podium-crown">👑</div>' : ''}
           <div class="podium-rank-badge ${badgeClass}">${rank}</div>
-          <img class="podium-avatar" src="${avatarUrl}" alt="${p.name}" onerror="this.src='${generateDefaultAvatar(p.name, p.gender)}'">
+          <div style="display: flex; justify-content: center; margin-bottom: 6px;">
+            ${renderAvatarHtml(p, { size: isFirst ? 'xl' : 'lg' })}
+          </div>
           <div class="podium-name">${p.name}</div>
-          <div class="podium-elo">${p.elo} Elo</div>
-          <div style="font-size: 0.72rem; color: ${tier.color}; font-weight: 700; margin-top: 2px;">
-            ${tier.icon} ${tier.name}
-          </div>
-          <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
-            ${p.wins}T - ${p.losses}B (${p.matchesPlayed > 0 ? Math.round((p.wins/p.matchesPlayed)*100) : 0}%)
-          </div>
+          ${isCoinSort 
+            ? `
+              <div class="podium-coin-amount">🪙 ${coins} Xu</div>
+              ${richBadgeHtml}
+              <div style="font-size: 0.74rem; color: var(--text-dim); margin-top: 4px;">
+                ${p.matchesPlayed} trận • ${p.elo} Elo
+              </div>
+            `
+            : `
+              <div class="podium-elo">${p.elo} Elo</div>
+              <div style="font-size: 0.72rem; color: ${tier.color}; font-weight: 700; margin-top: 2px;">
+                ${tier.icon} ${tier.name}
+              </div>
+              <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
+                ${p.wins}T - ${p.losses}B (${p.matchesPlayed > 0 ? Math.round((p.wins/p.matchesPlayed)*100) : 0}%)
+              </div>
+            `}
         </div>
       `;
     };
@@ -1765,13 +1802,15 @@ function renderLeaderboard() {
       const rank = index + 1;
       const tier = getTierByElo(p.elo);
       const nextTierInfo = getNextTier(p.elo);
-      const avatarUrl = getAvatarUrl(p);
       const winRate = p.matchesPlayed > 0 ? Math.round((p.wins / p.matchesPlayed) * 100) : 0;
+      const coins = p.coins !== undefined ? p.coins : 100;
 
       return `
         <div class="leaderboard-row" onclick="window.appViewPlayerProfile('${p.id}')" title="Bấm để xem hồ sơ chi tiết">
           <div class="lb-rank-num">${rank <= 3 ? ['🥇','🥈','🥉'][rank-1] : '#' + rank}</div>
-          <img class="lb-avatar" src="${avatarUrl}" alt="${p.name}" onerror="this.src='${generateDefaultAvatar(p.name, p.gender)}'">
+          <div style="flex-shrink: 0;">
+            ${renderAvatarHtml(p, { size: 'md' })}
+          </div>
           <div class="lb-member-details">
             <div class="lb-name-row">
               <span class="lb-name">${p.name}</span>
@@ -1779,6 +1818,7 @@ function renderLeaderboard() {
               <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
                 ${tier.icon} ${tier.name}
               </span>
+              ${p.activeEloShield ? '<span title="Khiên bảo vệ Elo đang BẬT" style="font-size: 0.85rem;">🛡️</span>' : ''}
             </div>
             <div class="lb-stats-sub">
               <span>Đã đấu: <strong>${p.matchesPlayed}</strong></span>
@@ -1788,10 +1828,19 @@ function renderLeaderboard() {
               ${p.streak >= 2 ? `<span style="color: #ef4444; font-weight: 800;">🔥 Thắng ${p.streak} trận</span>` : ''}
             </div>
           </div>
-          <div class="lb-elo-box">
-            <div class="lb-elo-num">${p.elo}</div>
-            <div class="lb-tier-label">${nextTierInfo.tier ? `Cần +${nextTierInfo.pointsNeeded} lên ${nextTierInfo.tier.name}` : 'Tối thượng'}</div>
-          </div>
+          ${isCoinSort 
+            ? `
+              <div class="lb-elo-box">
+                <div class="lb-coin-display">🪙 ${coins} Xu</div>
+                <div class="lb-tier-label" style="color: #facc15; font-weight: 700;">Đại Gia #${rank}</div>
+              </div>
+            `
+            : `
+              <div class="lb-elo-box">
+                <div class="lb-elo-num">${p.elo}</div>
+                <div class="lb-tier-label">${nextTierInfo.tier ? `Cần +${nextTierInfo.pointsNeeded} lên ${nextTierInfo.tier.name}` : 'Tối thượng'}</div>
+              </div>
+            `}
         </div>
       `;
     }).join('');
@@ -2005,7 +2054,7 @@ function renderMembers() {
 
         <div class="member-card-profile" onclick="window.appViewPlayerProfile('${m.id}')" style="cursor: pointer;" title="Bấm để xem hồ sơ chi tiết">
           <div class="member-card-avatar-wrap" onclick="event.stopPropagation(); ${isMe || isAdmin ? `window.appTriggerAvatarUpload('${m.id}')` : `window.appViewPlayerProfile('${m.id}')`}" title="${isMe || isAdmin ? 'Bấm để đổi ảnh đại diện' : 'Xem hồ sơ'}">
-            <img class="member-card-avatar" src="${avatarUrl}" alt="${m.name}" onerror="this.src='${generateDefaultAvatar(m.name, m.gender)}'">
+            ${renderAvatarHtml(m, { size: 'lg' })}
             ${isMe || isAdmin ? `<div class="camera-overlay-badge">📷</div>` : ''}
           </div>
           <div style="min-width: 0; flex: 1;">
@@ -3103,7 +3152,7 @@ window.appViewPlayerProfile = function(memberId) {
     <div class="profile-pro-wrap">
       <div class="profile-hero-card">
         <div class="profile-avatar-large-wrap">
-          <img class="profile-avatar-large" src="${avatarUrl}" alt="${m.name}" onerror="this.src='${generateDefaultAvatar(m.name, m.gender)}'">
+          ${renderAvatarHtml(m, { size: 'xl' })}
           <span class="gender-badge-dot ${isMale ? 'gender-male' : 'gender-female'}" style="width: 24px; height: 24px; font-size: 13px;">
             ${isMale ? '♂' : '♀'}
           </span>
@@ -3230,11 +3279,10 @@ function renderUserAuthHeader() {
   state.currentUser = currentUser;
 
   if (currentUser) {
-    const avatarUrl = getAvatarUrl(currentUser);
     const coins = currentUser.coins !== undefined ? currentUser.coins : 100;
     container.innerHTML = `
       <div id="header-user-widget" class="header-user-pill" onclick="window.appOpenUserWallet()" title="Xem ví xu & hồ sơ cá nhân">
-        <img class="header-user-avatar" src="${avatarUrl}" alt="${currentUser.name}" onerror="this.src='${generateDefaultAvatar(currentUser.name, currentUser.gender)}'">
+        ${renderAvatarHtml(currentUser, { size: 'xs', className: 'header-user-avatar' })}
         <span class="header-user-name">${currentUser.name}</span>
         <span class="header-coin-badge">🪙 <span id="header-user-coins">${coins}</span></span>
       </div>
@@ -3405,4 +3453,328 @@ window.appOpenRegisterNewMember = function() {
   closeAllModals();
   openMemberModal(null);
 };
+
+// =========================================================================
+// 10. CỬA HÀNG VẬT PHẨM & TÚI ĐỒ CỦA TÔI (GIAI ĐOẠN 3)
+// =========================================================================
+
+function renderClubShop() {
+  const user = StorageService.getCurrentUser();
+  const coinsSpan = document.getElementById('shop-user-coins');
+  const itemsContainer = document.getElementById('shop-items-container');
+  const invCountBadge = document.getElementById('inventory-count-badge');
+  const shieldBox = document.getElementById('inventory-elo-shield-box');
+  const invItemsContainer = document.getElementById('inventory-items-container');
+
+  const userCoins = user && user.coins !== undefined ? user.coins : 100;
+  if (coinsSpan) coinsSpan.textContent = userCoins;
+
+  const userInv = user ? StorageService.getUserInventory(user.id) : [];
+  if (invCountBadge) {
+    const totalItems = userInv.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    invCountBadge.textContent = totalItems;
+  }
+
+  // 1. RENDER SHOP ITEMS (Flat Grid, Không chia kệ)
+  if (itemsContainer) {
+    itemsContainer.innerHTML = SHOP_ITEMS.map(item => {
+      let badgeClass = 'badge-real';
+      if (item.category === 'perk') badgeClass = 'badge-perk';
+      else if (item.category === 'male') badgeClass = 'badge-male';
+      else if (item.category === 'female') badgeClass = 'badge-female';
+
+      const isOwnedFrame = item.type === 'frame' && userInv.some(i => i.itemId === item.id);
+      const consumableInv = item.type !== 'frame' ? userInv.find(i => i.itemId === item.id) : null;
+      const consumableCount = consumableInv?.quantity || 0;
+
+      let previewMarkup = '';
+      if (item.type === 'frame') {
+        const frameClass = `frame-${item.id.replace(/^frame_/, '')}`;
+        previewMarkup = `
+          <div class="avatar-container avatar-md avatar-frame-wrap ${frameClass}">
+            <img src="${user ? getAvatarUrl(user) : generateDefaultAvatar('Preview', item.category === 'female' ? 'female' : 'male')}" class="avatar-img" alt="${item.name}">
+            <span class="frame-deco-badge" data-frame="${item.id}"></span>
+          </div>
+        `;
+      } else {
+        previewMarkup = `
+          <div style="font-size: 2.2rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: rgba(255,255,255,0.06); border-radius: var(--radius-md);">
+            ${item.icon}
+          </div>
+        `;
+      }
+
+      let btnHtml = '';
+      if (isOwnedFrame) {
+        btnHtml = `<button class="shop-btn-owned" disabled title="Bạn đã sở hữu khung này">✓ Đã Có</button>`;
+      } else {
+        const canAfford = userCoins >= item.price;
+        btnHtml = `
+          <button class="shop-btn-buy" onclick="window.appBuyShopItem('${item.id}')" ${!canAfford ? 'style="opacity: 0.55; cursor: not-allowed;"' : ''} title="${canAfford ? 'Bấm để mua ngay' : 'Bạn chưa đủ xu'}">
+            Mua ${item.price} 🪙
+          </button>
+        `;
+      }
+
+      return `
+        <div class="shop-item-card">
+          <div>
+            <div class="shop-item-top">
+              <div class="shop-item-avatar-preview">${previewMarkup}</div>
+              <div style="flex: 1; min-width: 0;">
+                <span class="shop-item-badge ${badgeClass}">${item.badge}</span>
+                <div class="shop-item-title">${item.name}</div>
+                ${consumableCount > 0 ? `<div style="font-size: 0.74rem; color: #10b981; font-weight: 700; margin-top: 2px;">(Đang có: ${consumableCount})</div>` : ''}
+              </div>
+            </div>
+            <div class="shop-item-desc">${item.description}</div>
+          </div>
+          <div class="shop-item-bottom">
+            <div class="shop-item-price">🪙 ${item.price} Xu</div>
+            ${btnHtml}
+          </div>
+        </div>
+      `;
+    }).join('');
+  }
+
+  // 2. RENDER INVENTORY TAB (Túi Đồ Của Tôi)
+  if (shieldBox) {
+    const shieldItem = userInv.find(i => i.itemId === 'elo_shield' && i.quantity > 0);
+    const shieldCount = shieldItem?.quantity || 0;
+    const isShieldActive = !!(user && user.activeEloShield);
+
+    shieldBox.innerHTML = `
+      <div class="perk-banner-header">
+        <div class="perk-banner-title">
+          <span>🛡️</span> Thẻ Khiên Bảo Vệ Elo (Đang có: <strong>${shieldCount}</strong> thẻ)
+        </div>
+        <button class="perk-shield-toggle-btn ${isShieldActive ? 'shield-active' : 'shield-inactive'}" onclick="window.appToggleEloShield()">
+          ${isShieldActive ? '🛡️ KHIÊN ĐANG BẬT' : '⚪ KHIÊN ĐANG TẮT'}
+        </button>
+      </div>
+      <div class="perk-banner-desc">
+        ${isShieldActive 
+          ? `<strong style="color: #10b981;">Khiên đang BẬT:</strong> Nếu thua trận tiếp theo, bạn chỉ bị trừ 50% số điểm Elo! Nếu thắng, bạn nhận đủ 100% Elo và không bị trừ thẻ.`
+          : `Khiên đang TẮT. Bật khiên trước khi đánh trận để kích hoạt quyền lợi giảm 50% trừ điểm Elo khi thua.`}
+      </div>
+    `;
+  }
+
+  if (invItemsContainer) {
+    const gripItem = userInv.find(i => i.itemId === 'grip' && i.quantity > 0);
+    const ownedFrames = userInv.filter(i => i.itemType === 'frame');
+    const activeFrame = user?.activeFrame || '';
+
+    let cardsHtml = '';
+
+    // Khung Mặc Định (Không Khung)
+    const isDefaultActive = !activeFrame;
+    cardsHtml += `
+      <div class="inventory-card ${isDefaultActive ? 'is-active-frame' : ''}">
+        <div class="inventory-card-top">
+          <div class="avatar-container avatar-md">
+            <img src="${user ? getAvatarUrl(user) : generateDefaultAvatar('Tôi')}" class="avatar-img" alt="Mặc định">
+          </div>
+          <div class="inventory-card-info">
+            <div class="inventory-card-name">Avatar Mặc Định</div>
+            <div class="inventory-card-status">${isDefaultActive ? '🟢 Đang sử dụng' : 'Khung cơ bản của CLB'}</div>
+          </div>
+        </div>
+        <div class="inventory-card-bottom">
+          <span style="font-size: 0.74rem; color: var(--text-dim);">Cơ bản</span>
+          ${isDefaultActive 
+            ? `<span style="font-size: 0.78rem; font-weight: 700; color: #10b981;">✓ Đang Dùng</span>`
+            : `<button class="btn-inventory-action btn-inventory-unequip" onclick="window.appEquipFrame('')">Dùng Mặc Định</button>`}
+        </div>
+      </div>
+    `;
+
+    // Cuốn cán nếu có
+    if (gripItem && gripItem.quantity > 0) {
+      cardsHtml += `
+        <div class="inventory-card">
+          <div class="inventory-card-top">
+            <div style="font-size: 2.2rem; width: 48px; height: 48px; display: flex; align-items: center; justify-content: center; background: rgba(56, 189, 248, 0.1); border-radius: var(--radius-md);">
+              🏸
+            </div>
+            <div class="inventory-card-info">
+              <div class="inventory-card-name">Cuốn Cán Vợt Chống Trơn</div>
+              <div class="inventory-card-status">Còn lại: <strong style="color: #38bdf8;">${gripItem.quantity}</strong> chiếc</div>
+            </div>
+          </div>
+          <div class="inventory-card-bottom">
+            <span style="font-size: 0.74rem; color: var(--text-dim);">Nhận tại sân</span>
+            <button class="btn-inventory-action btn-inventory-claim" onclick="window.appClaimGrip()" title="Bấm khi bạn đã nhận 1 cuốn cán thật từ thủ quỹ/trọng tài tại sân">
+              Đã Nhận 1 Cuốn
+            </button>
+          </div>
+        </div>
+      `;
+    }
+
+    // Các khung đã sở hữu
+    ownedFrames.forEach(invItem => {
+      const shopDef = SHOP_ITEMS.find(s => s.id === invItem.itemId);
+      if (!shopDef) return;
+      const isActive = activeFrame === shopDef.id;
+      const frameClass = `frame-${shopDef.id.replace(/^frame_/, '')}`;
+
+      cardsHtml += `
+        <div class="inventory-card ${isActive ? 'is-active-frame' : ''}">
+          <div class="inventory-card-top">
+            <div class="avatar-container avatar-md avatar-frame-wrap ${frameClass}">
+              <img src="${user ? getAvatarUrl(user) : generateDefaultAvatar('Tôi')}" class="avatar-img" alt="${shopDef.name}">
+              <span class="frame-deco-badge" data-frame="${shopDef.id}"></span>
+            </div>
+            <div class="inventory-card-info">
+              <div class="inventory-card-name">${shopDef.name}</div>
+              <div class="inventory-card-status">${isActive ? '🟢 Đang sử dụng' : 'Trong túi đồ'}</div>
+            </div>
+          </div>
+          <div class="inventory-card-bottom">
+            <span style="font-size: 0.74rem; color: var(--text-dim);">${shopDef.badge}</span>
+            ${isActive 
+              ? `<button class="btn-inventory-action btn-inventory-unequip" onclick="window.appEquipFrame('')">Tháo Khung</button>`
+              : `<button class="btn-inventory-action btn-inventory-equip" onclick="window.appEquipFrame('${shopDef.id}')">Đeo Khung</button>`}
+          </div>
+        </div>
+      `;
+    });
+
+    invItemsContainer.innerHTML = cardsHtml;
+  }
+}
+
+window.appOpenShopModal = function() {
+  const user = StorageService.getCurrentUser();
+  if (!user) {
+    showToast('Vui lòng đăng nhập hoặc chọn hồ sơ của bạn trước khi vào Cửa Hàng!', 'info');
+    window.appOpenLoginModal();
+    return;
+  }
+
+  const modal = document.getElementById('modal-club-shop');
+  if (modal) {
+    modal.classList.add('open');
+    window.appSwitchShopTab('store');
+    renderClubShop();
+  }
+};
+
+window.appOpenWalletModal = function() {
+  window.appOpenUserWallet();
+};
+
+window.appSwitchShopTab = function(tab) {
+  const btnStore = document.getElementById('btn-shop-tab-store');
+  const btnInv = document.getElementById('btn-shop-tab-inventory');
+  const panelStore = document.getElementById('shop-panel-store');
+  const panelInv = document.getElementById('shop-panel-inventory');
+
+  if (tab === 'inventory') {
+    btnStore?.classList.remove('active');
+    btnInv?.classList.add('active');
+    if (panelStore) panelStore.style.display = 'none';
+    if (panelInv) panelInv.style.display = 'block';
+  } else {
+    btnStore?.classList.add('active');
+    btnInv?.classList.remove('active');
+    if (panelStore) panelStore.style.display = 'block';
+    if (panelInv) panelInv.style.display = 'none';
+  }
+  SoundService.playClick();
+};
+
+window.appBuyShopItem = function(itemId) {
+  const user = StorageService.getCurrentUser();
+  if (!user) {
+    window.appOpenLoginModal();
+    return;
+  }
+
+  const res = StorageService.buyShopItem(user.id, itemId);
+  if (!res.success) {
+    showToast(res.message, 'error');
+    return;
+  }
+
+  // Cập nhật state
+  state.currentUser = StorageService.getCurrentUser();
+  renderUserAuthHeader();
+  renderClubShop();
+
+  if (res.item.type === 'frame') {
+    confetti({
+      particleCount: 70,
+      spread: 60,
+      origin: { y: 0.6 }
+    });
+    SoundService.playLevelUp();
+    showToast(`🎉 Mua thành công ${res.item.name}! Hãy mở "Túi Đồ Của Tôi" để đeo khung!`, 'success');
+  } else {
+    SoundService.playClick();
+    showToast(`✅ Mua thành công ${res.item.name}! (Số dư còn lại: ${res.balanceAfter} Xu)`, 'success');
+  }
+};
+
+window.appEquipFrame = function(frameId) {
+  const user = StorageService.getCurrentUser();
+  if (!user) return;
+
+  const res = StorageService.equipAvatarFrame(user.id, frameId);
+  if (!res.success) {
+    showToast(res.message, 'error');
+    return;
+  }
+
+  state.currentUser = StorageService.getCurrentUser();
+  SoundService.playClick();
+  showToast(frameId ? '✨ Đã đeo khung Avatar mới thành công!' : 'Đã chuyển về khung Avatar mặc định', 'success');
+
+  renderClubShop();
+  renderUserAuthHeader();
+  renderLeaderboard();
+  renderAttendance();
+  renderMembers();
+  renderActiveCourtCard();
+};
+
+window.appToggleEloShield = function() {
+  const user = StorageService.getCurrentUser();
+  if (!user) return;
+
+  const res = StorageService.toggleEloShield(user.id);
+  if (!res.success) {
+    showToast(res.message, 'error');
+    return;
+  }
+
+  state.currentUser = StorageService.getCurrentUser();
+  SoundService.playClick();
+  showToast(res.activeEloShield ? '🛡️ Đã BẬT Khiên bảo vệ Elo cho trận đấu tiếp theo!' : 'Đã TẮT Khiên bảo vệ Elo', 'info');
+
+  renderClubShop();
+  renderActiveCourtCard();
+};
+
+window.appClaimGrip = function() {
+  const user = StorageService.getCurrentUser();
+  if (!user) return;
+
+  const confirmClaim = confirm('Bạn có chắc chắn muốn xác nhận đã nhận 1 cuốn cán vợt thật tại sân thi đấu không?');
+  if (!confirmClaim) return;
+
+  const res = StorageService.claimGrip(user.id);
+  if (!res.success) {
+    showToast(res.message, 'error');
+    return;
+  }
+
+  state.currentUser = StorageService.getCurrentUser();
+  SoundService.playClick();
+  showToast(`🏸 Đã xác nhận nhận cuốn cán! (Còn lại trong túi: ${res.remaining})`, 'success');
+  renderClubShop();
+};
+
 

@@ -96,3 +96,28 @@ export function getAvatarUrl(member) {
   }
   return generateDefaultAvatar(member ? member.name : '', member ? member.gender : 'male');
 }
+
+/**
+ * Render Avatar hoàn chỉnh kèm Khung Avatar Động (Giai đoạn 3)
+ * @param {Object} member - Thông tin thành viên
+ * @param {Object} options - { size: 'sm'|'md'|'lg'|'xl', className: string, imgStyle: string, wrapStyle: string }
+ * @returns {string} HTML markup của Avatar kèm khung
+ */
+export function renderAvatarHtml(member, options = {}) {
+  const size = options.size || 'md';
+  const extraClass = options.className || '';
+  const imgStyle = options.imgStyle || '';
+  const wrapStyle = options.wrapStyle || '';
+  const avatarUrl = getAvatarUrl(member);
+  const activeFrame = member?.activeFrame || '';
+
+  const frameClass = activeFrame ? `avatar-frame-wrap frame-${activeFrame.replace(/^frame_/, '')}` : '';
+
+  return `
+    <div class="avatar-container avatar-${size} ${frameClass} ${extraClass}" style="${wrapStyle}">
+      <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
+      ${activeFrame ? `<span class="frame-deco-badge" data-frame="${activeFrame}"></span>` : ''}
+    </div>
+  `;
+}
+

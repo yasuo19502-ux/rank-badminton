@@ -14,8 +14,116 @@ const STORAGE_KEYS = {
   SETTINGS: 'cbb_thai_thinh_settings_v2',
   CURRENT_USER_ID: 'cbb_thai_thinh_current_user_id_v1',
   COIN_TRANSACTIONS: 'cbb_thai_thinh_coin_transactions_v1',
-  BETS: 'cbb_thai_thinh_bets_v1'
+  BETS: 'cbb_thai_thinh_bets_v1',
+  INVENTORY: 'cbb_thai_thinh_inventory_v1'
 };
+
+export const SHOP_ITEMS = [
+  // 1. Đồ thật tại sân
+  {
+    id: 'grip',
+    name: 'Cuốn Cán Vợt Chống Trơn',
+    price: 50,
+    icon: '🏸',
+    type: 'consumable',
+    category: 'real',
+    badge: 'Đồ Thật Tại Sân',
+    description: 'Cuốn cán cầu lông êm tay, thấm hút mồ hôi. Đổi nhận trực tiếp tại sân thi đấu.'
+  },
+  // 2. Thẻ trận đấu
+  {
+    id: 'elo_shield',
+    name: 'Thẻ Khiên Bảo Vệ Elo',
+    price: 40,
+    icon: '🛡️',
+    type: 'perk',
+    category: 'perk',
+    badge: 'Đặc Quyền Trận',
+    description: 'Bật trước trận: Nếu thua chỉ bị trừ 50% Elo! Nếu thắng vẫn nhận 100% Elo và không mất thẻ.'
+  },
+  // 3. Khung Avatar Nam / Unisex
+  {
+    id: 'frame_fire',
+    name: 'Khung Lửa Chiến Thần',
+    price: 100,
+    icon: '🔥',
+    type: 'frame',
+    category: 'male',
+    badge: 'Nam / Unisex',
+    description: 'Viền lửa rực đỏ bốc cháy quanh Avatar, thể hiện phong cách tay đập cuồng nhiệt.'
+  },
+  {
+    id: 'frame_neon',
+    name: 'Khung Tia Chớp Neon',
+    price: 90,
+    icon: '⚡',
+    type: 'frame',
+    category: 'male',
+    badge: 'Nam / Unisex',
+    description: 'Viền sấm chớp Cyberpunk xanh Cyan & Volt giật sáng công nghệ cực ngầu.'
+  },
+  {
+    id: 'frame_gold',
+    name: 'Khung Rồng Vàng Hoàng Gia',
+    price: 120,
+    icon: '👑',
+    type: 'frame',
+    category: 'male',
+    badge: 'Nam / Unisex',
+    description: 'Viền vàng kim tuyến lấp lánh sang trọng của nhà vô địch bất khả chiến bại.'
+  },
+  {
+    id: 'frame_carbon',
+    name: 'Khung Titan Hắc Báo',
+    price: 80,
+    icon: '🖤',
+    type: 'frame',
+    category: 'male',
+    badge: 'Nam / Unisex',
+    description: 'Viền kim loại Carbon đen nhám tối giản, ngầu và lạnh lùng.'
+  },
+  // 4. Khung Avatar Nữ / Dễ thương
+  {
+    id: 'frame_sakura',
+    name: 'Khung Hoa Anh Đào',
+    price: 100,
+    icon: '🌸',
+    type: 'frame',
+    category: 'female',
+    badge: 'Nữ / Dễ thương',
+    description: 'Viền hồng pastel mềm mại kèm hiệu ứng cánh hoa đào lãng mạn bay bổng.'
+  },
+  {
+    id: 'frame_moon',
+    name: 'Khung Thỏ Trăng Sao',
+    price: 90,
+    icon: '🌙',
+    type: 'frame',
+    category: 'female',
+    badge: 'Nữ / Dễ thương',
+    description: 'Tông tím Lavender với trăng sao nhỏ lấp lánh mộng mơ.'
+  },
+  {
+    id: 'frame_diamond',
+    name: 'Khung Kim Cương Ngũ Sắc',
+    price: 120,
+    icon: '💎',
+    type: 'frame',
+    category: 'female',
+    badge: 'Nữ / Dễ thương',
+    description: 'Ánh lăng kính kim cương phản quang ngũ sắc lung linh tỏa sáng rực rỡ.'
+  },
+  {
+    id: 'frame_rainbow',
+    name: 'Khung Cầu Vồng Năng Lượng',
+    price: 80,
+    icon: '🌈',
+    type: 'frame',
+    category: 'female',
+    badge: 'Nữ / Dễ thương',
+    description: 'Đa sắc rực rỡ tươi trẻ, lan tỏa năng lượng tích cực trên sân cầu.'
+  }
+];
 
 // Dọn dẹp cache dữ liệu mẫu cũ nếu còn tồn tại trong trình duyệt
 try {
@@ -45,7 +153,7 @@ export const StorageService = {
 
     try {
       console.log('[Sync] Bắt đầu đồng bộ từ Supabase Cloud...');
-      const [cloudMembers, cloudMatches, cloudSessions, cloudSettings, liveCourt1, liveCourt2, cloudCoinTx, cloudBets] = await Promise.all([
+      const [cloudMembers, cloudMatches, cloudSessions, cloudSettings, liveCourt1, liveCourt2, cloudCoinTx, cloudBets, cloudInv] = await Promise.all([
         supabaseService.fetchMembers(),
         supabaseService.fetchMatches(),
         supabaseService.fetchSessions(),
@@ -53,7 +161,8 @@ export const StorageService = {
         supabaseService.fetchLiveCourt('court_1'),
         supabaseService.fetchLiveCourt('court_2'),
         supabaseService.fetchCoinTransactions(),
-        supabaseService.fetchBets()
+        supabaseService.fetchBets(),
+        supabaseService.fetchInventory()
       ]);
 
       if (cloudMembers && cloudMembers.length > 0) {
@@ -73,6 +182,9 @@ export const StorageService = {
       }
       if (cloudBets) {
         this.saveLocalBets(cloudBets);
+      }
+      if (cloudInv) {
+        this.saveLocalInventory(cloudInv);
       }
 
       const todayStr = getLocalDateStr();
@@ -967,5 +1079,189 @@ export const StorageService = {
 
     this.saveLocalBets(allBets);
     return refundedBets;
+  },
+
+  // --- TÚI ĐỒ & CỬA HÀNG VẬT PHẨM (GIAI ĐOẠN 3) ---
+  getLocalInventory() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.INVENTORY);
+      if (data) {
+        const parsed = JSON.parse(data);
+        return Array.isArray(parsed) ? parsed : [];
+      }
+      return [];
+    } catch (e) {
+      return [];
+    }
+  },
+
+  saveLocalInventory(inventory) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.INVENTORY, JSON.stringify(inventory));
+    } catch (e) {}
+  },
+
+  getUserInventory(memberId) {
+    if (!memberId) return [];
+    const all = this.getLocalInventory();
+    return all.filter(item => item.memberId === memberId);
+  },
+
+  buyShopItem(memberId, itemId) {
+    const itemDef = SHOP_ITEMS.find(i => i.id === itemId);
+    if (!itemDef) {
+      return { success: false, message: 'Vật phẩm không tồn tại!' };
+    }
+
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (!mem) {
+      return { success: false, message: 'Không tìm thấy thông tin thành viên!' };
+    }
+
+    // Nếu là khung avatar, kiểm tra xem đã sở hữu chưa
+    if (itemDef.type === 'frame') {
+      const userInv = this.getUserInventory(memberId);
+      const alreadyOwned = userInv.some(i => i.itemId === itemId);
+      if (alreadyOwned) {
+        return { success: false, message: 'Bạn đã sở hữu khung Avatar này rồi!' };
+      }
+    }
+
+    const currentCoins = Number(mem.coins !== undefined ? mem.coins : 100);
+    if (currentCoins < itemDef.price) {
+      return { success: false, message: `Số dư không đủ! Bạn có ${currentCoins} Xu, vật phẩm giá ${itemDef.price} Xu.` };
+    }
+
+    // Trừ xu
+    const deductRes = this.addCoins(
+      memberId,
+      -itemDef.price,
+      'shop_purchase',
+      `Mua vật phẩm Cửa hàng: ${itemDef.name} (-${itemDef.price} Xu)`
+    );
+
+    if (!deductRes || !deductRes.success) {
+      return { success: false, message: 'Lỗi khi trừ xu thanh toán!' };
+    }
+
+    // Thêm vào inventory
+    const allInv = this.getLocalInventory();
+    const existingConsumable = allInv.find(i => i.memberId === memberId && i.itemId === itemId && i.itemType !== 'frame');
+
+    let inventoryItem = null;
+    if (existingConsumable) {
+      existingConsumable.quantity = (existingConsumable.quantity || 1) + 1;
+      existingConsumable.updatedAt = new Date().toISOString();
+      inventoryItem = existingConsumable;
+    } else {
+      inventoryItem = {
+        id: 'inv_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
+        memberId,
+        itemId: itemDef.id,
+        itemType: itemDef.type,
+        quantity: 1,
+        status: 'available',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+      allInv.unshift(inventoryItem);
+    }
+
+    this.saveLocalInventory(allInv);
+
+    if (supabaseService.isConfigured()) {
+      supabaseService.upsertInventoryItem(inventoryItem);
+    }
+
+    return { success: true, item: itemDef, balanceAfter: deductRes.balanceAfter };
+  },
+
+  equipAvatarFrame(memberId, frameId) {
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (!mem) return { success: false, message: 'Không tìm thấy thành viên' };
+
+    // Nếu frameId là rỗng thì tháo khung
+    if (!frameId) {
+      mem.activeFrame = '';
+      this.saveMembers(members);
+      return { success: true, activeFrame: '' };
+    }
+
+    // Kiểm tra xem đã sở hữu khung này chưa
+    const userInv = this.getUserInventory(memberId);
+    const hasFrame = userInv.some(i => i.itemId === frameId);
+    if (!hasFrame) {
+      return { success: false, message: 'Bạn chưa sở hữu khung Avatar này!' };
+    }
+
+    mem.activeFrame = frameId;
+    this.saveMembers(members);
+    return { success: true, activeFrame: frameId };
+  },
+
+  toggleEloShield(memberId, enabled = null) {
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (!mem) return { success: false, message: 'Không tìm thấy thành viên' };
+
+    const userInv = this.getUserInventory(memberId);
+    const shieldItem = userInv.find(i => i.itemId === 'elo_shield' && i.quantity > 0);
+
+    const targetState = enabled !== null ? enabled : !mem.activeEloShield;
+
+    if (targetState && (!shieldItem || shieldItem.quantity <= 0)) {
+      return { success: false, message: 'Bạn chưa có Thẻ Khiên Bảo Vệ Elo nào! Hãy mua trong Cửa hàng.' };
+    }
+
+    mem.activeEloShield = targetState;
+    this.saveMembers(members);
+    return { success: true, activeEloShield: targetState, remainingShields: shieldItem?.quantity || 0 };
+  },
+
+  consumeEloShield(memberId) {
+    const members = this.getMembers();
+    const mem = members.find(m => m.id === memberId);
+    if (!mem || !mem.activeEloShield) return false;
+
+    const allInv = this.getLocalInventory();
+    const shieldItem = allInv.find(i => i.memberId === memberId && i.itemId === 'elo_shield' && i.quantity > 0);
+    if (!shieldItem) {
+      mem.activeEloShield = false;
+      this.saveMembers(members);
+      return false;
+    }
+
+    shieldItem.quantity -= 1;
+    shieldItem.updatedAt = new Date().toISOString();
+    if (shieldItem.quantity <= 0) {
+      mem.activeEloShield = false;
+    }
+
+    this.saveMembers(members);
+    this.saveLocalInventory(allInv);
+
+    if (supabaseService.isConfigured()) {
+      supabaseService.upsertInventoryItem(shieldItem);
+    }
+    return true;
+  },
+
+  claimGrip(memberId) {
+    const allInv = this.getLocalInventory();
+    const gripItem = allInv.find(i => i.memberId === memberId && i.itemId === 'grip' && i.quantity > 0);
+    if (!gripItem) {
+      return { success: false, message: 'Bạn không có cuốn cán nào để nhận!' };
+    }
+
+    gripItem.quantity -= 1;
+    gripItem.updatedAt = new Date().toISOString();
+    this.saveLocalInventory(allInv);
+
+    if (supabaseService.isConfigured()) {
+      supabaseService.upsertInventoryItem(gripItem);
+    }
+    return { success: true, remaining: gripItem.quantity };
   }
 };

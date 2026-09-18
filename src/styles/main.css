@@ -3853,3 +3853,648 @@ button {
   color: #facc15;
 }
 
+/* ==========================================================================
+   GIAI ĐOẠN 3: KHUNG AVATAR ĐỘNG & HIỆU ỨNG (ANIMATED AVATAR FRAMES)
+   ========================================================================== */
+.avatar-container {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  flex-shrink: 0;
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.avatar-xs {
+  width: 28px;
+  height: 28px;
+}
+
+.avatar-sm {
+  width: 36px;
+  height: 36px;
+}
+
+.avatar-md {
+  width: 48px;
+  height: 48px;
+}
+
+.avatar-lg {
+  width: 64px;
+  height: 64px;
+}
+
+.avatar-xl {
+  width: 88px;
+  height: 88px;
+}
+
+.avatar-container .avatar-img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+  background: var(--bg-surface-elevated, #1e293b);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+}
+
+/* Base Frame Wrap */
+.avatar-frame-wrap {
+  padding: 3px;
+  box-sizing: content-box;
+}
+
+.avatar-frame-wrap .avatar-img {
+  border: 1.5px solid rgba(255, 255, 255, 0.65);
+}
+
+/* Trang trí góc khung avatar */
+.frame-deco-badge {
+  position: absolute;
+  bottom: -2px;
+  right: -2px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
+  z-index: 2;
+  pointer-events: none;
+}
+
+.avatar-lg .frame-deco-badge,
+.avatar-xl .frame-deco-badge {
+  width: 22px;
+  height: 22px;
+  font-size: 12px;
+  bottom: 0px;
+  right: 0px;
+}
+
+/* 1. Khung Lửa Chiến Thần (Fire) */
+.frame-fire {
+  background: linear-gradient(135deg, #ff1a1a, #ff7700, #ff0055);
+  box-shadow: 0 0 10px rgba(255, 85, 0, 0.75), 0 0 18px rgba(255, 0, 85, 0.45);
+  animation: fireGlow 2s ease-in-out infinite alternate;
+}
+.frame-fire .frame-deco-badge::after {
+  content: '🔥';
+}
+@keyframes fireGlow {
+  0% {
+    box-shadow: 0 0 8px rgba(255, 69, 0, 0.6), 0 0 14px rgba(255, 140, 0, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 14px rgba(255, 30, 0, 0.9), 0 0 24px rgba(255, 120, 0, 0.6);
+  }
+}
+
+/* 2. Khung Tia Chớp Neon (Neon) */
+.frame-neon {
+  background: linear-gradient(135deg, #00f0ff, #ccff00, #0077ff);
+  box-shadow: 0 0 10px rgba(0, 240, 255, 0.75), 0 0 16px rgba(204, 255, 0, 0.5);
+  animation: neonFlicker 2.5s ease-in-out infinite alternate;
+}
+.frame-neon .frame-deco-badge::after {
+  content: '⚡';
+}
+@keyframes neonFlicker {
+  0% {
+    box-shadow: 0 0 7px rgba(0, 240, 255, 0.6), 0 0 12px rgba(204, 255, 0, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.95), 0 0 24px rgba(204, 255, 0, 0.7);
+  }
+}
+
+/* 3. Khung Rồng Vàng Hoàng Gia (Gold) */
+.frame-gold {
+  background: linear-gradient(135deg, #ffd700, #ffae19, #fff275, #d4af37);
+  box-shadow: 0 0 12px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 174, 25, 0.45);
+  animation: goldShimmer 3s ease-in-out infinite;
+}
+.frame-gold .frame-deco-badge::after {
+  content: '👑';
+}
+@keyframes goldShimmer {
+  0%, 100% {
+    filter: brightness(1);
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.7), 0 0 18px rgba(255, 174, 25, 0.4);
+  }
+  50% {
+    filter: brightness(1.2);
+    box-shadow: 0 0 16px rgba(255, 225, 50, 0.95), 0 0 26px rgba(255, 180, 40, 0.65);
+  }
+}
+
+/* 4. Khung Titan Hắc Báo (Carbon) */
+.frame-carbon {
+  background: linear-gradient(135deg, #2c3e50, #7f8c8d, #1a252f, #95a5a6);
+  box-shadow: 0 0 8px rgba(180, 195, 210, 0.5), inset 0 0 4px rgba(255, 255, 255, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+}
+.frame-carbon .frame-deco-badge::after {
+  content: '🖤';
+}
+
+/* 5. Khung Hoa Anh Đào (Sakura) */
+.frame-sakura {
+  background: linear-gradient(135deg, #ff9ebb, #ff6584, #fbcfe8, #fda4af);
+  box-shadow: 0 0 10px rgba(255, 158, 187, 0.75), 0 0 18px rgba(255, 101, 132, 0.4);
+  animation: sakuraSoft 2.8s ease-in-out infinite alternate;
+}
+.frame-sakura .frame-deco-badge::after {
+  content: '🌸';
+}
+@keyframes sakuraSoft {
+  0% {
+    box-shadow: 0 0 8px rgba(255, 158, 187, 0.6), 0 0 14px rgba(255, 101, 132, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 14px rgba(255, 158, 187, 0.9), 0 0 24px rgba(255, 101, 132, 0.6);
+  }
+}
+
+/* 6. Khung Thỏ Trăng Sao (Moon) */
+.frame-moon {
+  background: linear-gradient(135deg, #c084fc, #818cf8, #e879f9, #a855f7);
+  box-shadow: 0 0 10px rgba(192, 132, 252, 0.75), 0 0 18px rgba(129, 140, 248, 0.4);
+  animation: moonPulse 3s ease-in-out infinite alternate;
+}
+.frame-moon .frame-deco-badge::after {
+  content: '🌙';
+}
+@keyframes moonPulse {
+  0% {
+    box-shadow: 0 0 8px rgba(192, 132, 252, 0.6), 0 0 14px rgba(129, 140, 248, 0.3);
+  }
+  100% {
+    box-shadow: 0 0 15px rgba(192, 132, 252, 0.9), 0 0 24px rgba(129, 140, 248, 0.6);
+  }
+}
+
+/* 7. Khung Kim Cương Ngũ Sắc (Diamond) */
+.frame-diamond {
+  background: linear-gradient(135deg, #67e8f9, #f472b6, #a78bfa, #38bdf8, #ec4899);
+  box-shadow: 0 0 12px rgba(103, 232, 249, 0.8), 0 0 20px rgba(244, 114, 182, 0.5);
+  animation: diamondRotate 4s linear infinite;
+}
+.frame-diamond .frame-deco-badge::after {
+  content: '💎';
+}
+@keyframes diamondRotate {
+  0%, 100% {
+    filter: hue-rotate(0deg) brightness(1.05);
+  }
+  50% {
+    filter: hue-rotate(60deg) brightness(1.2);
+  }
+}
+
+/* 8. Khung Cầu Vồng Năng Lượng (Rainbow) */
+.frame-rainbow {
+  background: linear-gradient(135deg, #ff007f, #ff7700, #ffdd00, #00e5ff, #7928ca);
+  box-shadow: 0 0 12px rgba(255, 119, 0, 0.6), 0 0 20px rgba(0, 229, 255, 0.5);
+  animation: rainbowSpin 5s ease-in-out infinite alternate;
+}
+.frame-rainbow .frame-deco-badge::after {
+  content: '🌈';
+}
+@keyframes rainbowSpin {
+  0% {
+    filter: hue-rotate(0deg);
+  }
+  100% {
+    filter: hue-rotate(90deg);
+  }
+}
+
+/* ==========================================================================
+   CỬA HÀNG VẬT PHẨM & TÚI ĐỒ (CLUB SHOP & INVENTORY)
+   ========================================================================== */
+.btn-shop-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: rgba(204, 255, 0, 0.1);
+  color: var(--volt);
+  border: 1px solid rgba(204, 255, 0, 0.35);
+  padding: 6px 13px;
+  border-radius: var(--radius-full);
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-shop-chip:hover {
+  background: rgba(204, 255, 0, 0.22);
+  border-color: var(--volt);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(204, 255, 0, 0.25);
+}
+
+/* Shop Modal Tabs */
+.shop-modal-tabs {
+  display: flex;
+  gap: 6px;
+  background: rgba(0, 0, 0, 0.25);
+  padding: 4px;
+  border-radius: var(--radius-md);
+}
+
+.shop-tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: none;
+  color: var(--text-muted);
+  font-size: 0.84rem;
+  font-weight: 700;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shop-tab-btn:hover {
+  color: var(--text-primary);
+}
+
+.shop-tab-btn.active {
+  background: var(--bg-surface-elevated, #24344d);
+  color: var(--volt);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.25);
+}
+
+.badge-mini {
+  background: var(--volt);
+  color: #000000;
+  font-size: 0.7rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* Balance Banner */
+.shop-balance-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(204, 255, 0, 0.08), rgba(15, 23, 42, 0.4));
+  border: 1px solid rgba(204, 255, 0, 0.2);
+  border-radius: var(--radius-md);
+  padding: 12px 16px;
+  margin-bottom: 16px;
+}
+
+/* Flat Grid For Shop Items (No shelves) */
+.shop-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.shop-item-card {
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.22s ease;
+  position: relative;
+  overflow: hidden;
+}
+
+.shop-item-card:hover {
+  transform: translateY(-2px);
+  border-color: rgba(204, 255, 0, 0.4);
+  box-shadow: 0 6px 16px rgba(0, 0, 0, 0.35);
+}
+
+.shop-item-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.shop-item-avatar-preview {
+  flex-shrink: 0;
+}
+
+.shop-item-badge {
+  display: inline-block;
+  font-size: 0.68rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  padding: 2px 7px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  margin-bottom: 4px;
+}
+
+.badge-real {
+  background: rgba(56, 189, 248, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.3);
+}
+
+.badge-perk {
+  background: rgba(245, 158, 11, 0.15);
+  color: #f59e0b;
+  border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.badge-male {
+  background: rgba(14, 165, 233, 0.15);
+  color: #38bdf8;
+  border: 1px solid rgba(14, 165, 233, 0.3);
+}
+
+.badge-female {
+  background: rgba(244, 114, 182, 0.15);
+  color: #f472b6;
+  border: 1px solid rgba(244, 114, 182, 0.3);
+}
+
+.shop-item-title {
+  font-size: 0.92rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  line-height: 1.25;
+}
+
+.shop-item-desc {
+  font-size: 0.78rem;
+  color: var(--text-dim);
+  line-height: 1.4;
+  margin-bottom: 14px;
+  flex: 1;
+}
+
+.shop-item-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.shop-item-price {
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #facc15;
+}
+
+.shop-btn-buy {
+  background: var(--volt);
+  color: #000000;
+  border: none;
+  font-size: 0.8rem;
+  font-weight: 800;
+  padding: 6px 14px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.shop-btn-buy:hover:not(:disabled) {
+  background: #d4ff1a;
+  transform: translateY(-1px);
+  box-shadow: 0 4px 10px rgba(204, 255, 0, 0.3);
+}
+
+.shop-btn-owned {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 6px 12px;
+  border-radius: var(--radius-sm);
+  cursor: default;
+}
+
+/* ==========================================================================
+   TÚI ĐỒ (INVENTORY) & ĐẶC QUYỀN KHIÊN ELO
+   ========================================================================== */
+.inventory-perk-banner {
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.12), rgba(15, 23, 42, 0.6));
+  border: 1px solid rgba(245, 158, 11, 0.35);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  margin-bottom: 18px;
+}
+
+.perk-banner-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.perk-banner-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.95rem;
+  font-weight: 800;
+  color: #f59e0b;
+}
+
+.perk-shield-toggle-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 14px;
+  font-size: 0.8rem;
+  font-weight: 800;
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: 1px solid transparent;
+}
+
+.perk-shield-toggle-btn.shield-active {
+  background: #10b981;
+  color: #ffffff;
+  box-shadow: 0 0 12px rgba(16, 185, 129, 0.45);
+}
+
+.perk-shield-toggle-btn.shield-inactive {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+  border-color: rgba(255, 255, 255, 0.15);
+}
+
+.perk-banner-desc {
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.45;
+  margin-top: 8px;
+}
+
+.inventory-section-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.86rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-dim);
+  margin-bottom: 12px;
+}
+
+.inventory-items-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: 12px;
+}
+
+.inventory-card {
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  transition: all 0.2s ease;
+}
+
+.inventory-card:hover {
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.inventory-card.is-active-frame {
+  border-color: var(--volt);
+  background: linear-gradient(135deg, rgba(204, 255, 0, 0.05), var(--bg-surface));
+}
+
+.inventory-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+
+.inventory-card-info {
+  flex: 1;
+}
+
+.inventory-card-name {
+  font-size: 0.88rem;
+  font-weight: 800;
+  color: var(--text-primary);
+  margin-bottom: 2px;
+}
+
+.inventory-card-status {
+  font-size: 0.74rem;
+  color: var(--text-dim);
+}
+
+.inventory-card-bottom {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-top: 8px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.btn-inventory-action {
+  font-size: 0.78rem;
+  font-weight: 700;
+  padding: 5px 12px;
+  border-radius: var(--radius-sm);
+  border: none;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.btn-inventory-equip {
+  background: var(--volt);
+  color: #000000;
+}
+
+.btn-inventory-unequip {
+  background: rgba(255, 255, 255, 0.1);
+  color: var(--text-dim);
+}
+
+.btn-inventory-claim {
+  background: #38bdf8;
+  color: #000000;
+}
+
+/* ==========================================================================
+   BXH ĐẠI GIA XU (RICH LIST STYLING)
+   ========================================================================== */
+.podium-coin-amount {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: #facc15;
+  margin: 4px 0 2px 0;
+  text-shadow: 0 0 10px rgba(250, 204, 21, 0.4);
+}
+
+.rich-title-badge {
+  display: inline-block;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 12px;
+  letter-spacing: 0.04em;
+}
+
+.rich-title-1 {
+  background: rgba(250, 204, 21, 0.2);
+  color: #fde047;
+  border: 1px solid rgba(250, 204, 21, 0.4);
+}
+
+.rich-title-2 {
+  background: rgba(226, 232, 240, 0.2);
+  color: #f1f5f9;
+  border: 1px solid rgba(226, 232, 240, 0.4);
+}
+
+.rich-title-3 {
+  background: rgba(245, 158, 11, 0.2);
+  color: #fbbf24;
+  border: 1px solid rgba(245, 158, 11, 0.4);
+}
+
+.lb-coin-display {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #facc15;
+}
+
+@media (max-width: 640px) {
+  .shop-items-grid,
+  .inventory-items-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+

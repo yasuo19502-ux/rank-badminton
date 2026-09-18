@@ -28,6 +28,8 @@ create table if not exists public.members (
     pin_code text default '',
     coins integer default 100 check (coins >= 0),
     role text default 'member' check (role in ('admin', 'member')),
+    active_frame text default '',
+    active_elo_shield boolean default false,
     created_at timestamp with time zone default timezone('utc'::text, now()),
     updated_at timestamp with time zone default timezone('utc'::text, now())
 );
@@ -275,6 +277,27 @@ create policy "bets_all_access" on public.bets for all using (true) with check (
 alter table public.bets replica identity full;
 
 -- ====================================================================
+-- 9. BẢNG TÚI ĐỒ & VẬT PHẨM THÀNH VIÊN (USER_INVENTORY - GIAI ĐOẠN 3)
+-- Quản lý cuốn cán vợt, khiên bảo vệ Elo và bộ sưu tập khung Avatar
+-- ====================================================================
+create table if not exists public.user_inventory (
+    id text primary key,
+    member_id text not null references public.members(id) on delete cascade,
+    item_id text not null,                -- 'grip', 'elo_shield', 'frame_fire', ...
+    item_type text not null,              -- 'consumable', 'perk', 'frame'
+    quantity integer not null default 1 check (quantity >= 0),
+    status text not null default 'available' check (status in ('available', 'used', 'equipped')),
+    created_at timestamp with time zone default timezone('utc'::text, now()),
+    updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+
+create index if not exists idx_inventory_member on public.user_inventory (member_id);
+alter table public.user_inventory enable row level security;
+drop policy if exists "inventory_all_access" on public.user_inventory;
+create policy "inventory_all_access" on public.user_inventory for all using (true) with check (true);
+alter table public.user_inventory replica identity full;
+
+-- ====================================================================
 -- BẬT SUPABASE REALTIME (TỰ ĐỘNG PHÁT SỰ KIỆN TỚI MỌI TRÌNH DUYỆT WEB)
 -- ====================================================================
 begin;
@@ -290,6 +313,7 @@ alter publication supabase_realtime add table public.live_court;
 alter publication supabase_realtime add table public.club_settings;
 alter publication supabase_realtime add table public.coin_transactions;
 alter publication supabase_realtime add table public.bets;
+alter publication supabase_realtime add table public.user_inventory;
 
 -- ====================================================================
 -- SCRIPT NÂNG CẤP NHANH CHO DATABASE ĐÃ CÓ TỪ TRƯỚC (CHẠY TRONG SQL EDITOR)
@@ -336,7 +360,28 @@ drop policy if exists "bets_all_access" on public.bets;
 create policy "bets_all_access" on public.bets for all using (true) with check (true);
 alter table public.bets replica identity full;
 
+-- 3. Nâng cấp Giai đoạn 3 (Cửa Hàng, Túi Đồ, Khung Avatar & Khiên Elo):
+alter table public.members add column if not exists active_frame text default '';
+alter table public.members add column if not exists active_elo_shield boolean default false;
+
+create table if not exists public.user_inventory (
+    id text primary key,
+    member_id text not null references public.members(id) on delete cascade,
+    item_id text not null,
+    item_type text not null,
+    quantity integer not null default 1 check (quantity >= 0),
+    status text not null default 'available' check (status in ('available', 'used', 'equipped')),
+    created_at timestamp with time zone default timezone('utc'::text, now()),
+    updated_at timestamp with time zone default timezone('utc'::text, now())
+);
+create index if not exists idx_inventory_member on public.user_inventory (member_id);
+alter table public.user_inventory enable row level security;
+drop policy if exists "inventory_all_access" on public.user_inventory;
+create policy "inventory_all_access" on public.user_inventory for all using (true) with check (true);
+alter table public.user_inventory replica identity full;
+
 alter publication supabase_realtime add table public.coin_transactions;
 alter publication supabase_realtime add table public.bets;
+alter publication supabase_realtime add table public.user_inventory;
 */
 
