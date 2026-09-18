@@ -36,7 +36,7 @@ function assert(condition, message) {
 console.log('\n=== BẮT ĐẦU KIỂM THỬ GIAI ĐOẠN 3 ===\n');
 
 // 1. Kiểm tra cấu hình SHOP_ITEMS
-assert(SHOP_ITEMS.length === 10, `SHOP_ITEMS có đủ 10 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
+assert(SHOP_ITEMS.length === 11, `SHOP_ITEMS có đủ 11 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
 const gripDef = SHOP_ITEMS.find(i => i.id === 'grip');
 assert(gripDef && gripDef.price === 120 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 120 xu, type consumable');
 
@@ -44,12 +44,13 @@ const shieldDef = SHOP_ITEMS.find(i => i.id === 'elo_shield');
 assert(shieldDef && shieldDef.price === 100 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 100 xu, type perk');
 
 const frames = SHOP_ITEMS.filter(i => i.type === 'frame');
-assert(frames.length === 8, `Có đủ 8 Khung Avatar (hiện có: ${frames.length})`);
+assert(frames.length === 9, `Có đủ 9 Khung Avatar (hiện có: ${frames.length})`);
 
-const maleFrames = frames.filter(f => f.category === 'male');
-const femaleFrames = frames.filter(f => f.category === 'female');
-assert(maleFrames.length === 4, `Có 4 khung Nam/Unisex: ${maleFrames.map(f => f.name).join(', ')}`);
-assert(femaleFrames.length === 4, `Có 4 khung Nữ/Dễ thương: ${femaleFrames.map(f => f.name).join(', ')}`);
+const waterFrame = frames.find(f => f.id === 'frame_water');
+assert(waterFrame && waterFrame.hasAnimation === true, 'Có khung Thủy Triều Đại Dương (Nước) kèm hoạt ảnh');
+
+const fireFrame = frames.find(f => f.id === 'frame_fire');
+assert(fireFrame && fireFrame.hasAnimation === true, 'Có khung Hỏa Phụng Chiến Thần (Lửa) kèm hoạt ảnh');
 
 // Setup Mock Data
 const testMember = {
@@ -116,7 +117,9 @@ assert(updatedMem.activeFrame === 'frame_fire', 'activeFrame của thành viên 
 // Render Avatar có khung
 const htmlWithFrame = renderAvatarHtml(updatedMem, { size: 'md' });
 assert(htmlWithFrame.includes('frame-fire'), 'Markup renderAvatarHtml chứa class frame-fire');
-assert(htmlWithFrame.includes('frame-deco-badge'), 'Markup renderAvatarHtml chứa thẻ deco badge');
+assert(!htmlWithFrame.includes('frame-crest'), 'Markup renderAvatarHtml KHÔNG chứa frame-crest (đã bỏ icon đỉnh đầu)');
+assert(!htmlWithFrame.includes('frame-deco-badge'), 'Markup renderAvatarHtml KHÔNG chứa frame-deco-badge');
+assert(htmlWithFrame.includes('frame-fx-layer'), 'Markup renderAvatarHtml chứa lớp frame-fx-layer hoạt ảnh nguyên tố');
 
 // Tháo khung
 equipRes = StorageService.equipAvatarFrame(testMember.id, '');

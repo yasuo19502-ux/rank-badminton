@@ -120,28 +120,14 @@ export function renderAvatarHtml(member, options = {}) {
   }
 
   const frameType = activeFrame.replace(/^frame_/, '');
-  const crestIcons = {
-    gold: '👑',
-    fire: '🔥',
-    neon: '⚡',
-    diamond: '💎',
-    moon: '🌙',
-    sakura: '🌸',
-    carbon: '🖤',
-    rainbow: '🌈'
-  };
-  const crestIcon = crestIcons[frameType] || '✨';
 
   return `
     <div class="avatar-container avatar-${size} avatar-frame-wrap frame-${frameType} ${extraClass}" data-frame="${activeFrame}" style="${wrapStyle}">
       <div class="frame-aura"></div>
+      <div class="frame-fx-layer"></div>
       <div class="frame-spin-ring"></div>
       <div class="frame-inner-ring"></div>
       <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
-      <div class="frame-crest" data-frame="${activeFrame}">
-        <span class="crest-icon">${crestIcon}</span>
-      </div>
-      <span class="frame-deco-badge" data-frame="${activeFrame}"></span>
     </div>
   `;
 }

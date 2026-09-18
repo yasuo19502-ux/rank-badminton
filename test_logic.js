@@ -5,9 +5,22 @@ import { INITIAL_MEMBERS, INITIAL_MATCHES } from './src/js/storage.js';
 console.log('--- 1. KIỂM TRA BẬC RANK (TIERS) ---');
 TIERS.forEach(t => console.log(`${t.icon} ${t.name} (${t.minElo} - ${t.maxElo})`));
 
+const mockMembers = INITIAL_MEMBERS.length >= 5 ? INITIAL_MEMBERS : [
+  { id: '1', name: 'Long', elo: 1420, gender: 'male', matchesPlayed: 10, wins: 8 },
+  { id: '2', name: 'Nam', elo: 1300, gender: 'male', matchesPlayed: 5, wins: 3 },
+  { id: '3', name: 'Hương', elo: 1350, gender: 'female', matchesPlayed: 8, wins: 6 },
+  { id: '4', name: 'Huy', elo: 1460, gender: 'male', matchesPlayed: 12, wins: 9 },
+  { id: '5', name: 'Yến', elo: 1290, gender: 'female', matchesPlayed: 6, wins: 3 },
+  { id: '6', name: 'Tuấn', elo: 1250, gender: 'male', matchesPlayed: 4, wins: 2 },
+  { id: '7', name: 'Mai', elo: 1310, gender: 'female', matchesPlayed: 7, wins: 4 },
+  { id: '8', name: 'Đức', elo: 1400, gender: 'male', matchesPlayed: 9, wins: 6 },
+  { id: '9', name: 'Linh', elo: 1220, gender: 'female', matchesPlayed: 5, wins: 2 },
+  { id: '10', name: 'Phong', elo: 1380, gender: 'male', matchesPlayed: 11, wins: 7 }
+];
+
 console.log('\n--- 2. KIỂM TRA TÍNH DOUBLES ELO ---');
-const team1 = [INITIAL_MEMBERS[0], INITIAL_MEMBERS[2]]; // Long (1420), Hương (1350) -> Avg: 1385
-const team2 = [INITIAL_MEMBERS[3], INITIAL_MEMBERS[4]]; // Huy (1460), Yến (1290) -> Avg: 1375
+const team1 = [mockMembers[0], mockMembers[2]]; // Long (1420), Hương (1350) -> Avg: 1385
+const team2 = [mockMembers[3], mockMembers[4]]; // Huy (1460), Yến (1290) -> Avg: 1375
 const eloRes = calculateDoublesElo(team1, team2, 21, 19);
 console.log('Kết quả 21-19:');
 console.log(`Team 1 (Avg ${eloRes.team1Elo}) vs Team 2 (Avg ${eloRes.team2Elo})`);
@@ -17,7 +30,7 @@ const eloBlowout = calculateDoublesElo(team1, team2, 21, 8);
 console.log(`Kết quả thắng đậm 21-8: Delta Team 1: +${eloBlowout.deltaTeam1} (cao hơn khi thắng suýt sao)`);
 
 console.log('\n--- 3. KIỂM TRA THUẬT TOÁN GHÉP CẶP (MATCHMAKER) ---');
-const present = INITIAL_MEMBERS.slice(0, 10);
+const present = mockMembers.slice(0, 10);
 const balancedMatch = MatchmakerService.createMatch(present, {}, 'balanced');
 console.log('Trận Cân Kèo:');
 console.log(`Đội 1: ${balancedMatch.team1[0].name} & ${balancedMatch.team1[1].name}`);
@@ -30,7 +43,7 @@ console.log(`Đội 1: ${mixedMatch.team1[0].name} (${mixedMatch.team1[0].gender
 console.log(`Đội 2: ${mixedMatch.team2[0].name} (${mixedMatch.team2[0].gender}) & ${mixedMatch.team2[1].name} (${mixedMatch.team2[1].gender})`);
 
 console.log('\n--- 4. KIỂM TRA VINH DANH (BADGES) ---');
-const badges = calculateBadges(INITIAL_MEMBERS, INITIAL_MATCHES);
+const badges = calculateBadges(mockMembers, INITIAL_MATCHES);
 badges.forEach(b => console.log(`${b.icon} ${b.title}: ${b.player.name} - ${b.detail}`));
 
 console.log('\n=== TẤT CẢ MODULE HOẠT ĐỘNG HOÀN HẢO! ===');

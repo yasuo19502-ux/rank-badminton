@@ -3961,159 +3961,282 @@ button {
   border: 1.5px solid rgba(0, 0, 0, 0.45);
 }
 
-/* 4. Vương Miện & Huy Hiệu Đỉnh Đầu 3D (Top Crest) */
-.frame-crest {
+/* 4. Lớp Hiệu Ứng Nguyên Tố Động (Elemental FX Layer) */
+.frame-fx-layer {
   position: absolute;
-  top: -11px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 6;
-  pointer-events: none;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  line-height: 1;
-  font-size: 16px;
-  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
-  transition: transform 0.2s ease;
-}
-
-.avatar-xs .frame-crest { top: -7px; font-size: 11px; }
-.avatar-sm .frame-crest { top: -9px; font-size: 13px; }
-.avatar-md .frame-crest { top: -11px; font-size: 16px; }
-.avatar-lg .frame-crest { top: -14px; font-size: 21px; }
-.avatar-xl .frame-crest { top: -19px; font-size: 29px; }
-
-/* Trang trí góc dưới khung avatar */
-.frame-deco-badge {
-  position: absolute;
-  bottom: -2px;
-  right: -2px;
-  width: 17px;
-  height: 17px;
+  inset: -5px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.9);
-  border: 1.5px solid rgba(255, 255, 255, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  font-size: 9px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
-  z-index: 6;
+  pointer-events: none;
+  z-index: 2;
+  transition: all 0.3s ease;
+}
+.frame-fx-layer::before,
+.frame-fx-layer::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
   pointer-events: none;
 }
 
-.avatar-xs .frame-deco-badge { display: none; }
-.avatar-lg .frame-deco-badge,
-.avatar-xl .frame-deco-badge {
-  width: 22px;
-  height: 22px;
-  font-size: 11px;
-  bottom: -1px;
-  right: -1px;
-}
+.avatar-xs .frame-fx-layer { inset: -3px; }
+.avatar-sm .frame-fx-layer { inset: -4px; }
+.avatar-md .frame-fx-layer { inset: -5px; }
+.avatar-lg .frame-fx-layer { inset: -7px; }
+.avatar-xl .frame-fx-layer { inset: -10px; }
 
 /* ==========================================================================
-   CHI TIẾT 8 KHUNG THEO CHỦ ĐỀ & ANIMATION
+   CHI TIẾT CÁC KHUNG NGUYÊN TỐ & ANIMATION ĐỘC BẢN (KHÔNG ICON ĐỈNH ĐẦU)
    ========================================================================== */
 
-/* 1. KHUNG RỒNG VÀNG HOÀNG GIA (Ultimate Supreme VIP - 500 Xu) */
-.frame-gold .frame-spin-ring {
-  background: conic-gradient(from 0deg, #ffe066 0%, #f59e0b 25%, #ffffff 40%, #ffd700 65%, #b45309 85%, #ffe066 100%);
-  animation: frameSpin 3s linear infinite;
-  box-shadow: 0 0 12px #f59e0b, inset 0 0 4px #ffd700;
-}
-.frame-gold .frame-aura {
-  background: radial-gradient(circle, rgba(255, 215, 0, 0.9) 10%, rgba(245, 158, 11, 0.5) 60%, transparent 85%);
-  animation: goldAuraPulse 2s ease-in-out infinite alternate;
-}
-.frame-gold .frame-crest {
-  filter: drop-shadow(0 0 6px #ffd700) drop-shadow(0 0 14px #f59e0b);
-  animation: crownFloat 2s ease-in-out infinite alternate;
-}
-.frame-gold .frame-deco-badge::after { content: '👑'; }
-@keyframes crownFloat {
-  0% { transform: translateX(-50%) translateY(0) scale(1); }
-  100% { transform: translateX(-50%) translateY(-3px) scale(1.15); }
-}
-@keyframes goldAuraPulse {
-  0% { opacity: 0.65; filter: blur(5px) scale(0.98); }
-  100% { opacity: 1; filter: blur(9px) scale(1.1); }
-}
-
-/* 2. KHUNG HỎA PHỤNG CHIẾN THẦN (Mythic Legendary - 380 Xu) */
+/* 1. KHUNG HỎA PHỤNG CHIẾN THẦN (Mythic Legendary LỬA - 380 Xu) */
 .frame-fire .frame-spin-ring {
-  background: conic-gradient(from 0deg, #ff0055 0%, #ff4500 30%, #ffea00 50%, #ff1a1a 75%, #ff0055 100%);
+  background: conic-gradient(
+    from 0deg,
+    #ff0033 0%,
+    #ff4500 18%,
+    #ffea00 32%,
+    #ffffff 38%,
+    #ff7700 52%,
+    #ff1100 70%,
+    #ff0055 85%,
+    #ff0033 100%
+  );
   animation: frameSpin 2.2s linear infinite;
-  box-shadow: 0 0 12px #ff4500, inset 0 0 4px #ff0055;
+  box-shadow: 0 0 14px #ff3700, 0 0 24px rgba(255, 69, 0, 0.6), inset 0 0 4px #ffdd00;
 }
 .frame-fire .frame-aura {
-  background: radial-gradient(circle, rgba(255, 69, 0, 0.9) 0%, rgba(255, 0, 85, 0.5) 65%, transparent 85%);
-  animation: fireAuraFlicker 1.5s ease-in-out infinite alternate;
+  background: radial-gradient(
+    circle,
+    rgba(255, 69, 0, 0.95) 0%,
+    rgba(255, 0, 85, 0.6) 50%,
+    rgba(255, 200, 0, 0.2) 75%,
+    transparent 85%
+  );
+  animation: fireAuraFlicker 1.1s ease-in-out infinite alternate;
 }
-.frame-fire .frame-crest {
-  filter: drop-shadow(0 0 6px #ff3b00) drop-shadow(0 0 14px #ff9900);
-  animation: flameDance 1.4s ease-in-out infinite alternate;
+.frame-fire .frame-fx-layer {
+  animation: fireTurbulence 1.8s ease-in-out infinite alternate;
 }
-.frame-fire .frame-deco-badge::after { content: '🔥'; }
-@keyframes flameDance {
-  0% { transform: translateX(-50%) translateY(0) scale(1) rotate(-4deg); }
-  100% { transform: translateX(-50%) translateY(-3px) scale(1.18) rotate(4deg); }
+.frame-fire .frame-fx-layer::before {
+  inset: -3px;
+  border-radius: 46% 54% 48% 52% / 52% 47% 53% 48%;
+  background: conic-gradient(
+    from 45deg,
+    transparent 0%,
+    rgba(255, 230, 0, 0.85) 15%,
+    rgba(255, 60, 0, 0.95) 30%,
+    transparent 45%,
+    rgba(255, 140, 0, 0.9) 65%,
+    rgba(255, 0, 50, 0.8) 80%,
+    transparent 100%
+  );
+  animation: flameTonguesSpin 1.8s linear infinite;
+  filter: blur(1.5px);
+}
+.frame-fire .frame-fx-layer::after {
+  inset: -5px;
+  border-radius: 53% 47% 52% 48% / 47% 53% 47% 53%;
+  box-shadow:
+    0 -4px 12px rgba(255, 120, 0, 0.9),
+    0 4px 14px rgba(255, 20, 0, 0.8),
+    -4px 0 10px rgba(255, 200, 0, 0.8),
+    4px 0 12px rgba(255, 50, 0, 0.85);
+  animation: flameEmberFlicker 1.3s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+@keyframes flameTonguesSpin {
+  0% { transform: rotate(0deg) scale(0.98); }
+  50% { transform: rotate(180deg) scale(1.06); }
+  100% { transform: rotate(360deg) scale(0.98); }
+}
+@keyframes flameEmberFlicker {
+  0% { transform: scale(0.95) rotate(-2deg); opacity: 0.75; filter: brightness(1); }
+  50% { transform: scale(1.08) rotate(3deg); opacity: 1; filter: brightness(1.35); }
+  100% { transform: scale(0.97) rotate(-1deg); opacity: 0.85; filter: brightness(1.1); }
+}
+@keyframes fireTurbulence {
+  0% { transform: scale(0.98); }
+  100% { transform: scale(1.04); }
 }
 @keyframes fireAuraFlicker {
-  0% { opacity: 0.65; filter: blur(5px); }
-  100% { opacity: 1; filter: blur(10px) scale(1.08); }
+  0% { opacity: 0.7; filter: blur(5px) brightness(1); }
+  100% { opacity: 1; filter: blur(10px) brightness(1.3) scale(1.1); }
 }
 
-/* 3. KHUNG KIM CƯƠNG TINH THỂ (Mythic Legendary - 420 Xu) */
+/* 2. KHUNG THỦY TRIỀU ĐẠI DƯƠNG (Mythic Legendary NƯỚC - 350 Xu) */
+.frame-water .frame-spin-ring {
+  background: conic-gradient(
+    from 0deg,
+    #00f2fe 0%,
+    #0077ff 22%,
+    #ffffff 38%,
+    #00e5ff 50%,
+    #0038a8 70%,
+    #00d4ff 85%,
+    #00f2fe 100%
+  );
+  animation: frameSpin 2.6s linear infinite;
+  box-shadow: 0 0 14px #00bfff, 0 0 24px rgba(0, 180, 255, 0.6), inset 0 0 4px #00f2fe;
+}
+.frame-water .frame-aura {
+  background: radial-gradient(
+    circle,
+    rgba(0, 242, 254, 0.9) 0%,
+    rgba(0, 102, 255, 0.55) 55%,
+    rgba(0, 255, 240, 0.2) 75%,
+    transparent 85%
+  );
+  animation: waterAuraSurge 1.8s ease-in-out infinite alternate;
+}
+.frame-water .frame-fx-layer {
+  animation: waterVortexSurge 2.2s ease-in-out infinite alternate;
+}
+.frame-water .frame-fx-layer::before {
+  inset: -3px;
+  border-radius: 48% 52% 54% 46% / 51% 48% 52% 49%;
+  background: conic-gradient(
+    from 90deg,
+    transparent 0%,
+    rgba(0, 242, 254, 0.85) 20%,
+    rgba(255, 255, 255, 0.9) 35%,
+    transparent 50%,
+    rgba(0, 140, 255, 0.85) 70%,
+    rgba(0, 255, 240, 0.75) 85%,
+    transparent 100%
+  );
+  animation: waterWhirlpoolSpin 2.4s linear infinite;
+  filter: blur(1.5px);
+}
+.frame-water .frame-fx-layer::after {
+  inset: -5px;
+  border-radius: 52% 48% 47% 53% / 48% 52% 48% 52%;
+  box-shadow:
+    0 -4px 12px rgba(0, 242, 254, 0.85),
+    0 4px 14px rgba(0, 102, 255, 0.8),
+    -4px 0 12px rgba(0, 210, 255, 0.75),
+    4px 0 12px rgba(0, 140, 255, 0.7);
+  animation: waterWaveBreath 1.6s ease-in-out infinite alternate;
+  mix-blend-mode: screen;
+}
+
+@keyframes waterWhirlpoolSpin {
+  0% { transform: rotate(0deg) scale(0.98); }
+  50% { transform: rotate(180deg) scale(1.05); }
+  100% { transform: rotate(360deg) scale(0.98); }
+}
+@keyframes waterWaveBreath {
+  0% { transform: scale(0.96) rotate(-2deg); opacity: 0.75; filter: brightness(1); }
+  50% { transform: scale(1.06) rotate(2deg); opacity: 1; filter: brightness(1.25); }
+  100% { transform: scale(0.98) rotate(-1deg); opacity: 0.85; filter: brightness(1.1); }
+}
+@keyframes waterVortexSurge {
+  0% { transform: scale(0.98); }
+  100% { transform: scale(1.03); }
+}
+@keyframes waterAuraSurge {
+  0% { opacity: 0.65; filter: blur(5px) scale(0.97); }
+  100% { opacity: 1; filter: blur(10px) scale(1.09); }
+}
+
+/* 3. KHUNG RỒNG VÀNG HOÀNG GIA (Ultimate Supreme VIP - 500 Xu) */
+.frame-gold .frame-spin-ring {
+  background: conic-gradient(
+    from 0deg,
+    #ffe066 0%,
+    #f59e0b 22%,
+    #ffffff 38%,
+    #ffd700 55%,
+    #b45309 75%,
+    #ffe066 100%
+  );
+  animation: frameSpin 2.8s linear infinite;
+  box-shadow: 0 0 16px #f59e0b, 0 0 28px rgba(255, 215, 0, 0.6), inset 0 0 4px #ffd700;
+}
+.frame-gold .frame-aura {
+  background: radial-gradient(
+    circle,
+    rgba(255, 215, 0, 0.95) 10%,
+    rgba(245, 158, 11, 0.55) 60%,
+    transparent 85%
+  );
+  animation: goldAuraPulse 1.8s ease-in-out infinite alternate;
+}
+.frame-gold .frame-fx-layer::before {
+  inset: -3px;
+  background: conic-gradient(from 0deg, transparent 0%, rgba(255, 255, 255, 0.9) 25%, transparent 50%, rgba(255, 215, 0, 0.8) 75%, transparent 100%);
+  animation: frameSpin 3.5s linear infinite reverse;
+  filter: blur(1px);
+}
+@keyframes goldAuraPulse {
+  0% { opacity: 0.7; filter: blur(5px) scale(0.98); }
+  100% { opacity: 1; filter: blur(10px) scale(1.1); }
+}
+
+/* 4. KHUNG KIM CƯƠNG TINH THỂ (Mythic Legendary - 420 Xu) */
 .frame-diamond .frame-spin-ring {
-  background: conic-gradient(from 0deg, #38bdf8 0%, #ec4899 25%, #a855f7 50%, #67e8f9 75%, #38bdf8 100%);
-  animation: frameSpin 3.5s linear infinite;
-  box-shadow: 0 0 14px rgba(103, 232, 249, 0.85);
+  background: conic-gradient(
+    from 0deg,
+    #38bdf8 0%,
+    #ec4899 25%,
+    #ffffff 40%,
+    #a855f7 60%,
+    #67e8f9 80%,
+    #38bdf8 100%
+  );
+  animation: frameSpin 3.2s linear infinite;
+  box-shadow: 0 0 16px rgba(103, 232, 249, 0.9), 0 0 24px rgba(236, 72, 153, 0.5);
 }
 .frame-diamond .frame-aura {
-  background: radial-gradient(circle, rgba(103, 232, 249, 0.85) 0%, rgba(236, 72, 153, 0.5) 60%, transparent 85%);
-  animation: diamondShimmer 2.5s linear infinite alternate;
+  background: radial-gradient(
+    circle,
+    rgba(103, 232, 249, 0.9) 0%,
+    rgba(236, 72, 153, 0.55) 55%,
+    transparent 85%
+  );
+  animation: diamondShimmer 2.2s linear infinite alternate;
 }
-.frame-diamond .frame-crest {
-  filter: drop-shadow(0 0 8px #67e8f9) drop-shadow(0 0 14px #ec4899);
-  animation: diamondGlisten 1.8s ease-in-out infinite alternate;
-}
-.frame-diamond .frame-deco-badge::after { content: '💎'; }
-@keyframes diamondGlisten {
-  0% { transform: translateX(-50%) scale(1) rotate(0deg); }
-  100% { transform: translateX(-50%) scale(1.15) rotate(12deg); }
+.frame-diamond .frame-fx-layer::before {
+  inset: -2px;
+  background: conic-gradient(from 45deg, transparent 0%, rgba(255, 255, 255, 0.85) 30%, transparent 60%, rgba(168, 85, 247, 0.7) 85%, transparent 100%);
+  animation: frameSpin 4s linear infinite reverse;
+  filter: blur(1px);
 }
 @keyframes diamondShimmer {
-  0% { filter: hue-rotate(0deg) blur(6px); }
-  100% { filter: hue-rotate(60deg) blur(10px); }
+  0% { filter: hue-rotate(0deg) blur(6px); opacity: 0.7; }
+  100% { filter: hue-rotate(60deg) blur(10px); opacity: 1; }
 }
 
-/* 4. KHUNG TIA CHỚP CYBERPUNK (Legendary VIP - 320 Xu) */
+/* 5. KHUNG TIA CHỚP CYBERPUNK (Legendary VIP - 320 Xu) */
 .frame-neon .frame-spin-ring {
-  background: conic-gradient(from 0deg, #00f0ff 0%, #ccff00 35%, #0066ff 60%, #00f0ff 100%);
-  animation: frameSpin 1.8s linear infinite;
-  box-shadow: 0 0 14px #00f0ff, 0 0 20px #ccff00;
+  background: conic-gradient(
+    from 0deg,
+    #00f0ff 0%,
+    #ccff00 30%,
+    #ffffff 45%,
+    #0066ff 65%,
+    #00f0ff 100%
+  );
+  animation: frameSpin 1.6s linear infinite;
+  box-shadow: 0 0 16px #00f0ff, 0 0 24px #ccff00;
 }
 .frame-neon .frame-aura {
-  background: radial-gradient(circle, rgba(0, 240, 255, 0.9) 0%, rgba(204, 255, 0, 0.55) 65%, transparent 85%);
-  animation: electricStrobe 1.6s ease-in-out infinite alternate;
-}
-.frame-neon .frame-crest {
-  filter: drop-shadow(0 0 6px #00f0ff) drop-shadow(0 0 14px #ccff00);
-  animation: boltFlicker 1s steps(2, start) infinite alternate;
-}
-.frame-neon .frame-deco-badge::after { content: '⚡'; }
-@keyframes boltFlicker {
-  0% { transform: translateX(-50%) scale(1); filter: brightness(1) drop-shadow(0 0 6px #00f0ff); }
-  100% { transform: translateX(-50%) scale(1.2); filter: brightness(1.4) drop-shadow(0 0 14px #ccff00); }
+  background: radial-gradient(
+    circle,
+    rgba(0, 240, 255, 0.9) 0%,
+    rgba(204, 255, 0, 0.6) 60%,
+    transparent 85%
+  );
+  animation: electricStrobe 1.2s ease-in-out infinite alternate;
 }
 @keyframes electricStrobe {
   0% { opacity: 0.6; filter: blur(5px); }
-  100% { opacity: 1; filter: blur(10px) scale(1.08); }
+  50% { opacity: 0.95; filter: blur(8px) brightness(1.3); }
+  100% { opacity: 0.75; filter: blur(10px) scale(1.08); }
 }
 
-/* 5. KHUNG NGUYỆT DẠ THỎ NGỌC (Rare - 220 Xu) */
+/* 6. KHUNG NGUYỆT DẠ THỎ NGỌC (Rare - 220 Xu) */
 .frame-moon .frame-spin-ring {
   background: linear-gradient(135deg, #c084fc, #818cf8, #f472b6, #a855f7);
   box-shadow: 0 0 12px rgba(192, 132, 252, 0.85), inset 0 0 4px #ffffff;
@@ -4122,21 +4245,12 @@ button {
   background: radial-gradient(circle, rgba(192, 132, 252, 0.8) 0%, rgba(129, 140, 248, 0.45) 70%, transparent 85%);
   animation: moonPulse 3s ease-in-out infinite alternate;
 }
-.frame-moon .frame-crest {
-  filter: drop-shadow(0 0 6px #c084fc) drop-shadow(0 0 10px #818cf8);
-  animation: moonFloat 2.5s ease-in-out infinite alternate;
-}
-.frame-moon .frame-deco-badge::after { content: '🌙'; }
-@keyframes moonFloat {
-  0% { transform: translateX(-50%) translateY(0); }
-  100% { transform: translateX(-50%) translateY(-2.5px) scale(1.1); }
-}
 @keyframes moonPulse {
   0% { opacity: 0.6; }
   100% { opacity: 0.95; filter: blur(8px); }
 }
 
-/* 6. KHUNG HOA ANH ĐÀO TUYẾT (Rare - 200 Xu) */
+/* 7. KHUNG HOA ANH ĐÀO TUYẾT (Rare - 200 Xu) */
 .frame-sakura .frame-spin-ring {
   background: linear-gradient(135deg, #fda4af, #f43f5e, #fbcfe8, #fb7185);
   box-shadow: 0 0 12px rgba(251, 113, 133, 0.85), inset 0 0 4px #ffffff;
@@ -4145,21 +4259,12 @@ button {
   background: radial-gradient(circle, rgba(251, 113, 133, 0.8) 0%, rgba(253, 164, 175, 0.45) 70%, transparent 85%);
   animation: sakuraPulse 2.8s ease-in-out infinite alternate;
 }
-.frame-sakura .frame-crest {
-  filter: drop-shadow(0 0 6px #fb7185);
-  animation: sakuraFloat 2.2s ease-in-out infinite alternate;
-}
-.frame-sakura .frame-deco-badge::after { content: '🌸'; }
-@keyframes sakuraFloat {
-  0% { transform: translateX(-50%) rotate(-5deg); }
-  100% { transform: translateX(-50%) rotate(5deg) scale(1.1); }
-}
 @keyframes sakuraPulse {
   0% { opacity: 0.55; }
   100% { opacity: 0.95; filter: blur(8px); }
 }
 
-/* 7. KHUNG CẦU VỒNG NĂNG LƯỢNG (Rare - 180 Xu) */
+/* 8. KHUNG CẦU VỒNG NĂNG LƯỢNG (Rare - 180 Xu) */
 .frame-rainbow .frame-spin-ring {
   background: conic-gradient(from 0deg, #ff0055, #ff7700, #ffdd00, #00e5ff, #7928ca, #ff0055);
   animation: frameSpin 4.5s linear infinite;
@@ -4168,12 +4273,8 @@ button {
 .frame-rainbow .frame-aura {
   background: radial-gradient(circle, rgba(255, 119, 0, 0.6) 0%, rgba(0, 229, 255, 0.4) 65%, transparent 85%);
 }
-.frame-rainbow .frame-crest {
-  filter: drop-shadow(0 0 6px #ff7700);
-}
-.frame-rainbow .frame-deco-badge::after { content: '🌈'; }
 
-/* 8. KHUNG TITAN HẮC BÁO (Rare - 150 Xu) */
+/* 9. KHUNG TITAN HẮC BÁO (Rare - 150 Xu) */
 .frame-carbon .frame-spin-ring {
   background: linear-gradient(135deg, #1e293b, #64748b, #0f172a, #94a3b8);
   border: 2px solid #cbd5e1;
@@ -4182,10 +4283,6 @@ button {
 .frame-carbon .frame-aura {
   background: radial-gradient(circle, rgba(148, 163, 184, 0.5) 0%, rgba(30, 41, 59, 0.6) 70%, transparent 85%);
 }
-.frame-carbon .frame-crest {
-  filter: drop-shadow(0 0 5px #94a3b8);
-}
-.frame-carbon .frame-deco-badge::after { content: '🖤'; }
 
 /* Chung cho hiệu ứng xoay tròn */
 @keyframes frameSpin {

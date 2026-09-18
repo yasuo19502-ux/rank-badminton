@@ -106,7 +106,20 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Huyền Thoại VIP ⚡',
-    description: '⚡ Animation sấm sét: Luồng xung điện Cyan & Volt xoay vòng quét sáng 360°, tia chớp giật lóe công nghệ đỉnh cao.'
+    description: '⚡ Hoạt ảnh Sấm Sét: Luồng xung điện Cyan & Volt xoay vòng quét sáng 360°, các tia chớp giật lóe công nghệ đỉnh cao.'
+  },
+  {
+    id: 'frame_water',
+    name: 'Khung Thủy Triều Đại Dương',
+    price: 350,
+    icon: '🌊',
+    type: 'frame',
+    category: 'female',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Unisex / Mát lạnh',
+    tierBadge: 'Thần Thoại VIP 🌊',
+    description: '🌊 Hoạt ảnh Thủy Triều: Dòng nước đại dương cuộn trào xoay 360°, những con sóng ngầm và xoáy nước xanh biếc chuyển động liên tục quanh viền avatar.'
   },
   {
     id: 'frame_fire',
@@ -119,7 +132,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Thần Thoại VIP 🔥',
-    description: '🔥 Animation ngọn lửa: Vòng lửa địa ngục cuộn trào rực cháy xoay quanh avatar, biểu tượng ngọn lửa bất diệt đỉnh đầu.'
+    description: '🔥 Hoạt ảnh Lửa Cháy: Ngọn lửa địa ngục bập bùng rực cháy cuộn trào 360°, hào quang nhiệt bốc cao cùng các đốm lửa chuyển động quanh viền avatar cực ngầu.'
   },
   {
     id: 'frame_diamond',
@@ -132,7 +145,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nữ / Dễ thương',
     tierBadge: 'Thần Thoại VIP 💎',
-    description: '💎 Animation lăng kính: Ánh kim cương ngũ sắc quét tia sáng 360°, phản chiếu lấp lánh như viên ngọc quý giá nhất.'
+    description: '💎 Hoạt ảnh Lăng Kính: Ánh kim cương ngũ sắc quét tia sáng 360°, các tinh thể phát sáng phản chiếu lấp lánh như viên ngọc quý giá.'
   },
   {
     id: 'frame_gold',
@@ -145,7 +158,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Vô Địch Tối Thượng 👑',
-    description: '👑 Animation Độc Bản VIP: Vương Miện Hoàng Gia dát vàng tỏa sáng đỉnh đầu, hào quang Rồng Vàng xoay tròn uy nghiêm tối thượng.'
+    description: '👑 Hoạt ảnh Hoàng Gia VIP: Vòng kim quang dát vàng xoay tròn 360°, hào quang Rồng Vàng tỏa sáng uy nghiêm tối thượng.'
   }
 ];
 
