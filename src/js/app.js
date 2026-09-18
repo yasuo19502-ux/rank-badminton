@@ -2054,7 +2054,7 @@ function renderMembers() {
 
         <div class="member-card-profile" onclick="window.appViewPlayerProfile('${m.id}')" style="cursor: pointer;" title="Bấm để xem hồ sơ chi tiết">
           <div class="member-card-avatar-wrap" onclick="event.stopPropagation(); ${isMe || isAdmin ? `window.appTriggerAvatarUpload('${m.id}')` : `window.appViewPlayerProfile('${m.id}')`}" title="${isMe || isAdmin ? 'Bấm để đổi ảnh đại diện' : 'Xem hồ sơ'}">
-            ${renderAvatarHtml(m, { size: 'lg' })}
+            ${renderAvatarHtml(m, { size: 'md' })}
             ${isMe || isAdmin ? `<div class="camera-overlay-badge">📷</div>` : ''}
           </div>
           <div style="min-width: 0; flex: 1;">
@@ -3478,10 +3478,11 @@ function renderClubShop() {
   // 1. RENDER SHOP ITEMS (Flat Grid, Không chia kệ)
   if (itemsContainer) {
     itemsContainer.innerHTML = SHOP_ITEMS.map(item => {
+      const isLegendary = item.rarity === 'legendary';
       let badgeClass = 'badge-real';
       if (item.category === 'perk') badgeClass = 'badge-perk';
-      else if (item.category === 'male') badgeClass = 'badge-male';
-      else if (item.category === 'female') badgeClass = 'badge-female';
+      else if (isLegendary) badgeClass = 'badge-legendary';
+      else if (item.rarity === 'rare') badgeClass = 'badge-rare';
 
       const isOwnedFrame = item.type === 'frame' && userInv.some(i => i.itemId === item.id);
       const consumableInv = item.type !== 'frame' ? userInv.find(i => i.itemId === item.id) : null;
@@ -3489,11 +3490,15 @@ function renderClubShop() {
 
       let previewMarkup = '';
       if (item.type === 'frame') {
-        const frameClass = `frame-${item.id.replace(/^frame_/, '')}`;
+        const dummyMember = {
+          ...(user || {}),
+          name: user ? user.name : 'VĐV',
+          gender: item.category === 'female' ? 'female' : 'male',
+          activeFrame: item.id
+        };
         previewMarkup = `
-          <div class="avatar-container avatar-md avatar-frame-wrap ${frameClass}">
-            <img src="${user ? getAvatarUrl(user) : generateDefaultAvatar('Preview', item.category === 'female' ? 'female' : 'male')}" class="avatar-img" alt="${item.name}">
-            <span class="frame-deco-badge" data-frame="${item.id}"></span>
+          <div style="padding: 10px 4px 6px 4px; display: flex; justify-content: center; align-items: center;">
+            ${renderAvatarHtml(dummyMember, { size: 'md' })}
           </div>
         `;
       } else {
@@ -3517,12 +3522,15 @@ function renderClubShop() {
       }
 
       return `
-        <div class="shop-item-card">
+        <div class="shop-item-card ${isLegendary ? 'is-legendary' : ''}">
           <div>
             <div class="shop-item-top">
               <div class="shop-item-avatar-preview">${previewMarkup}</div>
               <div style="flex: 1; min-width: 0;">
-                <span class="shop-item-badge ${badgeClass}">${item.badge}</span>
+                <div style="display: flex; gap: 4px; flex-wrap: wrap; margin-bottom: 3px;">
+                  <span class="shop-item-badge ${badgeClass}">${item.tierBadge || item.badge}</span>
+                  ${item.hasAnimation ? '<span class="shop-anim-tag">⚡ XOAY 360°</span>' : ''}
+                </div>
                 <div class="shop-item-title">${item.name}</div>
                 ${consumableCount > 0 ? `<div style="font-size: 0.74rem; color: #10b981; font-weight: 700; margin-top: 2px;">(Đang có: ${consumableCount})</div>` : ''}
               </div>
@@ -3530,7 +3538,9 @@ function renderClubShop() {
             <div class="shop-item-desc">${item.description}</div>
           </div>
           <div class="shop-item-bottom">
-            <div class="shop-item-price">🪙 ${item.price} Xu</div>
+            <div class="shop-item-price" style="${isLegendary ? 'color: #fde047; font-size: 1.05rem; text-shadow: 0 0 10px rgba(250,204,21,0.5);' : ''}">
+              🪙 ${item.price} Xu
+            </div>
             ${btnHtml}
           </div>
         </div>
@@ -3618,22 +3628,27 @@ function renderClubShop() {
       const shopDef = SHOP_ITEMS.find(s => s.id === invItem.itemId);
       if (!shopDef) return;
       const isActive = activeFrame === shopDef.id;
-      const frameClass = `frame-${shopDef.id.replace(/^frame_/, '')}`;
+
+      const dummyMember = {
+        ...(user || {}),
+        name: user ? user.name : 'Tôi',
+        activeFrame: shopDef.id
+      };
 
       cardsHtml += `
         <div class="inventory-card ${isActive ? 'is-active-frame' : ''}">
           <div class="inventory-card-top">
-            <div class="avatar-container avatar-md avatar-frame-wrap ${frameClass}">
-              <img src="${user ? getAvatarUrl(user) : generateDefaultAvatar('Tôi')}" class="avatar-img" alt="${shopDef.name}">
-              <span class="frame-deco-badge" data-frame="${shopDef.id}"></span>
+            <div style="padding: 8px 4px 4px 4px; display: flex; align-items: center; justify-content: center;">
+              ${renderAvatarHtml(dummyMember, { size: 'md' })}
             </div>
             <div class="inventory-card-info">
               <div class="inventory-card-name">${shopDef.name}</div>
               <div class="inventory-card-status">${isActive ? '🟢 Đang sử dụng' : 'Trong túi đồ'}</div>
+              ${shopDef.hasAnimation ? '<div style="font-size: 0.7rem; color: #facc15; font-weight: 700;">⚡ Hiệu ứng xoay 360°</div>' : ''}
             </div>
           </div>
           <div class="inventory-card-bottom">
-            <span style="font-size: 0.74rem; color: var(--text-dim);">${shopDef.badge}</span>
+            <span style="font-size: 0.74rem; color: var(--text-dim);">${shopDef.tierBadge || shopDef.badge}</span>
             ${isActive 
               ? `<button class="btn-inventory-action btn-inventory-unequip" onclick="window.appEquipFrame('')">Tháo Khung</button>`
               : `<button class="btn-inventory-action btn-inventory-equip" onclick="window.appEquipFrame('${shopDef.id}')">Đeo Khung</button>`}

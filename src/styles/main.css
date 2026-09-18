@@ -2427,10 +2427,14 @@ button {
 
 .member-card-avatar-wrap {
   position: relative;
-  width: 52px;
-  height: 52px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
   cursor: pointer;
   flex-shrink: 0;
+  overflow: visible;
 }
 
 .member-card-avatar {
@@ -3854,26 +3858,26 @@ button {
 }
 
 /* ==========================================================================
-   GIAI ĐOẠN 3: KHUNG AVATAR ĐỘNG & HIỆU ỨNG (ANIMATED AVATAR FRAMES)
+   GIAI ĐOẠN 3: KHUNG AVATAR ĐỘNG SIÊU ĐẸP & ANIMATION 360° (PRO GAMING FRAMES)
    ========================================================================== */
 .avatar-container {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  border-radius: 50%;
   flex-shrink: 0;
-  transition: transform 0.25s ease, box-shadow 0.25s ease;
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: visible;
 }
 
 .avatar-xs {
-  width: 28px;
-  height: 28px;
+  width: 30px;
+  height: 30px;
 }
 
 .avatar-sm {
-  width: 36px;
-  height: 36px;
+  width: 38px;
+  height: 38px;
 }
 
 .avatar-md {
@@ -3887,8 +3891,8 @@ button {
 }
 
 .avatar-xl {
-  width: 88px;
-  height: 88px;
+  width: 92px;
+  height: 92px;
 }
 
 .avatar-container .avatar-img {
@@ -3898,183 +3902,295 @@ button {
   object-fit: cover;
   display: block;
   background: var(--bg-surface-elevated, #1e293b);
-  border: 2px solid rgba(255, 255, 255, 0.15);
+  border: 2px solid rgba(255, 255, 255, 0.2);
+  position: relative;
+  z-index: 3;
 }
 
-/* Base Frame Wrap */
+/* Base Frame Layer Wrap */
 .avatar-frame-wrap {
-  padding: 3px;
-  box-sizing: content-box;
+  position: relative;
+  overflow: visible;
 }
 
 .avatar-frame-wrap .avatar-img {
-  border: 1.5px solid rgba(255, 255, 255, 0.65);
+  border: 2px solid rgba(255, 255, 255, 0.7);
 }
 
-/* Trang trí góc khung avatar */
+/* 1. Vòng Hào Quang Tỏa Sáng (Aura Glow) */
+.frame-aura {
+  position: absolute;
+  inset: -6px;
+  border-radius: 50%;
+  z-index: 1;
+  pointer-events: none;
+  filter: blur(6px);
+  opacity: 0.8;
+  transition: all 0.3s ease;
+}
+
+/* 2. Vòng Năng Lượng Xoay 360 Độ (Spin Ring) */
+.frame-spin-ring {
+  position: absolute;
+  inset: -4.5px;
+  border-radius: 50%;
+  z-index: 2;
+  pointer-events: none;
+  transition: all 0.3s ease;
+}
+
+.avatar-xs .frame-spin-ring { inset: -2.5px; }
+.avatar-sm .frame-spin-ring { inset: -3px; }
+.avatar-md .frame-spin-ring { inset: -4.5px; }
+.avatar-lg .frame-spin-ring { inset: -6px; }
+.avatar-xl .frame-spin-ring { inset: -8px; }
+
+.avatar-xs .frame-aura { inset: -4px; filter: blur(4px); }
+.avatar-sm .frame-aura { inset: -5px; filter: blur(5px); }
+.avatar-md .frame-aura { inset: -7px; filter: blur(7px); }
+.avatar-lg .frame-aura { inset: -9px; filter: blur(9px); }
+.avatar-xl .frame-aura { inset: -13px; filter: blur(13px); }
+
+/* 3. Vành Kim Loại Lót Trong (Inner Border) */
+.frame-inner-ring {
+  position: absolute;
+  inset: -1px;
+  border-radius: 50%;
+  z-index: 3;
+  pointer-events: none;
+  border: 1.5px solid rgba(0, 0, 0, 0.45);
+}
+
+/* 4. Vương Miện & Huy Hiệu Đỉnh Đầu 3D (Top Crest) */
+.frame-crest {
+  position: absolute;
+  top: -11px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 6;
+  pointer-events: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  font-size: 16px;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.6));
+  transition: transform 0.2s ease;
+}
+
+.avatar-xs .frame-crest { top: -7px; font-size: 11px; }
+.avatar-sm .frame-crest { top: -9px; font-size: 13px; }
+.avatar-md .frame-crest { top: -11px; font-size: 16px; }
+.avatar-lg .frame-crest { top: -14px; font-size: 21px; }
+.avatar-xl .frame-crest { top: -19px; font-size: 29px; }
+
+/* Trang trí góc dưới khung avatar */
 .frame-deco-badge {
   position: absolute;
   bottom: -2px;
   right: -2px;
-  width: 18px;
-  height: 18px;
+  width: 17px;
+  height: 17px;
   border-radius: 50%;
-  background: rgba(15, 23, 42, 0.85);
-  border: 1.5px solid rgba(255, 255, 255, 0.4);
+  background: rgba(15, 23, 42, 0.9);
+  border: 1.5px solid rgba(255, 255, 255, 0.6);
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 10px;
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.4);
-  z-index: 2;
+  font-size: 9px;
+  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.6);
+  z-index: 6;
   pointer-events: none;
 }
 
+.avatar-xs .frame-deco-badge { display: none; }
 .avatar-lg .frame-deco-badge,
 .avatar-xl .frame-deco-badge {
   width: 22px;
   height: 22px;
-  font-size: 12px;
-  bottom: 0px;
-  right: 0px;
+  font-size: 11px;
+  bottom: -1px;
+  right: -1px;
 }
 
-/* 1. Khung Lửa Chiến Thần (Fire) */
-.frame-fire {
-  background: linear-gradient(135deg, #ff1a1a, #ff7700, #ff0055);
-  box-shadow: 0 0 10px rgba(255, 85, 0, 0.75), 0 0 18px rgba(255, 0, 85, 0.45);
-  animation: fireGlow 2s ease-in-out infinite alternate;
+/* ==========================================================================
+   CHI TIẾT 8 KHUNG THEO CHỦ ĐỀ & ANIMATION
+   ========================================================================== */
+
+/* 1. KHUNG RỒNG VÀNG HOÀNG GIA (Ultimate Supreme VIP - 500 Xu) */
+.frame-gold .frame-spin-ring {
+  background: conic-gradient(from 0deg, #ffe066 0%, #f59e0b 25%, #ffffff 40%, #ffd700 65%, #b45309 85%, #ffe066 100%);
+  animation: frameSpin 3s linear infinite;
+  box-shadow: 0 0 12px #f59e0b, inset 0 0 4px #ffd700;
 }
-.frame-fire .frame-deco-badge::after {
-  content: '🔥';
+.frame-gold .frame-aura {
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.9) 10%, rgba(245, 158, 11, 0.5) 60%, transparent 85%);
+  animation: goldAuraPulse 2s ease-in-out infinite alternate;
 }
-@keyframes fireGlow {
-  0% {
-    box-shadow: 0 0 8px rgba(255, 69, 0, 0.6), 0 0 14px rgba(255, 140, 0, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 14px rgba(255, 30, 0, 0.9), 0 0 24px rgba(255, 120, 0, 0.6);
-  }
+.frame-gold .frame-crest {
+  filter: drop-shadow(0 0 6px #ffd700) drop-shadow(0 0 14px #f59e0b);
+  animation: crownFloat 2s ease-in-out infinite alternate;
+}
+.frame-gold .frame-deco-badge::after { content: '👑'; }
+@keyframes crownFloat {
+  0% { transform: translateX(-50%) translateY(0) scale(1); }
+  100% { transform: translateX(-50%) translateY(-3px) scale(1.15); }
+}
+@keyframes goldAuraPulse {
+  0% { opacity: 0.65; filter: blur(5px) scale(0.98); }
+  100% { opacity: 1; filter: blur(9px) scale(1.1); }
 }
 
-/* 2. Khung Tia Chớp Neon (Neon) */
-.frame-neon {
-  background: linear-gradient(135deg, #00f0ff, #ccff00, #0077ff);
-  box-shadow: 0 0 10px rgba(0, 240, 255, 0.75), 0 0 16px rgba(204, 255, 0, 0.5);
-  animation: neonFlicker 2.5s ease-in-out infinite alternate;
+/* 2. KHUNG HỎA PHỤNG CHIẾN THẦN (Mythic Legendary - 380 Xu) */
+.frame-fire .frame-spin-ring {
+  background: conic-gradient(from 0deg, #ff0055 0%, #ff4500 30%, #ffea00 50%, #ff1a1a 75%, #ff0055 100%);
+  animation: frameSpin 2.2s linear infinite;
+  box-shadow: 0 0 12px #ff4500, inset 0 0 4px #ff0055;
 }
-.frame-neon .frame-deco-badge::after {
-  content: '⚡';
+.frame-fire .frame-aura {
+  background: radial-gradient(circle, rgba(255, 69, 0, 0.9) 0%, rgba(255, 0, 85, 0.5) 65%, transparent 85%);
+  animation: fireAuraFlicker 1.5s ease-in-out infinite alternate;
 }
-@keyframes neonFlicker {
-  0% {
-    box-shadow: 0 0 7px rgba(0, 240, 255, 0.6), 0 0 12px rgba(204, 255, 0, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 15px rgba(0, 240, 255, 0.95), 0 0 24px rgba(204, 255, 0, 0.7);
-  }
+.frame-fire .frame-crest {
+  filter: drop-shadow(0 0 6px #ff3b00) drop-shadow(0 0 14px #ff9900);
+  animation: flameDance 1.4s ease-in-out infinite alternate;
 }
-
-/* 3. Khung Rồng Vàng Hoàng Gia (Gold) */
-.frame-gold {
-  background: linear-gradient(135deg, #ffd700, #ffae19, #fff275, #d4af37);
-  box-shadow: 0 0 12px rgba(255, 215, 0, 0.8), 0 0 20px rgba(255, 174, 25, 0.45);
-  animation: goldShimmer 3s ease-in-out infinite;
+.frame-fire .frame-deco-badge::after { content: '🔥'; }
+@keyframes flameDance {
+  0% { transform: translateX(-50%) translateY(0) scale(1) rotate(-4deg); }
+  100% { transform: translateX(-50%) translateY(-3px) scale(1.18) rotate(4deg); }
 }
-.frame-gold .frame-deco-badge::after {
-  content: '👑';
-}
-@keyframes goldShimmer {
-  0%, 100% {
-    filter: brightness(1);
-    box-shadow: 0 0 10px rgba(255, 215, 0, 0.7), 0 0 18px rgba(255, 174, 25, 0.4);
-  }
-  50% {
-    filter: brightness(1.2);
-    box-shadow: 0 0 16px rgba(255, 225, 50, 0.95), 0 0 26px rgba(255, 180, 40, 0.65);
-  }
+@keyframes fireAuraFlicker {
+  0% { opacity: 0.65; filter: blur(5px); }
+  100% { opacity: 1; filter: blur(10px) scale(1.08); }
 }
 
-/* 4. Khung Titan Hắc Báo (Carbon) */
-.frame-carbon {
-  background: linear-gradient(135deg, #2c3e50, #7f8c8d, #1a252f, #95a5a6);
-  box-shadow: 0 0 8px rgba(180, 195, 210, 0.5), inset 0 0 4px rgba(255, 255, 255, 0.25);
-  border: 1px solid rgba(255, 255, 255, 0.3);
+/* 3. KHUNG KIM CƯƠNG TINH THỂ (Mythic Legendary - 420 Xu) */
+.frame-diamond .frame-spin-ring {
+  background: conic-gradient(from 0deg, #38bdf8 0%, #ec4899 25%, #a855f7 50%, #67e8f9 75%, #38bdf8 100%);
+  animation: frameSpin 3.5s linear infinite;
+  box-shadow: 0 0 14px rgba(103, 232, 249, 0.85);
 }
-.frame-carbon .frame-deco-badge::after {
-  content: '🖤';
+.frame-diamond .frame-aura {
+  background: radial-gradient(circle, rgba(103, 232, 249, 0.85) 0%, rgba(236, 72, 153, 0.5) 60%, transparent 85%);
+  animation: diamondShimmer 2.5s linear infinite alternate;
 }
-
-/* 5. Khung Hoa Anh Đào (Sakura) */
-.frame-sakura {
-  background: linear-gradient(135deg, #ff9ebb, #ff6584, #fbcfe8, #fda4af);
-  box-shadow: 0 0 10px rgba(255, 158, 187, 0.75), 0 0 18px rgba(255, 101, 132, 0.4);
-  animation: sakuraSoft 2.8s ease-in-out infinite alternate;
+.frame-diamond .frame-crest {
+  filter: drop-shadow(0 0 8px #67e8f9) drop-shadow(0 0 14px #ec4899);
+  animation: diamondGlisten 1.8s ease-in-out infinite alternate;
 }
-.frame-sakura .frame-deco-badge::after {
-  content: '🌸';
+.frame-diamond .frame-deco-badge::after { content: '💎'; }
+@keyframes diamondGlisten {
+  0% { transform: translateX(-50%) scale(1) rotate(0deg); }
+  100% { transform: translateX(-50%) scale(1.15) rotate(12deg); }
 }
-@keyframes sakuraSoft {
-  0% {
-    box-shadow: 0 0 8px rgba(255, 158, 187, 0.6), 0 0 14px rgba(255, 101, 132, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 14px rgba(255, 158, 187, 0.9), 0 0 24px rgba(255, 101, 132, 0.6);
-  }
+@keyframes diamondShimmer {
+  0% { filter: hue-rotate(0deg) blur(6px); }
+  100% { filter: hue-rotate(60deg) blur(10px); }
 }
 
-/* 6. Khung Thỏ Trăng Sao (Moon) */
-.frame-moon {
-  background: linear-gradient(135deg, #c084fc, #818cf8, #e879f9, #a855f7);
-  box-shadow: 0 0 10px rgba(192, 132, 252, 0.75), 0 0 18px rgba(129, 140, 248, 0.4);
+/* 4. KHUNG TIA CHỚP CYBERPUNK (Legendary VIP - 320 Xu) */
+.frame-neon .frame-spin-ring {
+  background: conic-gradient(from 0deg, #00f0ff 0%, #ccff00 35%, #0066ff 60%, #00f0ff 100%);
+  animation: frameSpin 1.8s linear infinite;
+  box-shadow: 0 0 14px #00f0ff, 0 0 20px #ccff00;
+}
+.frame-neon .frame-aura {
+  background: radial-gradient(circle, rgba(0, 240, 255, 0.9) 0%, rgba(204, 255, 0, 0.55) 65%, transparent 85%);
+  animation: electricStrobe 1.6s ease-in-out infinite alternate;
+}
+.frame-neon .frame-crest {
+  filter: drop-shadow(0 0 6px #00f0ff) drop-shadow(0 0 14px #ccff00);
+  animation: boltFlicker 1s steps(2, start) infinite alternate;
+}
+.frame-neon .frame-deco-badge::after { content: '⚡'; }
+@keyframes boltFlicker {
+  0% { transform: translateX(-50%) scale(1); filter: brightness(1) drop-shadow(0 0 6px #00f0ff); }
+  100% { transform: translateX(-50%) scale(1.2); filter: brightness(1.4) drop-shadow(0 0 14px #ccff00); }
+}
+@keyframes electricStrobe {
+  0% { opacity: 0.6; filter: blur(5px); }
+  100% { opacity: 1; filter: blur(10px) scale(1.08); }
+}
+
+/* 5. KHUNG NGUYỆT DẠ THỎ NGỌC (Rare - 220 Xu) */
+.frame-moon .frame-spin-ring {
+  background: linear-gradient(135deg, #c084fc, #818cf8, #f472b6, #a855f7);
+  box-shadow: 0 0 12px rgba(192, 132, 252, 0.85), inset 0 0 4px #ffffff;
+}
+.frame-moon .frame-aura {
+  background: radial-gradient(circle, rgba(192, 132, 252, 0.8) 0%, rgba(129, 140, 248, 0.45) 70%, transparent 85%);
   animation: moonPulse 3s ease-in-out infinite alternate;
 }
-.frame-moon .frame-deco-badge::after {
-  content: '🌙';
+.frame-moon .frame-crest {
+  filter: drop-shadow(0 0 6px #c084fc) drop-shadow(0 0 10px #818cf8);
+  animation: moonFloat 2.5s ease-in-out infinite alternate;
+}
+.frame-moon .frame-deco-badge::after { content: '🌙'; }
+@keyframes moonFloat {
+  0% { transform: translateX(-50%) translateY(0); }
+  100% { transform: translateX(-50%) translateY(-2.5px) scale(1.1); }
 }
 @keyframes moonPulse {
-  0% {
-    box-shadow: 0 0 8px rgba(192, 132, 252, 0.6), 0 0 14px rgba(129, 140, 248, 0.3);
-  }
-  100% {
-    box-shadow: 0 0 15px rgba(192, 132, 252, 0.9), 0 0 24px rgba(129, 140, 248, 0.6);
-  }
+  0% { opacity: 0.6; }
+  100% { opacity: 0.95; filter: blur(8px); }
 }
 
-/* 7. Khung Kim Cương Ngũ Sắc (Diamond) */
-.frame-diamond {
-  background: linear-gradient(135deg, #67e8f9, #f472b6, #a78bfa, #38bdf8, #ec4899);
-  box-shadow: 0 0 12px rgba(103, 232, 249, 0.8), 0 0 20px rgba(244, 114, 182, 0.5);
-  animation: diamondRotate 4s linear infinite;
+/* 6. KHUNG HOA ANH ĐÀO TUYẾT (Rare - 200 Xu) */
+.frame-sakura .frame-spin-ring {
+  background: linear-gradient(135deg, #fda4af, #f43f5e, #fbcfe8, #fb7185);
+  box-shadow: 0 0 12px rgba(251, 113, 133, 0.85), inset 0 0 4px #ffffff;
 }
-.frame-diamond .frame-deco-badge::after {
-  content: '💎';
+.frame-sakura .frame-aura {
+  background: radial-gradient(circle, rgba(251, 113, 133, 0.8) 0%, rgba(253, 164, 175, 0.45) 70%, transparent 85%);
+  animation: sakuraPulse 2.8s ease-in-out infinite alternate;
 }
-@keyframes diamondRotate {
-  0%, 100% {
-    filter: hue-rotate(0deg) brightness(1.05);
-  }
-  50% {
-    filter: hue-rotate(60deg) brightness(1.2);
-  }
+.frame-sakura .frame-crest {
+  filter: drop-shadow(0 0 6px #fb7185);
+  animation: sakuraFloat 2.2s ease-in-out infinite alternate;
+}
+.frame-sakura .frame-deco-badge::after { content: '🌸'; }
+@keyframes sakuraFloat {
+  0% { transform: translateX(-50%) rotate(-5deg); }
+  100% { transform: translateX(-50%) rotate(5deg) scale(1.1); }
+}
+@keyframes sakuraPulse {
+  0% { opacity: 0.55; }
+  100% { opacity: 0.95; filter: blur(8px); }
 }
 
-/* 8. Khung Cầu Vồng Năng Lượng (Rainbow) */
-.frame-rainbow {
-  background: linear-gradient(135deg, #ff007f, #ff7700, #ffdd00, #00e5ff, #7928ca);
-  box-shadow: 0 0 12px rgba(255, 119, 0, 0.6), 0 0 20px rgba(0, 229, 255, 0.5);
-  animation: rainbowSpin 5s ease-in-out infinite alternate;
+/* 7. KHUNG CẦU VỒNG NĂNG LƯỢNG (Rare - 180 Xu) */
+.frame-rainbow .frame-spin-ring {
+  background: conic-gradient(from 0deg, #ff0055, #ff7700, #ffdd00, #00e5ff, #7928ca, #ff0055);
+  animation: frameSpin 4.5s linear infinite;
+  box-shadow: 0 0 12px rgba(255, 119, 0, 0.7);
 }
-.frame-rainbow .frame-deco-badge::after {
-  content: '🌈';
+.frame-rainbow .frame-aura {
+  background: radial-gradient(circle, rgba(255, 119, 0, 0.6) 0%, rgba(0, 229, 255, 0.4) 65%, transparent 85%);
 }
-@keyframes rainbowSpin {
-  0% {
-    filter: hue-rotate(0deg);
-  }
-  100% {
-    filter: hue-rotate(90deg);
-  }
+.frame-rainbow .frame-crest {
+  filter: drop-shadow(0 0 6px #ff7700);
+}
+.frame-rainbow .frame-deco-badge::after { content: '🌈'; }
+
+/* 8. KHUNG TITAN HẮC BÁO (Rare - 150 Xu) */
+.frame-carbon .frame-spin-ring {
+  background: linear-gradient(135deg, #1e293b, #64748b, #0f172a, #94a3b8);
+  border: 2px solid #cbd5e1;
+  box-shadow: 0 0 10px rgba(148, 163, 184, 0.7), inset 0 0 4px rgba(255, 255, 255, 0.4);
+}
+.frame-carbon .frame-aura {
+  background: radial-gradient(circle, rgba(148, 163, 184, 0.5) 0%, rgba(30, 41, 59, 0.6) 70%, transparent 85%);
+}
+.frame-carbon .frame-crest {
+  filter: drop-shadow(0 0 5px #94a3b8);
+}
+.frame-carbon .frame-deco-badge::after { content: '🖤'; }
+
+/* Chung cho hiệu ứng xoay tròn */
+@keyframes frameSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
 }
 
 /* ==========================================================================
@@ -4229,6 +4345,45 @@ button {
   background: rgba(244, 114, 182, 0.15);
   color: #f472b6;
   border: 1px solid rgba(244, 114, 182, 0.3);
+}
+
+.badge-legendary {
+  background: linear-gradient(135deg, #f59e0b, #ef4444);
+  color: #ffffff;
+  border: 1px solid rgba(255, 255, 255, 0.4);
+  box-shadow: 0 0 10px rgba(245, 158, 11, 0.5);
+}
+
+.badge-rare {
+  background: rgba(14, 165, 233, 0.2);
+  color: #38bdf8;
+  border: 1px solid rgba(56, 189, 248, 0.4);
+}
+
+.shop-anim-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 0.66rem;
+  font-weight: 800;
+  color: #fde047;
+  background: rgba(250, 204, 21, 0.14);
+  padding: 2px 7px;
+  border-radius: 4px;
+  margin-top: 4px;
+  border: 1px dashed rgba(250, 204, 21, 0.4);
+  letter-spacing: 0.03em;
+}
+
+.shop-item-card.is-legendary {
+  border-color: rgba(250, 204, 21, 0.35);
+  background: linear-gradient(135deg, rgba(250, 204, 21, 0.05), var(--bg-surface));
+  box-shadow: 0 4px 16px rgba(250, 204, 21, 0.08);
+}
+
+.shop-item-card.is-legendary:hover {
+  border-color: #facc15;
+  box-shadow: 0 8px 24px rgba(250, 204, 21, 0.25);
 }
 
 .shop-item-title {

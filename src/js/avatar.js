@@ -111,12 +111,37 @@ export function renderAvatarHtml(member, options = {}) {
   const avatarUrl = getAvatarUrl(member);
   const activeFrame = member?.activeFrame || '';
 
-  const frameClass = activeFrame ? `avatar-frame-wrap frame-${activeFrame.replace(/^frame_/, '')}` : '';
+  if (!activeFrame) {
+    return `
+      <div class="avatar-container avatar-${size} ${extraClass}" style="${wrapStyle}">
+        <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
+      </div>
+    `;
+  }
+
+  const frameType = activeFrame.replace(/^frame_/, '');
+  const crestIcons = {
+    gold: '👑',
+    fire: '🔥',
+    neon: '⚡',
+    diamond: '💎',
+    moon: '🌙',
+    sakura: '🌸',
+    carbon: '🖤',
+    rainbow: '🌈'
+  };
+  const crestIcon = crestIcons[frameType] || '✨';
 
   return `
-    <div class="avatar-container avatar-${size} ${frameClass} ${extraClass}" style="${wrapStyle}">
+    <div class="avatar-container avatar-${size} avatar-frame-wrap frame-${frameType} ${extraClass}" data-frame="${activeFrame}" style="${wrapStyle}">
+      <div class="frame-aura"></div>
+      <div class="frame-spin-ring"></div>
+      <div class="frame-inner-ring"></div>
       <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
-      ${activeFrame ? `<span class="frame-deco-badge" data-frame="${activeFrame}"></span>` : ''}
+      <div class="frame-crest" data-frame="${activeFrame}">
+        <span class="crest-icon">${crestIcon}</span>
+      </div>
+      <span class="frame-deco-badge" data-frame="${activeFrame}"></span>
     </div>
   `;
 }

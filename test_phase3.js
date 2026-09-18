@@ -38,10 +38,10 @@ console.log('\n=== BẮT ĐẦU KIỂM THỬ GIAI ĐOẠN 3 ===\n');
 // 1. Kiểm tra cấu hình SHOP_ITEMS
 assert(SHOP_ITEMS.length === 10, `SHOP_ITEMS có đủ 10 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
 const gripDef = SHOP_ITEMS.find(i => i.id === 'grip');
-assert(gripDef && gripDef.price === 50 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 50 xu, type consumable');
+assert(gripDef && gripDef.price === 120 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 120 xu, type consumable');
 
 const shieldDef = SHOP_ITEMS.find(i => i.id === 'elo_shield');
-assert(shieldDef && shieldDef.price === 40 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 40 xu, type perk');
+assert(shieldDef && shieldDef.price === 100 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 100 xu, type perk');
 
 const frames = SHOP_ITEMS.filter(i => i.type === 'frame');
 assert(frames.length === 8, `Có đủ 8 Khung Avatar (hiện có: ${frames.length})`);
@@ -57,7 +57,7 @@ const testMember = {
   name: 'Nguyễn Văn Test P3',
   gender: 'male',
   elo: 1200,
-  coins: 200,
+  coins: 500,
   activeFrame: '',
   activeEloShield: false,
   matchesPlayed: 10,
@@ -69,35 +69,36 @@ StorageService.saveMembers([testMember]);
 StorageService.setCurrentUser(testMember.id);
 StorageService.saveLocalInventory([]);
 
-// 2. Mua thẻ khiên Elo (Giá 40 xu)
+// 2. Mua thẻ khiên Elo (Giá 100 xu)
 const buyShieldRes = StorageService.buyShopItem(testMember.id, 'elo_shield');
 assert(buyShieldRes.success === true, 'Mua thẻ khiên Elo thành công');
-assert(buyShieldRes.balanceAfter === 160, `Số dư sau khi mua khiên là 160 xu (thực tế: ${buyShieldRes.balanceAfter})`);
+assert(buyShieldRes.balanceAfter === 400, `Số dư sau khi mua khiên là 400 xu (thực tế: ${buyShieldRes.balanceAfter})`);
 
 let inv = StorageService.getUserInventory(testMember.id);
 let shieldInv = inv.find(i => i.itemId === 'elo_shield');
 assert(shieldInv && shieldInv.quantity === 1, 'Túi đồ có 1 thẻ khiên Elo');
 
-// Mua tiếp 1 thẻ khiên nữa (cộng dồn)
+// Mua tiếp 1 thẻ khiên nữa (cộng dồn, 100 xu)
 StorageService.buyShopItem(testMember.id, 'elo_shield');
 inv = StorageService.getUserInventory(testMember.id);
 shieldInv = inv.find(i => i.itemId === 'elo_shield');
 assert(shieldInv && shieldInv.quantity === 2, `Cộng dồn số lượng khiên Elo thành 2 (thực tế: ${shieldInv?.quantity})`);
 
-// 3. Mua cuốn cán vợt (Giá 50 xu)
+// 3. Mua cuốn cán vợt (Giá 120 xu)
 const buyGripRes = StorageService.buyShopItem(testMember.id, 'grip');
 assert(buyGripRes.success === true, 'Mua cuốn cán vợt thành công');
+assert(buyGripRes.balanceAfter === 180, `Số dư sau khi mua cuốn cán là 180 xu (thực tế: ${buyGripRes.balanceAfter})`);
 inv = StorageService.getUserInventory(testMember.id);
 let gripInv = inv.find(i => i.itemId === 'grip');
 assert(gripInv && gripInv.quantity === 1, 'Túi đồ có 1 cuốn cán');
 
-// 4. Mua khung Avatar Lửa Chiến Thần (frame_fire, 100 xu)
-// Số dư hiện tại: 200 - 40 - 40 - 50 = 70 xu => Thử mua khung 100 xu phải báo không đủ xu
+// 4. Mua khung Avatar Lửa Chiến Thần (frame_fire, 380 xu)
+// Số dư hiện tại: 180 xu => Thử mua khung 380 xu phải báo không đủ xu
 const buyFrameFail = StorageService.buyShopItem(testMember.id, 'frame_fire');
 assert(buyFrameFail.success === false && buyFrameFail.message.includes('không đủ'), 'Không đủ xu mua khung avatar báo lỗi chính xác');
 
 // Nạp thêm xu cho testMember và mua lại
-StorageService.addCoins(testMember.id, 100, 'test_reward', 'Nạp test');
+StorageService.addCoins(testMember.id, 300, 'test_reward', 'Nạp test');
 const buyFrameOk = StorageService.buyShopItem(testMember.id, 'frame_fire');
 assert(buyFrameOk.success === true, 'Mua khung Lửa Chiến Thần thành công sau khi nạp xu');
 

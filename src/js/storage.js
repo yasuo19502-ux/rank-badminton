@@ -23,105 +23,129 @@ export const SHOP_ITEMS = [
   {
     id: 'grip',
     name: 'Cuốn Cán Vợt Chống Trơn',
-    price: 50,
+    price: 120,
     icon: '🏸',
     type: 'consumable',
     category: 'real',
+    rarity: 'rare',
     badge: 'Đồ Thật Tại Sân',
-    description: 'Cuốn cán cầu lông êm tay, thấm hút mồ hôi. Đổi nhận trực tiếp tại sân thi đấu.'
+    tierBadge: 'Vật Phẩm Sân',
+    description: 'Cuốn cán cầu lông xịn êm tay, thấm hút mồ hôi tối ưu. Tích xu đổi nhận trực tiếp tại sân thi đấu.'
   },
   // 2. Thẻ trận đấu
   {
     id: 'elo_shield',
     name: 'Thẻ Khiên Bảo Vệ Elo',
-    price: 40,
+    price: 100,
     icon: '🛡️',
     type: 'perk',
     category: 'perk',
+    rarity: 'rare',
     badge: 'Đặc Quyền Trận',
-    description: 'Bật trước trận: Nếu thua chỉ bị trừ 50% Elo! Nếu thắng vẫn nhận 100% Elo và không mất thẻ.'
+    tierBadge: 'Bảo Hiểm Elo',
+    description: 'Bật trước trận: Nếu thua chỉ bị trừ 50% Elo! Nếu thắng vẫn nhận đủ 100% Elo và không mất thẻ.'
   },
-  // 3. Khung Avatar Nam / Unisex
-  {
-    id: 'frame_fire',
-    name: 'Khung Lửa Chiến Thần',
-    price: 100,
-    icon: '🔥',
-    type: 'frame',
-    category: 'male',
-    badge: 'Nam / Unisex',
-    description: 'Viền lửa rực đỏ bốc cháy quanh Avatar, thể hiện phong cách tay đập cuồng nhiệt.'
-  },
-  {
-    id: 'frame_neon',
-    name: 'Khung Tia Chớp Neon',
-    price: 90,
-    icon: '⚡',
-    type: 'frame',
-    category: 'male',
-    badge: 'Nam / Unisex',
-    description: 'Viền sấm chớp Cyberpunk xanh Cyan & Volt giật sáng công nghệ cực ngầu.'
-  },
-  {
-    id: 'frame_gold',
-    name: 'Khung Rồng Vàng Hoàng Gia',
-    price: 120,
-    icon: '👑',
-    type: 'frame',
-    category: 'male',
-    badge: 'Nam / Unisex',
-    description: 'Viền vàng kim tuyến lấp lánh sang trọng của nhà vô địch bất khả chiến bại.'
-  },
+  // 3. Khung Avatar Tinh Anh (Rare - Thiết kế ngầu, sắc nét)
   {
     id: 'frame_carbon',
     name: 'Khung Titan Hắc Báo',
-    price: 80,
+    price: 150,
     icon: '🖤',
     type: 'frame',
     category: 'male',
+    rarity: 'rare',
     badge: 'Nam / Unisex',
-    description: 'Viền kim loại Carbon đen nhám tối giản, ngầu và lạnh lùng.'
-  },
-  // 4. Khung Avatar Nữ / Dễ thương
-  {
-    id: 'frame_sakura',
-    name: 'Khung Hoa Anh Đào',
-    price: 100,
-    icon: '🌸',
-    type: 'frame',
-    category: 'female',
-    badge: 'Nữ / Dễ thương',
-    description: 'Viền hồng pastel mềm mại kèm hiệu ứng cánh hoa đào lãng mạn bay bổng.'
-  },
-  {
-    id: 'frame_moon',
-    name: 'Khung Thỏ Trăng Sao',
-    price: 90,
-    icon: '🌙',
-    type: 'frame',
-    category: 'female',
-    badge: 'Nữ / Dễ thương',
-    description: 'Tông tím Lavender với trăng sao nhỏ lấp lánh mộng mơ.'
-  },
-  {
-    id: 'frame_diamond',
-    name: 'Khung Kim Cương Ngũ Sắc',
-    price: 120,
-    icon: '💎',
-    type: 'frame',
-    category: 'female',
-    badge: 'Nữ / Dễ thương',
-    description: 'Ánh lăng kính kim cương phản quang ngũ sắc lung linh tỏa sáng rực rỡ.'
+    tierBadge: 'Tinh Anh 🖤',
+    description: 'Viền giáp kim loại Titan carbon đen nhám, đinh tán bạc sắc bén, biểu tượng khiên bóng đêm cực ngầu.'
   },
   {
     id: 'frame_rainbow',
     name: 'Khung Cầu Vồng Năng Lượng',
-    price: 80,
+    price: 180,
     icon: '🌈',
     type: 'frame',
     category: 'female',
+    rarity: 'rare',
     badge: 'Nữ / Dễ thương',
-    description: 'Đa sắc rực rỡ tươi trẻ, lan tỏa năng lượng tích cực trên sân cầu.'
+    tierBadge: 'Tinh Anh 🌈',
+    description: 'Vòng quang phổ 7 sắc cầu vồng rực rỡ, phản chiếu năng lượng nhiệt huyết và tươi trẻ trên sân cầu.'
+  },
+  {
+    id: 'frame_sakura',
+    name: 'Khung Hoa Anh Đào Tuyết',
+    price: 200,
+    icon: '🌸',
+    type: 'frame',
+    category: 'female',
+    rarity: 'rare',
+    badge: 'Nữ / Dễ thương',
+    tierBadge: 'Tinh Anh 🌸',
+    description: 'Viền ngọc hồng pastel mềm mại kèm hiệu ứng cánh hoa đào bay bổng lãng mạn.'
+  },
+  {
+    id: 'frame_moon',
+    name: 'Khung Nguyệt Dạ Thỏ Ngọc',
+    price: 220,
+    icon: '🌙',
+    type: 'frame',
+    category: 'female',
+    rarity: 'rare',
+    badge: 'Nữ / Dễ thương',
+    tierBadge: 'Tinh Anh 🌙',
+    description: 'Vành trăng khuyết phát sáng huyền bí cùng tinh tú tím Lavender mộng mơ.'
+  },
+  // 4. Khung Avatar Thần Thoại / Huyền Thoại VIP (Legendary - Animation Xoay 360°, Hào Quang Nổi Bật)
+  {
+    id: 'frame_neon',
+    name: 'Khung Tia Chớp Cyberpunk',
+    price: 320,
+    icon: '⚡',
+    type: 'frame',
+    category: 'male',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Nam / Unisex',
+    tierBadge: 'Huyền Thoại VIP ⚡',
+    description: '⚡ Animation sấm sét: Luồng xung điện Cyan & Volt xoay vòng quét sáng 360°, tia chớp giật lóe công nghệ đỉnh cao.'
+  },
+  {
+    id: 'frame_fire',
+    name: 'Khung Hỏa Phụng Chiến Thần',
+    price: 380,
+    icon: '🔥',
+    type: 'frame',
+    category: 'male',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Nam / Unisex',
+    tierBadge: 'Thần Thoại VIP 🔥',
+    description: '🔥 Animation ngọn lửa: Vòng lửa địa ngục cuộn trào rực cháy xoay quanh avatar, biểu tượng ngọn lửa bất diệt đỉnh đầu.'
+  },
+  {
+    id: 'frame_diamond',
+    name: 'Khung Kim Cương Tinh Thể',
+    price: 420,
+    icon: '💎',
+    type: 'frame',
+    category: 'female',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Nữ / Dễ thương',
+    tierBadge: 'Thần Thoại VIP 💎',
+    description: '💎 Animation lăng kính: Ánh kim cương ngũ sắc quét tia sáng 360°, phản chiếu lấp lánh như viên ngọc quý giá nhất.'
+  },
+  {
+    id: 'frame_gold',
+    name: 'Khung Rồng Vàng Hoàng Gia',
+    price: 500,
+    icon: '👑',
+    type: 'frame',
+    category: 'male',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Nam / Unisex',
+    tierBadge: 'Vô Địch Tối Thượng 👑',
+    description: '👑 Animation Độc Bản VIP: Vương Miện Hoàng Gia dát vàng tỏa sáng đỉnh đầu, hào quang Rồng Vàng xoay tròn uy nghiêm tối thượng.'
   }
 ];
 
