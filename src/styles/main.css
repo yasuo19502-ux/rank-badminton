@@ -4825,4 +4825,181 @@ button {
   }
 }
 
+/* ==========================================================================
+   LỊCH SỬ GIAO DỊCH XU (COIN TRANSACTION HISTORY)
+   ========================================================================== */
+.coin-history-stats-bar {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  background: rgba(15, 23, 42, 0.6);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 12px;
+  margin-bottom: 14px;
+}
+
+.coin-stat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+}
+
+.coin-stat-label {
+  font-size: 0.72rem;
+  color: var(--text-muted);
+  font-weight: 700;
+  text-transform: uppercase;
+  margin-bottom: 2px;
+}
+
+.coin-stat-val {
+  font-size: 0.95rem;
+  font-weight: 800;
+}
+
+.coin-stat-val.pos { color: #10b981; }
+.coin-stat-val.neg { color: #f43f5e; }
+.coin-stat-val.highlight { color: var(--volt); }
+
+.coin-history-filters {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+
+.coin-filter-chip {
+  padding: 5px 12px;
+  border-radius: var(--radius-full);
+  font-size: 0.76rem;
+  font-weight: 700;
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-dim);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.coin-filter-chip:hover {
+  background: rgba(255, 255, 255, 0.12);
+  color: var(--text-primary);
+}
+
+.coin-filter-chip.active {
+  background: var(--volt);
+  color: #000000;
+  border-color: var(--volt);
+  box-shadow: 0 2px 8px rgba(204, 255, 0, 0.3);
+}
+
+.coin-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.coin-history-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  background: var(--bg-surface, #1e293b);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  transition: all 0.2s ease;
+}
+
+.coin-history-card:hover {
+  border-color: rgba(255, 255, 255, 0.2);
+  transform: translateY(-1px);
+}
+
+.coin-history-card.is-inflow {
+  border-left: 3px solid #10b981;
+}
+
+.coin-history-card.is-outflow {
+  border-left: 3px solid #f43f5e;
+}
+
+.coin-history-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+
+.coin-history-body {
+  flex: 1;
+  min-width: 0;
+}
+
+.coin-history-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 2px;
+}
+
+.coin-history-desc {
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.coin-history-badge {
+  font-size: 0.68rem;
+  font-weight: 800;
+  padding: 1px 6px;
+  border-radius: 6px;
+  border: 1px solid;
+  flex-shrink: 0;
+}
+
+.coin-history-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.74rem;
+  color: var(--text-muted);
+}
+
+.coin-history-time {
+  color: var(--text-dim);
+}
+
+.coin-history-after strong {
+  color: var(--text-primary);
+}
+
+.coin-history-amount {
+  font-size: 1.05rem;
+  font-weight: 800;
+  flex-shrink: 0;
+  text-align: right;
+  min-width: 65px;
+}
+
+.coin-history-amount.pos {
+  color: #10b981;
+}
+
+.coin-history-amount.neg {
+  color: #f43f5e;
+}
+
+.empty-history-box {
+  text-align: center;
+  padding: 36px 16px;
+  color: var(--text-muted);
+}
+
 

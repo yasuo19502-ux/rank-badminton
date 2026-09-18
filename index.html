@@ -1004,6 +1004,9 @@
           <button class="shop-tab-btn" id="btn-shop-tab-inventory" onclick="window.appSwitchShopTab('inventory')">
             <span>🎒</span> Túi Đồ Của Tôi <span id="inventory-count-badge" class="badge-mini">0</span>
           </button>
+          <button class="shop-tab-btn" id="btn-shop-tab-history" onclick="window.appSwitchShopTab('history')">
+            <span>📜</span> Lịch Sử Xu
+          </button>
         </div>
         <button class="btn-icon btn-close-modal">✕</button>
       </div>
@@ -1016,8 +1019,8 @@
               🪙 <span id="shop-user-coins">100</span> <span style="font-size: 0.85rem; color: var(--volt);">Xu</span>
             </div>
           </div>
-          <button class="btn-mini-action" onclick="window.appOpenWalletModal()" style="font-size: 0.78rem;">
-            📜 Lịch Sử Xu
+          <button class="btn-mini-action" onclick="window.appSwitchShopTab('history')" style="font-size: 0.78rem;">
+            📜 Xem Lịch Sử Xu
           </button>
         </div>
 
@@ -1039,6 +1042,37 @@
             <span>📦</span> Vật Phẩm & Khung Avatar Đã Sở Hữu
           </div>
           <div class="inventory-items-grid" id="inventory-items-container">
+            <!-- Injected via JS -->
+          </div>
+        </div>
+
+        <!-- 3. TAB LỊCH SỬ XU (COIN HISTORY) -->
+        <div id="shop-panel-history" class="shop-panel" style="display: none;">
+          <!-- Thống kê tổng thu/chi -->
+          <div class="coin-history-stats-bar">
+            <div class="coin-stat-item">
+              <span class="coin-stat-label">Tổng đã nhận</span>
+              <span class="coin-stat-val pos" id="coin-history-total-in">+0 🪙</span>
+            </div>
+            <div class="coin-stat-item">
+              <span class="coin-stat-label">Tổng đã tiêu</span>
+              <span class="coin-stat-val neg" id="coin-history-total-out">-0 🪙</span>
+            </div>
+            <div class="coin-stat-item">
+              <span class="coin-stat-label">Số dư hiện tại</span>
+              <span class="coin-stat-val highlight" id="coin-history-balance">0 🪙</span>
+            </div>
+          </div>
+
+          <!-- Bộ lọc loại giao dịch -->
+          <div class="coin-history-filters">
+            <button class="coin-filter-chip active" data-filter="all" onclick="window.appFilterCoinHistory('all')">Tất cả</button>
+            <button class="coin-filter-chip" data-filter="in" onclick="window.appFilterCoinHistory('in')">Thu vào (+)</button>
+            <button class="coin-filter-chip" data-filter="out" onclick="window.appFilterCoinHistory('out')">Chi tiêu (-)</button>
+          </div>
+
+          <!-- Danh sách giao dịch -->
+          <div class="coin-history-list" id="shop-history-container">
             <!-- Injected via JS -->
           </div>
         </div>

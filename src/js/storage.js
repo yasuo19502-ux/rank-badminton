@@ -23,7 +23,7 @@ export const SHOP_ITEMS = [
   {
     id: 'grip',
     name: 'Cuốn Cán Vợt Chống Trơn',
-    price: 120,
+    price: 150,
     icon: '🏸',
     type: 'consumable',
     category: 'real',
@@ -36,7 +36,7 @@ export const SHOP_ITEMS = [
   {
     id: 'elo_shield',
     name: 'Thẻ Khiên Bảo Vệ Elo',
-    price: 100,
+    price: 120,
     icon: '🛡️',
     type: 'perk',
     category: 'perk',
@@ -49,7 +49,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_carbon',
     name: 'Khung Titan Hắc Báo',
-    price: 150,
+    price: 500,
     icon: '🖤',
     type: 'frame',
     category: 'male',
@@ -61,7 +61,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_rainbow',
     name: 'Khung Cầu Vồng Năng Lượng',
-    price: 180,
+    price: 600,
     icon: '🌈',
     type: 'frame',
     category: 'female',
@@ -73,7 +73,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_sakura',
     name: 'Khung Hoa Anh Đào Tuyết',
-    price: 200,
+    price: 700,
     icon: '🌸',
     type: 'frame',
     category: 'female',
@@ -85,7 +85,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_moon',
     name: 'Khung Nguyệt Dạ Thỏ Ngọc',
-    price: 220,
+    price: 800,
     icon: '🌙',
     type: 'frame',
     category: 'female',
@@ -98,7 +98,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_neon',
     name: 'Khung Tia Chớp Cyberpunk',
-    price: 320,
+    price: 1100,
     icon: '⚡',
     type: 'frame',
     category: 'male',
@@ -111,7 +111,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_water',
     name: 'Khung Thủy Triều Đại Dương',
-    price: 350,
+    price: 1300,
     icon: '🌊',
     type: 'frame',
     category: 'female',
@@ -124,7 +124,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_fire',
     name: 'Khung Hỏa Phụng Chiến Thần',
-    price: 380,
+    price: 1500,
     icon: '🔥',
     type: 'frame',
     category: 'male',
@@ -137,7 +137,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_diamond',
     name: 'Khung Kim Cương Tinh Thể',
-    price: 420,
+    price: 1650,
     icon: '💎',
     type: 'frame',
     category: 'female',
@@ -150,7 +150,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_gold',
     name: 'Khung Rồng Vàng Hoàng Gia',
-    price: 500,
+    price: 1800,
     icon: '👑',
     type: 'frame',
     category: 'male',
@@ -163,7 +163,7 @@ export const SHOP_ITEMS = [
   {
     id: 'frame_glory_wings',
     name: 'Khung Thần Thoại Thách Đấu',
-    price: 550,
+    price: 2000,
     icon: '⚜️',
     type: 'frame',
     category: 'male',

@@ -38,22 +38,22 @@ console.log('\n=== BẮT ĐẦU KIỂM THỬ GIAI ĐOẠN 3 ===\n');
 // 1. Kiểm tra cấu hình SHOP_ITEMS
 assert(SHOP_ITEMS.length === 12, `SHOP_ITEMS có đủ 12 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
 const gripDef = SHOP_ITEMS.find(i => i.id === 'grip');
-assert(gripDef && gripDef.price === 120 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 120 xu, type consumable');
+assert(gripDef && gripDef.price === 150 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 150 xu, type consumable');
 
 const shieldDef = SHOP_ITEMS.find(i => i.id === 'elo_shield');
-assert(shieldDef && shieldDef.price === 100 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 100 xu, type perk');
+assert(shieldDef && shieldDef.price === 120 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 120 xu, type perk');
 
 const frames = SHOP_ITEMS.filter(i => i.type === 'frame');
 assert(frames.length === 10, `Có đủ 10 Khung Avatar (hiện có: ${frames.length})`);
 
 const waterFrame = frames.find(f => f.id === 'frame_water');
-assert(waterFrame && waterFrame.hasAnimation === true, 'Có khung Thủy Triều Đại Dương (Nước) kèm hoạt ảnh');
+assert(waterFrame && waterFrame.hasAnimation === true && waterFrame.price === 1300, 'Có khung Thủy Triều Đại Dương (Nước) 1300 xu');
 
 const fireFrame = frames.find(f => f.id === 'frame_fire');
-assert(fireFrame && fireFrame.hasAnimation === true, 'Có khung Hỏa Phụng Chiến Thần (Lửa) kèm hoạt ảnh');
+assert(fireFrame && fireFrame.hasAnimation === true && fireFrame.price === 1500, 'Có khung Hỏa Phụng Chiến Thần (Lửa) 1500 xu');
 
 const wingsFrame = frames.find(f => f.id === 'frame_glory_wings');
-assert(wingsFrame && wingsFrame.hasAnimation === true && wingsFrame.price === 550, 'Có khung Thần Thoại Thách Đấu (Game Art Cánh Vàng) 550 xu');
+assert(wingsFrame && wingsFrame.hasAnimation === true && wingsFrame.price === 2000, 'Có khung Thần Thoại Thách Đấu (Game Art Cánh Vàng) 2000 xu chuẩn 2 tháng');
 
 // Setup Mock Data
 const testMember = {
@@ -61,7 +61,7 @@ const testMember = {
   name: 'Nguyễn Văn Test P3',
   gender: 'male',
   elo: 1200,
-  coins: 500,
+  coins: 1000,
   activeFrame: '',
   activeEloShield: false,
   matchesPlayed: 10,
@@ -73,38 +73,44 @@ StorageService.saveMembers([testMember]);
 StorageService.setCurrentUser(testMember.id);
 StorageService.saveLocalInventory([]);
 
-// 2. Mua thẻ khiên Elo (Giá 100 xu)
+// 2. Mua thẻ khiên Elo (Giá 120 xu)
 const buyShieldRes = StorageService.buyShopItem(testMember.id, 'elo_shield');
 assert(buyShieldRes.success === true, 'Mua thẻ khiên Elo thành công');
-assert(buyShieldRes.balanceAfter === 400, `Số dư sau khi mua khiên là 400 xu (thực tế: ${buyShieldRes.balanceAfter})`);
+assert(buyShieldRes.balanceAfter === 880, `Số dư sau khi mua khiên là 880 xu (thực tế: ${buyShieldRes.balanceAfter})`);
 
 let inv = StorageService.getUserInventory(testMember.id);
 let shieldInv = inv.find(i => i.itemId === 'elo_shield');
 assert(shieldInv && shieldInv.quantity === 1, 'Túi đồ có 1 thẻ khiên Elo');
 
-// Mua tiếp 1 thẻ khiên nữa (cộng dồn, 100 xu)
+// Mua tiếp 1 thẻ khiên nữa (cộng dồn, 120 xu)
 StorageService.buyShopItem(testMember.id, 'elo_shield');
 inv = StorageService.getUserInventory(testMember.id);
 shieldInv = inv.find(i => i.itemId === 'elo_shield');
 assert(shieldInv && shieldInv.quantity === 2, `Cộng dồn số lượng khiên Elo thành 2 (thực tế: ${shieldInv?.quantity})`);
 
-// 3. Mua cuốn cán vợt (Giá 120 xu)
+// 3. Mua cuốn cán vợt (Giá 150 xu)
 const buyGripRes = StorageService.buyShopItem(testMember.id, 'grip');
 assert(buyGripRes.success === true, 'Mua cuốn cán vợt thành công');
-assert(buyGripRes.balanceAfter === 180, `Số dư sau khi mua cuốn cán là 180 xu (thực tế: ${buyGripRes.balanceAfter})`);
+assert(buyGripRes.balanceAfter === 610, `Số dư sau khi mua cuốn cán là 610 xu (thực tế: ${buyGripRes.balanceAfter})`);
 inv = StorageService.getUserInventory(testMember.id);
 let gripInv = inv.find(i => i.itemId === 'grip');
 assert(gripInv && gripInv.quantity === 1, 'Túi đồ có 1 cuốn cán');
 
-// 4. Mua khung Avatar Lửa Chiến Thần (frame_fire, 380 xu)
-// Số dư hiện tại: 180 xu => Thử mua khung 380 xu phải báo không đủ xu
+// 4. Mua khung Avatar Lửa Chiến Thần (frame_fire, 1500 xu)
+// Số dư hiện tại: 610 xu => Thử mua khung 1500 xu phải báo không đủ xu
 const buyFrameFail = StorageService.buyShopItem(testMember.id, 'frame_fire');
 assert(buyFrameFail.success === false && buyFrameFail.message.includes('không đủ'), 'Không đủ xu mua khung avatar báo lỗi chính xác');
 
 // Nạp thêm xu cho testMember và mua lại
-StorageService.addCoins(testMember.id, 300, 'test_reward', 'Nạp test');
+StorageService.addCoins(testMember.id, 1000, 'test_reward', 'Nạp test');
 const buyFrameOk = StorageService.buyShopItem(testMember.id, 'frame_fire');
 assert(buyFrameOk.success === true, 'Mua khung Lửa Chiến Thần thành công sau khi nạp xu');
+
+// Kiểm tra sổ giao dịch xu (Coin Transactions)
+const txs = StorageService.getCoinTransactions(testMember.id);
+assert(txs.length >= 5, `Sổ giao dịch ghi nhận đủ các biến động xu (hiện có: ${txs.length} giao dịch)`);
+const purchaseTx = txs.find(t => t.type === 'shop_purchase');
+assert(purchaseTx && purchaseTx.amount < 0, 'Sổ giao dịch có bản ghi chi tiêu mua vật phẩm');
 
 // Thử mua lại khung đã sở hữu => phải báo đã sở hữu
 const buyFrameDuplicate = StorageService.buyShopItem(testMember.id, 'frame_fire');

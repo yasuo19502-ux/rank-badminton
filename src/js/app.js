@@ -3659,7 +3659,113 @@ function renderClubShop() {
 
     invItemsContainer.innerHTML = cardsHtml;
   }
+
+  // 3. RENDER COIN HISTORY
+  renderCoinHistory();
 }
+
+let currentCoinHistoryFilter = 'all';
+
+function renderCoinHistory(filter = null) {
+  if (filter) currentCoinHistoryFilter = filter;
+  const user = StorageService.getCurrentUser();
+  if (!user) return;
+
+  const totalInSpan = document.getElementById('coin-history-total-in');
+  const totalOutSpan = document.getElementById('coin-history-total-out');
+  const balanceSpan = document.getElementById('coin-history-balance');
+  const container = document.getElementById('shop-history-container');
+
+  const allTxs = StorageService.getCoinTransactions(user.id);
+
+  let totalIn = 0;
+  let totalOut = 0;
+  allTxs.forEach(tx => {
+    if (tx.amount > 0) totalIn += Number(tx.amount);
+    else totalOut += Math.abs(Number(tx.amount));
+  });
+
+  if (totalInSpan) totalInSpan.textContent = `+${totalIn.toLocaleString('vi-VN')} 🪙`;
+  if (totalOutSpan) totalOutSpan.textContent = `-${totalOut.toLocaleString('vi-VN')} 🪙`;
+  if (balanceSpan) balanceSpan.textContent = `${(user.coins !== undefined ? user.coins : 100).toLocaleString('vi-VN')} 🪙`;
+
+  let displayTxs = allTxs;
+  if (currentCoinHistoryFilter === 'in') {
+    displayTxs = allTxs.filter(tx => tx.amount > 0);
+  } else if (currentCoinHistoryFilter === 'out') {
+    displayTxs = allTxs.filter(tx => tx.amount < 0);
+  }
+
+  document.querySelectorAll('.coin-filter-chip').forEach(chip => {
+    chip.classList.toggle('active', chip.getAttribute('data-filter') === currentCoinHistoryFilter);
+  });
+
+  if (!container) return;
+
+  if (displayTxs.length === 0) {
+    container.innerHTML = `
+      <div class="empty-history-box">
+        <div style="font-size: 2.2rem; margin-bottom: 6px;">📜</div>
+        <div style="font-weight: 700; color: var(--text-secondary);">Chưa có giao dịch nào</div>
+        <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">
+          ${currentCoinHistoryFilter === 'all' 
+            ? 'Hãy tích cực điểm danh và thi đấu để tích lũy xu!' 
+            : currentCoinHistoryFilter === 'in' 
+              ? 'Chưa có giao dịch thu vào nào.' 
+              : 'Chưa có giao dịch chi tiêu nào.'}
+        </div>
+      </div>
+    `;
+    return;
+  }
+
+  const typeIcons = {
+    session_checkin: { icon: '🏸', label: 'Điểm danh', color: '#10b981' },
+    match_win: { icon: '🏆', label: 'Thắng trận', color: '#f59e0b' },
+    match_loss: { icon: '⚡', label: 'Hoàn thành', color: '#3b82f6' },
+    bet_won: { icon: '🎲', label: 'Thắng cược', color: '#ec4899' },
+    bet_placed: { icon: '🎯', label: 'Đặt cược', color: '#6366f1' },
+    bet_refund: { icon: '🔁', label: 'Hoàn tiền', color: '#06b6d4' },
+    shop_purchase: { icon: '🛒', label: 'Cửa hàng', color: '#f43f5e' },
+    system: { icon: '🪙', label: 'Hệ thống', color: '#8b5cf6' }
+  };
+
+  container.innerHTML = displayTxs.map(tx => {
+    const isPos = tx.amount > 0;
+    const typeMeta = typeIcons[tx.type] || { icon: '🪙', label: 'Giao dịch', color: '#8b5cf6' };
+    const dateObj = new Date(tx.createdAt || Date.now());
+    const timeStr = dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' });
+    const dateStr = dateObj.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit', year: 'numeric' });
+
+    return `
+      <div class="coin-history-card ${isPos ? 'is-inflow' : 'is-outflow'}">
+        <div class="coin-history-icon" style="background: ${typeMeta.color}22; color: ${typeMeta.color}; border: 1px solid ${typeMeta.color}44;">
+          ${typeMeta.icon}
+        </div>
+        <div class="coin-history-body">
+          <div class="coin-history-title-row">
+            <span class="coin-history-desc">${tx.description || 'Giao dịch xu'}</span>
+            <span class="coin-history-badge" style="color: ${typeMeta.color}; border-color: ${typeMeta.color}44;">
+              ${typeMeta.label}
+            </span>
+          </div>
+          <div class="coin-history-meta-row">
+            <span class="coin-history-time">${timeStr} • ${dateStr}</span>
+            <span class="coin-history-after">Số dư: <strong>${(tx.balanceAfter !== undefined ? tx.balanceAfter : (user.coins || 100)).toLocaleString('vi-VN')} 🪙</strong></span>
+          </div>
+        </div>
+        <div class="coin-history-amount ${isPos ? 'pos' : 'neg'}">
+          ${isPos ? '+' : ''}${tx.amount.toLocaleString('vi-VN')} 🪙
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+window.appFilterCoinHistory = function(filter) {
+  SoundService.playClick();
+  renderCoinHistory(filter);
+};
 
 window.appOpenShopModal = function() {
   const user = StorageService.getCurrentUser();
@@ -3678,25 +3784,35 @@ window.appOpenShopModal = function() {
 };
 
 window.appOpenWalletModal = function() {
-  window.appOpenUserWallet();
+  window.appOpenShopModal();
+  window.appSwitchShopTab('history');
 };
 
 window.appSwitchShopTab = function(tab) {
   const btnStore = document.getElementById('btn-shop-tab-store');
   const btnInv = document.getElementById('btn-shop-tab-inventory');
+  const btnHist = document.getElementById('btn-shop-tab-history');
   const panelStore = document.getElementById('shop-panel-store');
   const panelInv = document.getElementById('shop-panel-inventory');
+  const panelHist = document.getElementById('shop-panel-history');
+
+  btnStore?.classList.remove('active');
+  btnInv?.classList.remove('active');
+  btnHist?.classList.remove('active');
+  if (panelStore) panelStore.style.display = 'none';
+  if (panelInv) panelInv.style.display = 'none';
+  if (panelHist) panelHist.style.display = 'none';
 
   if (tab === 'inventory') {
-    btnStore?.classList.remove('active');
     btnInv?.classList.add('active');
-    if (panelStore) panelStore.style.display = 'none';
     if (panelInv) panelInv.style.display = 'block';
+  } else if (tab === 'history') {
+    btnHist?.classList.add('active');
+    if (panelHist) panelHist.style.display = 'block';
+    renderCoinHistory();
   } else {
     btnStore?.classList.add('active');
-    btnInv?.classList.remove('active');
     if (panelStore) panelStore.style.display = 'block';
-    if (panelInv) panelInv.style.display = 'none';
   }
   SoundService.playClick();
 };
