@@ -57,7 +57,7 @@ export const SHOP_ITEMS = [
     rarity: 'rare',
     badge: 'Nam / Unisex',
     tierBadge: 'Tinh Anh 🖤',
-    description: 'Viền giáp kim loại Titan carbon đen nhám, đinh tán bạc sắc bén, biểu tượng khiên bóng đêm cực ngầu.'
+    description: 'Đúc từ kim loại của những cây vợt từng trải qua trăm trận thư hùng. Biểu tượng của sát thủ thầm lặng: không ồn ào phô trương nhưng một khi vung vợt là dứt điểm đoạt mạng.'
   },
   {
     id: 'frame_rainbow',
@@ -69,7 +69,7 @@ export const SHOP_ITEMS = [
     rarity: 'rare',
     badge: 'Nữ / Dễ thương',
     tierBadge: 'Tinh Anh 🌈',
-    description: 'Vòng quang phổ 7 sắc cầu vồng rực rỡ, phản chiếu năng lượng nhiệt huyết và tươi trẻ trên sân cầu.'
+    description: 'Kết tinh từ nụ cười rạng rỡ và ngọn lửa đam mê không bao giờ tắt. Người mang khung này luôn thắp sáng cả sân đấu, kéo tinh thần đồng đội đứng dậy sau mọi pha cầu hỏng.'
   },
   {
     id: 'frame_sakura',
@@ -81,7 +81,7 @@ export const SHOP_ITEMS = [
     rarity: 'rare',
     badge: 'Nữ / Dễ thương',
     tierBadge: 'Tinh Anh 🌸',
-    description: 'Viền ngọc hồng pastel mềm mại kèm hiệu ứng cánh hoa đào bay bổng lãng mạn.'
+    description: 'Tượng trưng cho những pha bỏ nhỏ thanh thoát êm như cánh hoa rơi. Vẻ ngoài mềm mại, uyển chuyển nhưng ẩn chứa những đường cầu gài góc hiểm hóc khôn lường.'
   },
   {
     id: 'frame_moon',
@@ -93,7 +93,7 @@ export const SHOP_ITEMS = [
     rarity: 'rare',
     badge: 'Nữ / Dễ thương',
     tierBadge: 'Tinh Anh 🌙',
-    description: 'Vành trăng khuyết phát sáng huyền bí cùng tinh tú tím Lavender mộng mơ.'
+    description: 'Dành riêng cho những tay vợt bền bỉ nán lại dưới ánh đèn đêm muộn. Bộ pháp di chuyển thoắt ẩn thoắt hiện, điều cầu biến ảo và khó lường như ánh trăng rằm.'
   },
   // 4. Khung Avatar Thần Thoại / Huyền Thoại VIP (Legendary - Animation Xoay 360°, Hào Quang Nổi Bật)
   {
@@ -107,7 +107,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Huyền Thoại VIP ⚡',
-    description: '⚡ Hoạt ảnh Sấm Sét: Luồng xung điện Cyan & Volt xoay vòng quét sáng 360°, các tia chớp giật lóe công nghệ đỉnh cao.'
+    description: 'Đại diện cho tốc độ và phản xạ vượt ngoài giới hạn thể chất. Khi tia chớp vừa lóe lên, quả cầu đã cắm sàn trước khi đối thủ kịp nhận ra điều gì vừa xảy ra.'
   },
   {
     id: 'frame_water',
@@ -120,7 +120,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Unisex / Mát lạnh',
     tierBadge: 'Thần Thoại VIP 🌊',
-    description: '🌊 Hoạt ảnh Thủy Triều: Dòng nước đại dương cuộn trào xoay 360°, những con sóng ngầm và xoáy nước xanh biếc chuyển động liên tục quanh viền avatar.'
+    description: 'Hiện thân của trường phái lấy nhu thắng cương. Dù đối thủ có smash bão táp đến đâu, dòng nước cuộn trào cũng nuốt trọn mọi đòn đánh rồi êm ru phản công kết liễu.'
   },
   {
     id: 'frame_fire',
@@ -133,7 +133,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Thần Thoại VIP 🔥',
-    description: '🔥 Hoạt ảnh Lửa Cháy: Ngọn lửa địa ngục bập bùng rực cháy cuộn trào 360°, hào quang nhiệt bốc cao cùng các đốm lửa chuyển động quanh viền avatar cực ngầu.'
+    description: 'Tái sinh từ những pha lội ngược dòng nghẹt thở. Ngọn lửa thi đấu càng bị dồn vào nghịch cảnh càng bùng cháy dữ dội, thiêu rụi hoàn toàn ý chí của đối phương.'
   },
   {
     id: 'frame_diamond',
@@ -146,7 +146,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nữ / Dễ thương',
     tierBadge: 'Thần Thoại VIP 💎',
-    description: '💎 Hoạt ảnh Lăng Kính: Ánh kim cương ngũ sắc quét tia sáng 360°, các tinh thể phát sáng phản chiếu lấp lánh như viên ngọc quý giá.'
+    description: 'Đúc kết từ hàng nghìn giờ mồ hôi mài giũa không ngừng trên sàn đấu. Bản lĩnh kiên cố không tì vết, tỏa sáng rực rỡ và vững vàng trước mọi sức ép ở những điểm số quyết định.'
   },
   {
     id: 'frame_gold',
@@ -159,7 +159,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Vô Địch Tối Thượng 👑',
-    description: '👑 Hoạt ảnh Hoàng Gia VIP: Vòng kim quang dát vàng xoay tròn 360°, hào quang Rồng Vàng tỏa sáng uy nghiêm tối thượng.'
+    description: 'Mang khí chất quân vương áp đảo toàn bộ sân đấu. Mỗi sải bước đều toát lên uy quyền của kẻ thống trị, khiến đối thủ chùn chân rén vợt từ trước khi giao cầu.'
   },
   {
     id: 'frame_glory_wings',
@@ -172,7 +172,7 @@ export const SHOP_ITEMS = [
     hasAnimation: true,
     badge: 'Nam / Unisex',
     tierBadge: 'Thần Thoại Thách Đấu ⚜️',
-    description: '⚜️ Game Art Thần Thoại VIP: Đôi cánh phượng hoàng dát vàng hoàng kim, vương miện khiên ngọc đỏ và xích thạch phát sáng rực rỡ chuẩn MOBA Thách Đấu.'
+    description: 'Bảo vật tối thượng của CLB Thái Thịnh. Đôi cánh hoàng kim nâng đỡ những cú nhảy đập đỉnh cao, chỉ trao tay những nhà vô địch khắc tên mình vào lịch sử giải đấu.'
   }
 ];
 
