@@ -2112,8 +2112,18 @@ function finishMatch() {
   team1.forEach(p => updatePlayer(p, result.deltaTeam1, team1Won));
   team2.forEach(p => updatePlayer(p, result.deltaTeam2, !team1Won));
 
-  // Lưu members đã cập nhật
-  StorageService.saveMembers(members);
+  // Lưu members đã cập nhật vào LocalStorage
+  StorageService.saveLocalMembers(members);
+
+  // Chỉ cập nhật các thành viên thực sự tham gia trận đấu lên Cloud Supabase (bảo vệ tuyệt đối các thành viên khác không bị ghi đè)
+  if (supabaseService.isConfigured()) {
+    const inv = StorageService.getLocalInventory();
+    const matchMemberIds = [...team1, ...team2].map(p => p.id).filter(id => id && !id.startsWith('guest_'));
+    matchMemberIds.forEach(id => {
+      const m = members.find(mem => mem.id === id);
+      if (m) supabaseService.upsertMember(m, inv);
+    });
+  }
 
   // Lưu trận đấu vào lịch sử
   const activeCourt = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';

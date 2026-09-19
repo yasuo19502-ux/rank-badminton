@@ -241,18 +241,14 @@ export const StorageService = {
         });
         this.saveLocalInventory(Array.from(invMap.values()));
 
-        // 2. Đồng bộ thành viên: Bảo toàn activeFrame & activeEloShield
+        // 2. Đồng bộ thành viên từ Cloud về LocalStorage (Luồng một chiều an toàn tuyệt đối)
         const localMembers = this.getMembers();
         const localMap = new Map(localMembers.map(m => [m.id, m]));
-        let needsCloudUpdate = false;
 
         const mergedMembers = cloudMembers.map(cm => {
           const lm = localMap.get(cm.id);
           const activeFrame = cm.activeFrame || lm?.activeFrame || '';
           const activeEloShield = cm.activeEloShield || lm?.activeEloShield || false;
-          if (lm?.activeFrame && !cm.activeFrame) {
-            needsCloudUpdate = true;
-          }
           return {
             ...cm,
             activeFrame,
@@ -261,11 +257,6 @@ export const StorageService = {
         });
 
         this.saveLocalMembers(mergedMembers);
-
-        if (needsCloudUpdate) {
-          const inv = this.getLocalInventory();
-          supabaseService.upsertMembers(mergedMembers, inv);
-        }
       }
       if (cloudMatches) {
         this.saveLocalMatches(cloudMatches);
@@ -738,8 +729,19 @@ export const StorageService = {
       }
     });
 
-    // Lưu lại danh sách members (cả local và batch sync lên Supabase)
-    this.saveMembers(members);
+    // Lưu lại danh sách members vào LocalStorage
+    this.saveLocalMembers(members);
+
+    // Chỉ cập nhật các thành viên thực sự liên quan tới trận đấu bị hoàn tác lên Cloud Supabase
+    if (supabaseService.isConfigured()) {
+      const inv = this.getLocalInventory();
+      allInvolvedIds.forEach(id => {
+        if (!id.startsWith('guest_')) {
+          const m = members.find(mem => mem.id === id);
+          if (m) supabaseService.upsertMember(m, inv);
+        }
+      });
+    }
 
     // Giảm số trận hôm nay trong điểm danh nếu có
     this.decrementGamePlayedToday(allInvolvedIds);
@@ -1205,7 +1207,11 @@ export const StorageService = {
     const mem = members.find(m => m.id === memberId);
     if (mem) {
       mem.pinCode = String(newPin).trim();
-      this.saveMembers(members);
+      this.saveLocalMembers(members);
+      if (supabaseService.isConfigured()) {
+        const inv = this.getLocalInventory();
+        supabaseService.upsertMember(mem, inv);
+      }
       return true;
     }
     return false;
@@ -1264,7 +1270,11 @@ export const StorageService = {
     const currentCoins = Number(mem.coins !== undefined ? mem.coins : 100);
     const balanceAfter = Math.max(0, currentCoins + Number(amount));
     mem.coins = balanceAfter;
-    this.saveMembers(members);
+    this.saveLocalMembers(members);
+    if (supabaseService.isConfigured()) {
+      const inv = this.getLocalInventory();
+      supabaseService.upsertMember(mem, inv);
+    }
 
     const tx = this.recordCoinTx(memberId, amount, balanceAfter, type, description);
     return { success: true, balanceAfter, transaction: tx };
@@ -1584,7 +1594,11 @@ export const StorageService = {
     // Nếu frameId là rỗng thì tháo khung
     if (!frameId) {
       mem.activeFrame = '';
-      this.saveMembers(members);
+      this.saveLocalMembers(members);
+      if (supabaseService.isConfigured()) {
+        const inv = this.getLocalInventory();
+        supabaseService.upsertMember(mem, inv);
+      }
       return { success: true, activeFrame: '' };
     }
 
@@ -1596,7 +1610,11 @@ export const StorageService = {
     }
 
     mem.activeFrame = frameId;
-    this.saveMembers(members);
+    this.saveLocalMembers(members);
+    if (supabaseService.isConfigured()) {
+      const inv = this.getLocalInventory();
+      supabaseService.upsertMember(mem, inv);
+    }
     return { success: true, activeFrame: frameId };
   },
 
@@ -1615,7 +1633,11 @@ export const StorageService = {
     }
 
     mem.activeEloShield = targetState;
-    this.saveMembers(members);
+    this.saveLocalMembers(members);
+    if (supabaseService.isConfigured()) {
+      const inv = this.getLocalInventory();
+      supabaseService.upsertMember(mem, inv);
+    }
     return { success: true, activeEloShield: targetState, remainingShields: shieldItem?.quantity || 0 };
   },
 
@@ -1628,7 +1650,11 @@ export const StorageService = {
     const shieldItem = allInv.find(i => i.memberId === memberId && i.itemId === 'elo_shield' && i.quantity > 0);
     if (!shieldItem) {
       mem.activeEloShield = false;
-      this.saveMembers(members);
+      this.saveLocalMembers(members);
+      if (supabaseService.isConfigured()) {
+        const inv = this.getLocalInventory();
+        supabaseService.upsertMember(mem, inv);
+      }
       return false;
     }
 
@@ -1638,10 +1664,12 @@ export const StorageService = {
       mem.activeEloShield = false;
     }
 
-    this.saveMembers(members);
+    this.saveLocalMembers(members);
     this.saveLocalInventory(allInv);
 
     if (supabaseService.isConfigured()) {
+      const inv = this.getLocalInventory();
+      supabaseService.upsertMember(mem, inv);
       supabaseService.upsertInventoryItem(shieldItem);
     }
     return true;
