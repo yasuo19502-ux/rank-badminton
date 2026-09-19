@@ -15,7 +15,8 @@ const STORAGE_KEYS = {
   CURRENT_USER_ID: 'cbb_thai_thinh_current_user_id_v1',
   COIN_TRANSACTIONS: 'cbb_thai_thinh_coin_transactions_v1',
   BETS: 'cbb_thai_thinh_bets_v1',
-  INVENTORY: 'cbb_thai_thinh_inventory_v1'
+  INVENTORY: 'cbb_thai_thinh_inventory_v1',
+  GUESTS: 'cbb_thai_thinh_guests_v1'
 };
 
 export const SHOP_ITEMS = [
@@ -240,6 +241,16 @@ export const StorageService = {
       const todayStr = getLocalDateStr();
       const cloudAttendance = await supabaseService.fetchAttendance(todayStr);
       if (cloudAttendance) {
+        // Luôn bảo toàn danh sách khách giao lưu hôm nay, không để cloud sync ghi đè mất khách
+        const localGuests = this.getGuests();
+        cloudAttendance.guests = localGuests;
+        if (Array.isArray(cloudAttendance.presentIds)) {
+          localGuests.forEach(g => {
+            if (!cloudAttendance.presentIds.includes(g.id)) {
+              cloudAttendance.presentIds.push(g.id);
+            }
+          });
+        }
         this.saveLocalAttendance(cloudAttendance);
       }
 
@@ -680,13 +691,30 @@ export const StorageService = {
 
   // --- GUEST MANAGEMENT (KHÁCH VÃNG LAI) ---
   getGuests() {
+    try {
+      const data = localStorage.getItem(STORAGE_KEYS.GUESTS);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+      }
+    } catch (e) {}
+
     const attendance = this.getAttendance();
     return Array.isArray(attendance.guests) ? attendance.guests : [];
   },
 
-  addGuest(guestData) {
+  saveGuests(guests) {
+    try {
+      localStorage.setItem(STORAGE_KEYS.GUESTS, JSON.stringify(guests));
+    } catch (e) {}
     const attendance = this.getAttendance();
-    if (!Array.isArray(attendance.guests)) attendance.guests = [];
+    attendance.guests = guests;
+    this.saveLocalAttendance(attendance);
+  },
+
+  addGuest(guestData) {
+    const guests = this.getGuests();
+    const attendance = this.getAttendance();
     if (!Array.isArray(attendance.presentIds)) attendance.presentIds = [];
 
     const newGuest = {
@@ -704,16 +732,21 @@ export const StorageService = {
       createdAt: new Date().toISOString()
     };
 
-    attendance.guests.push(newGuest);
+    guests.push(newGuest);
     if (!attendance.presentIds.includes(newGuest.id)) {
       attendance.presentIds.push(newGuest.id);
     }
 
+    this.saveGuests(guests);
     this.saveAttendance(attendance);
     return newGuest;
   },
 
   removeGuest(guestId) {
+    let guests = this.getGuests();
+    guests = guests.filter(g => g.id !== guestId);
+    this.saveGuests(guests);
+
     const attendance = this.getAttendance();
     if (attendance.guests) {
       attendance.guests = attendance.guests.filter(g => g.id !== guestId);
