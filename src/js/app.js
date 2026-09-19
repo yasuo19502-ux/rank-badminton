@@ -2078,7 +2078,7 @@ function finishMatch() {
     if (mem) {
       let finalDelta = delta;
       // Giai đoạn 3: Quyền lợi Thẻ Khiên Bảo Vệ Elo
-      if (!won && mem.activeEloShield) {
+      if (!won && delta < 0 && mem.activeEloShield) {
         // Giảm 50% số điểm trừ (làm tròn số nguyên)
         finalDelta = Math.min(-1, Math.round(delta * 0.5));
         StorageService.consumeEloShield(mem.id);
@@ -5192,5 +5192,4 @@ window.appClaimGrip = async function() {
   showToast(`🏸 Đã xác nhận nhận cuốn cán! (Còn lại trong túi: ${res.remaining})`, 'success');
   renderClubShop();
 };
-
 

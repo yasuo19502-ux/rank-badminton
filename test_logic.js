@@ -25,9 +25,24 @@ const eloRes = calculateDoublesElo(team1, team2, 21, 19);
 console.log('Kết quả 21-19:');
 console.log(`Team 1 (Avg ${eloRes.team1Elo}) vs Team 2 (Avg ${eloRes.team2Elo})`);
 console.log(`Delta Team 1: ${eloRes.deltaTeam1 > 0 ? '+' : ''}${eloRes.deltaTeam1} | Delta Team 2: ${eloRes.deltaTeam2}`);
+if (eloRes.deltaTeam1 !== -eloRes.deltaTeam2) {
+  throw new Error('Elo không zero-sum: điểm đội thắng và đội thua phải cân bằng tuyệt đối');
+}
 
 const eloBlowout = calculateDoublesElo(team1, team2, 21, 8);
 console.log(`Kết quả thắng đậm 21-8: Delta Team 1: +${eloBlowout.deltaTeam1} (cao hơn khi thắng suýt sao)`);
+if (eloBlowout.deltaTeam1 !== -eloBlowout.deltaTeam2) {
+  throw new Error('Elo trận thắng đậm không zero-sum');
+}
+
+const floorTeam = [
+  { id: 'floor_1', elo: 500, matchesPlayed: 30 },
+  { id: 'floor_2', elo: 500, matchesPlayed: 30 }
+];
+const floorRes = calculateDoublesElo(team1, floorTeam, 21, 19);
+if (floorRes.deltaTeam1 !== 0 || floorRes.deltaTeam2 !== 0) {
+  throw new Error('Elo tại sàn 500 phải giữ zero-sum và không tạo thêm điểm');
+}
 
 console.log('\n--- 3. KIỂM TRA THUẬT TOÁN GHÉP CẶP (MATCHMAKER) ---');
 const present = mockMembers.slice(0, 10);

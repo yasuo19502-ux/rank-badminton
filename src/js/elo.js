@@ -71,6 +71,9 @@ export const TIERS = [
   }
 ];
 
+export const MIN_ELO = 500;
+export const ZERO_SUM_MATCH_PREFIX = 'match_zs_';
+
 export function getTierByElo(elo) {
   for (let i = TIERS.length - 1; i >= 0; i--) {
     if (elo >= TIERS[i].minElo) {
@@ -118,9 +121,11 @@ export function calculateDoublesElo(team1Players, team2Players, score1, score2) 
   const scoreDiff = Math.abs(score1 - score2);
 
   // Hệ số cách biệt điểm số (Margin of Victory Multiplier)
-  // Thắng huỷ diệt (ví dụ 21-5) được cộng nhiều hơn thắng deuce sít sao (21-19, 22-20)
-  const eloDiff = Math.abs(elo1 - elo2);
-  const marginMultiplier = Math.log(scoreDiff + 1) * (2.2 / (eloDiff * 0.001 + 2.2));
+  // Giữ ảnh hưởng của tỷ số trong biên 0.90 - 1.50 để thắng đậm vẫn có ý nghĩa
+  // nhưng không còn làm điểm Elo tăng hơn gấp đôi so với một trận thắng sát nút.
+  // Chênh 1 điểm = 0.90, chênh từ 15 điểm trở lên = 1.50.
+  const cappedScoreDiff = Math.max(1, Math.min(scoreDiff, 15));
+  const marginMultiplier = 0.9 + ((cappedScoreDiff - 1) / 14) * 0.6;
 
   // K-factor trung bình của từng đội
   const getTeamK = (team) => {
@@ -134,6 +139,13 @@ export function calculateDoublesElo(team1Players, team2Players, score1, score2) 
   const k1 = getTeamK(team1Players);
   const k2 = getTeamK(team2Players);
 
+  // Nếu một người thua đã gần chạm sàn Elo, giới hạn điểm chuyển giao
+  // để tổng Elo thực tế sau trận vẫn bằng 0.
+  const getMaxLossPerPlayer = (team) => Math.min(...team.map(player => {
+    const playerElo = Number(player.elo);
+    return Math.max(0, (Number.isFinite(playerElo) ? playerElo : MIN_ELO) - MIN_ELO);
+  }));
+
   // Lượng điểm thay đổi cơ bản
   let deltaTeam1 = 0;
   let deltaTeam2 = 0;
@@ -144,22 +156,24 @@ export function calculateDoublesElo(team1Players, team2Players, score1, score2) 
     const maxDelta = Math.round(k1 * 1.2);
     if (winDelta > maxDelta) winDelta = maxDelta;
     if (winDelta < 5) winDelta = 5;
+    winDelta = Math.min(winDelta, getMaxLossPerPlayer(team2Players));
 
     deltaTeam1 = winDelta;
-    // Đội 2 thua: Giảm 20% mức phạt so với thắng (chỉ trừ 80%), làm tròn số nguyên không có số thập phân
-    const lossPenalty = Math.max(1, Math.round(winDelta * 0.8));
-    deltaTeam2 = -lossPenalty;
+    // Elo cơ bản là zero-sum: mỗi người đội thua mất đúng số điểm
+    // mà mỗi người đội thắng nhận được, tránh lạm phát Elo toàn CLB.
+    deltaTeam2 = -winDelta;
   } else {
     // Đội 2 thắng
     let winDelta = Math.round(k2 * (1 - expected2) * marginMultiplier);
     const maxDelta = Math.round(k2 * 1.2);
     if (winDelta > maxDelta) winDelta = maxDelta;
     if (winDelta < 5) winDelta = 5;
+    winDelta = Math.min(winDelta, getMaxLossPerPlayer(team1Players));
 
     deltaTeam2 = winDelta;
-    // Đội 1 thua: Giảm 20% mức phạt so với thắng (chỉ trừ 80%), làm tròn số nguyên không có số thập phân
-    const lossPenalty = Math.max(1, Math.round(winDelta * 0.8));
-    deltaTeam1 = -lossPenalty;
+    // Elo cơ bản là zero-sum: mỗi người đội thua mất đúng số điểm
+    // mà mỗi người đội thắng nhận được, tránh lạm phát Elo toàn CLB.
+    deltaTeam1 = -winDelta;
   }
 
   return {
@@ -362,7 +376,9 @@ export function getPlayerDetailedStats(memberId, members, matches = []) {
         myEloDelta = Number(m.deltaTeam2);
       } else {
         const baseChange = Number(m.eloChange) || 16;
-        myEloDelta = isWin ? baseChange : -Math.max(1, Math.round(baseChange * 0.8));
+        const usesZeroSum = String(m.id || '').startsWith(ZERO_SUM_MATCH_PREFIX);
+        const lossChange = usesZeroSum ? baseChange : Math.max(1, Math.round(baseChange * 0.8));
+        myEloDelta = isWin ? baseChange : -lossChange;
       }
 
       personalMatches.push({
@@ -457,4 +473,3 @@ export function calculateBettingOdds(team1, team2) {
     avgElo2: Math.round(avgElo2)
   };
 }
-

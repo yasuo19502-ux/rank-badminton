@@ -3,7 +3,7 @@
  */
 
 import { supabaseService } from './supabase.js';
-import { calculateDoublesElo } from './elo.js';
+import { calculateDoublesElo, ZERO_SUM_MATCH_PREFIX } from './elo.js';
 
 const STORAGE_KEYS = {
   MEMBERS: 'cbb_thai_thinh_members_v2',
@@ -585,7 +585,7 @@ export const StorageService = {
   addMatch(matchData) {
     const matches = this.getMatches();
     const newMatch = {
-      id: 'match_' + Date.now(),
+      id: ZERO_SUM_MATCH_PREFIX + Date.now(),
       timestamp: Date.now(),
       courtNumber: matchData.courtNumber || 'Sân 1',
       ...matchData
@@ -625,7 +625,8 @@ export const StorageService = {
       delta2 = Number(matchToDelete.deltaTeam2);
     } else {
       const eloChange = Number(matchToDelete.eloChange) || 16;
-      const lossPenalty = Math.max(1, Math.round(eloChange * 0.8));
+      const usesZeroSum = String(matchToDelete.id || '').startsWith(ZERO_SUM_MATCH_PREFIX);
+      const lossPenalty = usesZeroSum ? eloChange : Math.max(1, Math.round(eloChange * 0.8));
       delta1 = team1Won ? eloChange : -lossPenalty;
       delta2 = team1Won ? -lossPenalty : eloChange;
     }
