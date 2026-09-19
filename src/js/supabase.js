@@ -560,6 +560,20 @@ class SupabaseService {
     }
   }
 
+  async deleteCoinTransactionsByType(type) {
+    if (!this.isConfigured()) return false;
+    try {
+      const { error } = await this.client
+        .from('coin_transactions')
+        .delete()
+        .eq('type', type);
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      return false;
+    }
+  }
+
   // --- API DỰ ĐOÁN & CƯỢC VUI (BETS - GIAI ĐOẠN 2) ---
   async fetchBets(courtId = null) {
     if (!this.isConfigured()) return null;

@@ -217,6 +217,11 @@ export const StorageService = {
       ]);
 
       if (cloudMembers && cloudMembers.length > 0) {
+        cloudMembers.forEach(m => {
+          if (m.coins > 100 && (!cloudInv || !cloudInv.some(i => i.user_id === m.id))) {
+            m.coins = 100;
+          }
+        });
         this.saveLocalMembers(cloudMembers);
       }
       if (cloudMatches) {
@@ -229,7 +234,8 @@ export const StorageService = {
         this.saveLocalSettings(cloudSettings);
       }
       if (cloudCoinTx && cloudCoinTx.length > 0) {
-        this.saveLocalCoinTransactions(cloudCoinTx);
+        const sanitizedTx = cloudCoinTx.filter(t => t.type !== 'session_checkin');
+        this.saveLocalCoinTransactions(sanitizedTx);
       }
       if (cloudBets) {
         this.saveLocalBets(cloudBets);
@@ -1063,6 +1069,40 @@ export const StorageService = {
 
     const tx = this.recordCoinTx(memberId, amount, balanceAfter, type, description);
     return { success: true, balanceAfter, transaction: tx };
+  },
+
+  revertAllCheckinCoins() {
+    try {
+      // 1. Xóa các giao dịch session_checkin cũ khỏi sổ giao dịch
+      let txs = this.getLocalCoinTransactions();
+      const beforeCount = txs.length;
+      txs = txs.filter(t => t.type !== 'session_checkin');
+      if (txs.length !== beforeCount) {
+        this.saveLocalCoinTransactions(txs);
+      }
+
+      // 2. Đặt lại số dư của tất cả thành viên về 100 mặc định nếu chưa chi tiêu mua đồ
+      const members = this.getMembers();
+      let changed = false;
+      const inv = this.getLocalInventory();
+      members.forEach(m => {
+        const hasPurchases = inv.some(item => item.userId === m.id);
+        if (!hasPurchases && m.coins !== 100) {
+          m.coins = 100;
+          changed = true;
+        }
+      });
+      if (changed) {
+        this.saveMembers(members);
+      }
+
+      // 3. Dọn dẹp giao dịch session_checkin trên Supabase Cloud nếu đã kết nối
+      if (supabaseService.isConfigured()) {
+        supabaseService.deleteCoinTransactionsByType('session_checkin').catch(() => {});
+      }
+    } catch (e) {
+      console.warn('Lỗi hoàn tác xu điểm danh:', e);
+    }
   },
 
   // --- KIỂM TRA LỊCH BUỔI ĐÁNH HỢP LỆ (SESSION CHECK) ---

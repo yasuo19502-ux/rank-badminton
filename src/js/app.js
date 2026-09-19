@@ -141,6 +141,7 @@ document.addEventListener('DOMContentLoaded', () => {
 function initApp() {
   initTheme();
   setupEventListeners();
+  StorageService.revertAllCheckinCoins();
   loadInitialState();
   state.currentUser = StorageService.getCurrentUser();
   renderUserAuthHeader();
@@ -2062,9 +2063,29 @@ function finishMatch() {
   const allIds = [...team1.map(p => p.id), ...team2.map(p => p.id)];
   StorageService.recordGamePlayedToday(allIds);
 
-  // Thưởng xu thi đấu (Giai đoạn 1): Thắng +20 Xu, Thua +5 Xu (Chỉ thành viên chính thức)
   const winningTeam = team1Won ? team1 : team2;
   const losingTeam = team1Won ? team2 : team1;
+  const allMatchPlayers = [...winningTeam, ...losingTeam];
+  const todayStr = getLocalDateStr();
+
+  // 1. Thưởng xu điểm danh buổi đánh: +50 Xu
+  // QUY TẮC MỚI: Chỉ cộng vào TRẬN ĐẦU TIÊN TRONG NGÀY (phải thực sự có mặt thi đấu ít nhất 1 trận)
+  allMatchPlayers.forEach(p => {
+    if (p.id && !p.id.startsWith('guest_')) {
+      const existingTxs = StorageService.getCoinTransactions(p.id);
+      const alreadyGotDaily = existingTxs.some(t => t.type === 'session_checkin' && t.createdAt?.startsWith(todayStr));
+      if (!alreadyGotDaily) {
+        StorageService.addCoins(p.id, 50, 'session_checkin', `Thưởng điểm danh & thi đấu trận đầu tiên ngày ${todayStr}`);
+        if (state.currentUser && state.currentUser.id === p.id) {
+          setTimeout(() => {
+            showToast(`🎁 Bạn nhận được +50 Xu điểm danh (Trận đấu đầu tiên trong ngày)!`, 'success');
+          }, 300);
+        }
+      }
+    }
+  });
+
+  // 2. Thưởng xu thi đấu (Giai đoạn 1): Thắng +20 Xu, Thua +5 Xu (Chỉ thành viên chính thức)
   winningTeam.forEach(p => {
     if (p.id && !p.id.startsWith('guest_')) {
       StorageService.addCoins(p.id, 20, 'match_win', `Thắng trận ${activeCourt} (${state.score1}-${state.score2})`);
@@ -2527,20 +2548,10 @@ window.appToggleAttendance = function(memberId) {
     return;
   }
 
-  // Thưởng xu điểm danh buổi đánh: +50 Xu (mỗi người 1 lần / ngày có lịch - chỉ thành viên CLB)
-  if (!wasPresent) {
-    const todayStr = getLocalDateStr();
-    const existingTxs = StorageService.getCoinTransactions(memberId);
-    const alreadyRewarded = existingTxs.some(t => t.type === 'session_checkin' && t.createdAt?.startsWith(todayStr));
-    if (!alreadyRewarded) {
-      StorageService.addCoins(memberId, 50, 'session_checkin', `Điểm danh buổi đánh ngày ${todayStr}`);
-      const mem = StorageService.getMemberById(memberId);
-      showToast(`✅ ${mem ? mem.name : 'Thành viên'} đã có mặt tại sân! (+50 Xu)`);
-      if (state.currentUser && state.currentUser.id === memberId) {
-        state.currentUser = StorageService.getCurrentUser();
-        renderUserAuthHeader();
-      }
-    }
+  // Thành viên chính thức: Chỉ đổi trạng thái có mặt / rời sân, KHÔNG cộng xu ngay khi tick
+  const mem = StorageService.getMemberById(memberId);
+  if (mem) {
+    showToast(wasPresent ? `${mem.name} đã rời sân` : `✅ ${mem.name} đã điểm danh có mặt! (Xu điểm danh sẽ cộng sau trận đầu)`);
   }
 };
 
@@ -3433,6 +3444,8 @@ async function initCloudSyncAndRealtime() {
   const synced = await StorageService.syncFromCloud();
   if (synced) {
     loadInitialState();
+    state.currentUser = StorageService.getCurrentUser();
+    renderUserAuthHeader();
     switchTab(state.currentTab);
     updateSessionStatusBadge();
     console.log('[App] Đã đồng bộ dữ liệu mới nhất từ Supabase Cloud!');
