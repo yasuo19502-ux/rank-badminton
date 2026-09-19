@@ -5,47 +5,58 @@
 export const TIERS = [
   {
     id: 'ga_nhat_cau',
-    name: 'Tân Binh Tiềm Năng',
+    name: 'Gà Nhặt Cầu',
     icon: '🐣',
     minElo: 0,
+    maxElo: 899,
+    color: '#64748b',
+    bgColor: 'rgba(100, 116, 139, 0.08)',
+    borderColor: 'rgba(100, 116, 139, 0.28)',
+    description: 'Đam mê bất tận, nhặt cầu khởi động dưỡng sinh'
+  },
+  {
+    id: 'mam_non',
+    name: 'Mầm Non Sân Cầu',
+    icon: '🌱',
+    minElo: 900,
     maxElo: 999,
     color: '#0284c7',
     bgColor: 'rgba(2, 132, 199, 0.08)',
     borderColor: 'rgba(2, 132, 199, 0.28)',
-    description: 'Thành viên mới gia nhập, đang từng bước nâng cao kỹ thuật và cảm giác cầu'
-  },
-  {
-    id: 'chat_cau_phui',
-    name: 'Tay Vợt Phong Trào',
-    icon: '🏸',
-    minElo: 1000,
-    maxElo: 1199,
-    color: '#0d9488',
-    bgColor: 'rgba(13, 148, 136, 0.08)',
-    borderColor: 'rgba(13, 148, 136, 0.28)',
-    description: 'Nền tảng kỹ thuật vững vàng, điều cầu linh hoạt và phối hợp ăn ý'
-  },
-  {
-    id: 'cat_cau_bay',
-    name: 'Thiện Chiến Sân Đôi',
-    icon: '⚡',
-    minElo: 1200,
-    maxElo: 1349,
-    color: '#16a34a',
-    bgColor: 'rgba(22, 163, 74, 0.08)',
-    borderColor: 'rgba(22, 163, 74, 0.28)',
-    description: 'Phản xạ nhanh nhạy, gài lưới hiểm hóc và chớp thời cơ dứt điểm'
+    description: 'Bậc đệm nắn lại phong độ, đang rèn giũa cảm giác cầu và bước chân'
   },
   {
     id: 'smash_chay_san',
-    name: 'Chủ Lực Smash',
+    name: 'Smash Cháy Sân',
     icon: '💥',
-    minElo: 1350,
+    minElo: 1000,
+    maxElo: 1149,
+    color: '#0d9488',
+    bgColor: 'rgba(13, 148, 136, 0.08)',
+    borderColor: 'rgba(13, 148, 136, 0.28)',
+    description: 'Nhiệt huyết bùng cháy, đập cầu quyết liệt, đối đầu sòng phẳng'
+  },
+  {
+    id: 'buc_tuong_thep',
+    name: 'Bức Tường Thép',
+    icon: '🛡️',
+    minElo: 1150,
+    maxElo: 1299,
+    color: '#16a34a',
+    bgColor: 'rgba(22, 163, 74, 0.08)',
+    borderColor: 'rgba(22, 163, 74, 0.28)',
+    description: 'Thủ chắc như bàn thạch, gài lưới hiểm hóc, đối phương đập mỏi tay tự hỏng'
+  },
+  {
+    id: 'tho_thay',
+    name: 'Thợ Thầy',
+    icon: '🥋',
+    minElo: 1300,
     maxElo: 1499,
     color: '#ea580c',
     bgColor: 'rgba(234, 88, 12, 0.08)',
     borderColor: 'rgba(234, 88, 12, 0.28)',
-    description: 'Lực cổ tay uy lực, đập cầu cắm vạch, trụ cột tấn công của cặp đôi'
+    description: 'Trình độ lão luyện, tay nghề đỉnh cao, gánh kèo độ và điều tiết trận đấu bậc thầy'
   },
   {
     id: 'chien_than',
