@@ -735,7 +735,7 @@
             <span>📤</span> Nhập File Dữ Liệu (Import JSON)
             <input type="file" id="input-import-json" accept=".json" style="display: none;">
           </label>
-          <button id="btn-reset-default" class="btn-secondary" style="color: var(--coral); margin-top: 10px;">
+          <button id="btn-reset-default" class="btn-secondary" style="color: var(--coral); margin-top: 6px;">
             <span>🗑️</span> Xóa Toàn Bộ Dữ Liệu (Làm Sạch 100%)
           </button>
         </div>
@@ -1207,6 +1207,21 @@
           <button type="submit" class="btn btn-primary" style="font-weight: 700;">➕ Thêm Khách Vào Sân</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Xác Nhận Tùy Chỉnh (Custom Confirm Modal) -->
+  <div id="modal-confirm" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 400px; text-align: center; border-radius: 16px;">
+      <div class="modal-body" style="padding: 24px 20px 14px;">
+        <div id="confirm-modal-icon" style="font-size: 2.8rem; margin-bottom: 12px; line-height: 1;">⚠️</div>
+        <h3 id="confirm-modal-title" style="margin: 0 0 8px; font-size: 1.15rem; font-weight: 700; color: var(--text-main);">Xác Nhận Thao Tác</h3>
+        <p id="confirm-modal-message" style="margin: 0; font-size: 0.92rem; color: var(--text-muted); line-height: 1.5;"></p>
+      </div>
+      <div class="modal-footer" style="display: flex; gap: 10px; justify-content: center; padding: 12px 20px 20px; border-top: none;">
+        <button type="button" id="confirm-modal-cancel" class="btn btn-secondary" style="flex: 1; padding: 10px; font-weight: 600;">Hủy</button>
+        <button type="button" id="confirm-modal-ok" class="btn btn-primary" style="flex: 1; padding: 10px; font-weight: 700;">Đồng Ý</button>
+      </div>
     </div>
   </div>
 

@@ -38,42 +38,46 @@ export const MatchmakerService = {
   _createBalancedMatch(available, gamesPlayedToday) {
     // Sắp xếp người theo:
     // 1. Số trận hôm nay (tăng dần - ai ít trận được ưu tiên)
-    // 2. Thêm chút ngẫu nhiên nếu bằng nhau để không bị cố định
-    const sorted = [...available].sort((a, b) => {
-      const countA = gamesPlayedToday[a.id] || 0;
-      const countB = gamesPlayedToday[b.id] || 0;
-      if (countA !== countB) return countA - countB;
-      return 0.5 - Math.random();
+    // 2. Phân định bằng số ngẫu nhiên chuẩn xác (tránh sort không ổn định)
+    const pool = available.map(p => ({
+      player: p,
+      games: gamesPlayedToday[p.id] || 0,
+      rand: Math.random()
+    })).sort((a, b) => {
+      if (a.games !== b.games) return a.games - b.games;
+      return a.rand - b.rand;
     });
 
     // Lấy 4 người đầu tiên
-    const players = sorted.slice(0, 4);
+    const players = pool.slice(0, 4).map(item => item.player);
 
-    // Tìm cách ghép 2 đội cân nhất trong 4 người
+    // Thử 3 cách chia đội
     const pairings = [
       { team1: [players[0], players[1]], team2: [players[2], players[3]] },
       { team1: [players[0], players[2]], team2: [players[1], players[3]] },
       { team1: [players[0], players[3]], team2: [players[1], players[2]] }
     ];
 
-    let bestPairing = pairings[0];
-    let minDiff = Infinity;
-
-    pairings.forEach(p => {
+    const evaluatedPairings = pairings.map(p => {
       const elo1 = (p.team1[0].elo + p.team1[1].elo) / 2;
       const elo2 = (p.team2[0].elo + p.team2[1].elo) / 2;
-      const diff = Math.abs(elo1 - elo2);
-      if (diff < minDiff) {
-        minDiff = diff;
-        bestPairing = p;
-      }
-    });
+      return {
+        ...p,
+        diff: Math.abs(elo1 - elo2)
+      };
+    }).sort((a, b) => a.diff - b.diff);
+
+    const minDiff = evaluatedPairings[0].diff;
+    // Lấy các cách ghép có độ cân tương đương (chênh lệch không quá 25 Elo so với tối ưu)
+    const balancedOptions = evaluatedPairings.filter(p => p.diff <= minDiff + 25);
+    // Chọn ngẫu nhiên trong các phương án cân kèo để đa dạng hoá cặp đấu
+    const bestPairing = balancedOptions[Math.floor(Math.random() * balancedOptions.length)];
 
     return {
       team1: bestPairing.team1,
       team2: bestPairing.team2,
       mode: 'balanced',
-      diffElo: Math.round(minDiff),
+      diffElo: Math.round(bestPairing.diff),
       allSelected: players
     };
   },
@@ -90,41 +94,48 @@ export const MatchmakerService = {
       throw new Error(`Cần tối thiểu 2 Nam và 2 Nữ để đánh Đôi Nam Nữ (hiện có ${males.length} Nam, ${females.length} Nữ)`);
     }
 
-    const sortFn = (a, b) => {
-      const countA = gamesPlayedToday[a.id] || 0;
-      const countB = gamesPlayedToday[b.id] || 0;
-      if (countA !== countB) return countA - countB;
-      return 0.5 - Math.random();
+    const sortWithRand = (list) => {
+      return list.map(p => ({
+        player: p,
+        games: gamesPlayedToday[p.id] || 0,
+        rand: Math.random()
+      })).sort((a, b) => {
+        if (a.games !== b.games) return a.games - b.games;
+        return a.rand - b.rand;
+      }).map(item => item.player);
     };
 
-    males.sort(sortFn);
-    females.sort(sortFn);
+    const sortedMales = sortWithRand(males);
+    const sortedFemales = sortWithRand(females);
 
-    const m1 = males[0];
-    const m2 = males[1];
-    const f1 = females[0];
-    const f2 = females[1];
+    const m1 = sortedMales[0];
+    const m2 = sortedMales[1];
+    const f1 = sortedFemales[0];
+    const f2 = sortedFemales[1];
 
     // Có 2 cách ghép: (m1, f1) vs (m2, f2) hoặc (m1, f2) vs (m2, f1)
     const diff1 = Math.abs((m1.elo + f1.elo) / 2 - (m2.elo + f2.elo) / 2);
     const diff2 = Math.abs((m1.elo + f2.elo) / 2 - (m2.elo + f1.elo) / 2);
 
-    let team1, team2, minDiff;
-    if (diff1 <= diff2) {
-      team1 = [m1, f1];
-      team2 = [m2, f2];
-      minDiff = diff1;
+    let team1, team2, chosenDiff;
+    if (Math.abs(diff1 - diff2) <= 25) {
+      // Nếu 2 phương án đều cân kèo, ngẫu nhiên chọn để đổi bạn cặp
+      if (Math.random() < 0.5) {
+        team1 = [m1, f1]; team2 = [m2, f2]; chosenDiff = diff1;
+      } else {
+        team1 = [m1, f2]; team2 = [m2, f1]; chosenDiff = diff2;
+      }
+    } else if (diff1 <= diff2) {
+      team1 = [m1, f1]; team2 = [m2, f2]; chosenDiff = diff1;
     } else {
-      team1 = [m1, f2];
-      team2 = [m2, f1];
-      minDiff = diff2;
+      team1 = [m1, f2]; team2 = [m2, f1]; chosenDiff = diff2;
     }
 
     return {
       team1,
       team2,
       mode: 'mixed',
-      diffElo: Math.round(minDiff),
+      diffElo: Math.round(chosenDiff),
       allSelected: [m1, m2, f1, f2]
     };
   },
@@ -134,8 +145,8 @@ export const MatchmakerService = {
    * Bốc 4 người hoàn toàn ngẫu nhiên và xếp ngẫu nhiên để tấu hài
    */
   _createRandomMatch(available) {
-    const shuffled = [...available].sort(() => 0.5 - Math.random());
-    const players = shuffled.slice(0, 4);
+    const pool = available.map(p => ({ player: p, rand: Math.random() })).sort((a, b) => a.rand - b.rand);
+    const players = pool.slice(0, 4).map(item => item.player);
 
     const team1 = [players[0], players[1]];
     const team2 = [players[2], players[3]];

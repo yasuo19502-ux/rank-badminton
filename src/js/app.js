@@ -141,7 +141,6 @@ document.addEventListener('DOMContentLoaded', () => {
 function initApp() {
   initTheme();
   setupEventListeners();
-  StorageService.revertAllCheckinCoins();
   loadInitialState();
   state.currentUser = StorageService.getCurrentUser();
   renderUserAuthHeader();
@@ -181,32 +180,59 @@ function updateThemeButton(theme) {
  * Nạp trạng thái ban đầu từ Storage cho 2 Sân (Sân 1 & Sân 2)
  */
 function loadInitialState() {
-  const savedCourt1 = StorageService.getActiveMatch('court_1');
-  if (savedCourt1 && savedCourt1.team1 && savedCourt1.team2) {
-    state.courtMatches.court_1.activeMatch = savedCourt1;
-    state.courtMatches.court_1.score1 = savedCourt1.score1 || 0;
-    state.courtMatches.court_1.score2 = savedCourt1.score2 || 0;
-    state.courtMatches.court_1.mode = savedCourt1.mode || 'balanced';
-    state.courtMatches.court_1.matchStatus = savedCourt1.matchStatus || ((savedCourt1.score1 > 0 || savedCourt1.score2 > 0) ? 'in_progress' : 'ready');
-    state.courtMatches.court_1.isSwappedSides = !!savedCourt1.isSwappedSides;
-    state.courtMatches.court_1.scoreHistory = [];
-  } else {
-    state.courtMatches.court_1.activeMatch = { team1: [null, null], team2: [null, null] };
-  }
+  const initCourt = (courtId, courtName) => {
+    const saved = StorageService.getActiveMatch(courtId);
+    const hasAny = saved && (
+      (Array.isArray(saved.team1) && saved.team1.some(Boolean)) ||
+      (Array.isArray(saved.team2) && saved.team2.some(Boolean))
+    );
+    if (saved && hasAny) {
+      const s1 = Number(saved.score1) || 0;
+      const s2 = Number(saved.score2) || 0;
+      const validTotal = (saved.team1?.filter(Boolean).length || 0) + (saved.team2?.filter(Boolean).length || 0);
+      let st = saved.matchStatus || saved.status;
+      if (s1 > 0 || s2 > 0) st = 'in_progress';
+      else if (!st || st === 'idle') st = validTotal === 4 ? 'ready' : 'idle';
 
-  const savedCourt2 = StorageService.getActiveMatch('court_2');
-  if (savedCourt2 && savedCourt2.team1 && savedCourt2.team2) {
-    state.courtMatches.court_2.activeMatch = savedCourt2;
-    state.courtMatches.court_2.score1 = savedCourt2.score1 || 0;
-    state.courtMatches.court_2.score2 = savedCourt2.score2 || 0;
-    state.courtMatches.court_2.mode = savedCourt2.mode || 'balanced';
-    state.courtMatches.court_2.matchStatus = savedCourt2.matchStatus || ((savedCourt2.score1 > 0 || savedCourt2.score2 > 0) ? 'in_progress' : 'ready');
-    state.courtMatches.court_2.isSwappedSides = !!savedCourt2.isSwappedSides;
-    state.courtMatches.court_2.scoreHistory = [];
-  } else {
-    state.courtMatches.court_2.activeMatch = { team1: [null, null], team2: [null, null] };
-  }
+      state.courtMatches[courtId].activeMatch = {
+        courtNumber: saved.courtNumber || courtName,
+        team1: Array.isArray(saved.team1) ? saved.team1 : [null, null],
+        team2: Array.isArray(saved.team2) ? saved.team2 : [null, null],
+        score1: s1,
+        score2: s2,
+        mode: saved.mode || 'balanced',
+        status: st,
+        matchStatus: st,
+        diffElo: Number(saved.diffElo) || 0,
+        isSwappedSides: !!saved.isSwappedSides
+      };
+      state.courtMatches[courtId].score1 = s1;
+      state.courtMatches[courtId].score2 = s2;
+      state.courtMatches[courtId].mode = saved.mode || 'balanced';
+      state.courtMatches[courtId].matchStatus = st;
+      state.courtMatches[courtId].isSwappedSides = !!saved.isSwappedSides;
+      state.courtMatches[courtId].scoreHistory = [];
+    } else {
+      state.courtMatches[courtId].activeMatch = {
+        courtNumber: courtName,
+        team1: [null, null],
+        team2: [null, null],
+        score1: 0,
+        score2: 0,
+        status: 'idle',
+        matchStatus: 'idle',
+        diffElo: 0,
+        isSwappedSides: false
+      };
+      state.courtMatches[courtId].score1 = 0;
+      state.courtMatches[courtId].score2 = 0;
+      state.courtMatches[courtId].matchStatus = 'idle';
+      state.courtMatches[courtId].scoreHistory = [];
+    }
+  };
 
+  initCourt('court_1', 'Sân 1');
+  initCourt('court_2', 'Sân 2');
   updateCourtTabStatusPills();
 }
 
@@ -821,11 +847,20 @@ function setupEventListeners() {
     });
   }
 
+
+
   // Reset to empty clean slate
   const btnReset = document.getElementById('btn-reset-default');
   if (btnReset) {
-    btnReset.addEventListener('click', () => {
-      if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu (thành viên, lịch sử trận, điểm danh) để làm mới 100% không?')) {
+    btnReset.addEventListener('click', async () => {
+      const ok = await showConfirmModal({
+        title: 'Xóa Toàn Bộ Dữ Liệu?',
+        message: 'Bạn có chắc chắn muốn xóa sạch thành viên, lịch sử trận và điểm danh để làm mới 100% không? Thao tác này không thể hoàn tác!',
+        confirmText: 'Xóa Sạch 100%',
+        icon: '🗑️',
+        isDanger: true
+      });
+      if (ok) {
         StorageService.resetAllData();
         closeAllModals();
         loadInitialState();
@@ -926,8 +961,15 @@ function setupEventListeners() {
 
   const btnSettingsReset = document.getElementById('btn-settings-reset');
   if (btnSettingsReset) {
-    btnSettingsReset.addEventListener('click', () => {
-      if (confirm('Bạn có chắc chắn muốn xóa toàn bộ dữ liệu (thành viên, lịch sử trận, điểm danh) để làm mới 100% không?')) {
+    btnSettingsReset.addEventListener('click', async () => {
+      const ok = await showConfirmModal({
+        title: 'Xóa Toàn Bộ Dữ Liệu?',
+        message: 'Bạn có chắc chắn muốn xóa sạch thành viên, lịch sử trận và điểm danh để làm mới 100% không? Thao tác này không thể hoàn tác!',
+        confirmText: 'Xóa Sạch 100%',
+        icon: '🗑️',
+        isDanger: true
+      });
+      if (ok) {
         StorageService.resetAllData();
         closeAllModals();
         loadInitialState();
@@ -1137,10 +1179,11 @@ function renderCourt() {
   if (sideLeft) sideLeft.style.opacity = '1';
   if (sideRight) sideRight.style.opacity = '1';
 
-  // Lấy dữ liệu mới nhất từ storage đề phòng thành viên vừa được sửa điểm
-  const memberMap = new Map(StorageService.getMembers().map(m => [m.id, m]));
-  const t1 = state.activeMatch.team1.map(p => p ? (memberMap.get(p.id) || p) : null);
-  const t2 = state.activeMatch.team2.map(p => p ? (memberMap.get(p.id) || p) : null);
+  // Lấy dữ liệu mới nhất từ storage đề phòng thành viên hoặc khách vừa được sửa điểm
+  const allPeople = [...StorageService.getMembers(), ...StorageService.getGuests()];
+  const personMap = new Map(allPeople.map(p => [p.id, p]));
+  const t1 = state.activeMatch.team1.map(p => p ? (personMap.get(p.id) || p) : null);
+  const t2 = state.activeMatch.team2.map(p => p ? (personMap.get(p.id) || p) : null);
 
   // Render Team 1 (2 slots)
   if (team1Grid) {
@@ -1989,8 +2032,35 @@ function finishMatch() {
     return;
   }
 
-  if (state.score1 === state.score2) {
+  const s1 = Number(state.score1) || 0;
+  const s2 = Number(state.score2) || 0;
+
+  if (s1 === 0 && s2 === 0) {
+    showToast('Trận đấu chưa diễn ra (tỷ số 0-0)! Vui lòng cập nhật điểm trước khi lưu.', 'error');
+    return;
+  }
+
+  if (s1 === s2) {
     showToast('Tỷ số chưa có người thắng! Cầu lông không có tỉ số hòa.', 'error');
+    return;
+  }
+
+  const maxScore = Math.max(s1, s2);
+  const minScore = Math.min(s1, s2);
+
+  if (maxScore < 11) {
+    showToast('Tỷ số chưa hợp lệ! Điểm của đội thắng phải đạt ít nhất 11 điểm.', 'error');
+    return;
+  }
+
+  if (maxScore > 30) {
+    showToast('Tỷ số cầu lông tối đa là 30 điểm!', 'error');
+    return;
+  }
+
+  // Deuce: khi cả 2 đội cùng từ 20 điểm trở lên
+  if (minScore >= 20 && maxScore < 30 && (maxScore - minScore) < 2) {
+    showToast('Trận đấu đang deuce (20 đều trở lên)! Đội thắng phải cách biệt 2 điểm (hoặc chạm mốc 30).', 'error');
     return;
   }
 
@@ -2140,10 +2210,17 @@ function finishMatch() {
 
   showToast(`🏆 Trận đấu ${activeCourt} kết thúc! ${team1Won ? 'Đội 1' : 'Đội 2'} Thắng (${state.score1} - ${state.score2})`);
 
-  // Tự động quay trận tiếp theo cho sân này
-  setTimeout(() => {
-    generateNewMatch(false);
-  }, 1000);
+  // Đặt lại sân về trạng thái trống (idle) sẵn sàng cho trận tiếp theo
+  const finishedCourtId = state.currentCourtId;
+  const emptyMatch = { team1: [null, null], team2: [null, null] };
+  state.courtMatches[finishedCourtId].activeMatch = emptyMatch;
+  state.courtMatches[finishedCourtId].score1 = 0;
+  state.courtMatches[finishedCourtId].score2 = 0;
+  state.courtMatches[finishedCourtId].matchStatus = 'idle';
+  state.courtMatches[finishedCourtId].scoreHistory = [];
+  StorageService.saveActiveMatch(emptyMatch, finishedCourtId);
+  renderCourt();
+  updateCourtTabStatusPills();
 }
 
 /**
@@ -2491,10 +2568,17 @@ window.appSubmitAddGuest = function(e) {
 };
 
 // Global hook để xóa khách khỏi danh sách hôm nay
-window.appRemoveGuest = function(guestId) {
+window.appRemoveGuest = async function(guestId) {
   const guest = StorageService.getGuests().find(g => g.id === guestId);
   const guestName = guest ? guest.name : 'khách';
-  if (!confirm(`Bạn có chắc muốn xóa ${guestName} khỏi danh sách hôm nay?`)) return;
+  const ok = await showConfirmModal({
+    title: 'Xóa Khách Giao Lưu?',
+    message: `Bạn có chắc muốn xóa "${guestName}" khỏi danh sách hôm nay?`,
+    confirmText: 'Xóa Khách',
+    icon: '👤',
+    isDanger: true
+  });
+  if (!ok) return;
 
   // Nếu khách đang trên Sân 1 hoặc Sân 2, gỡ ra khỏi sân trước
   ['court_1', 'court_2'].forEach(cId => {
@@ -2743,7 +2827,7 @@ window.appStartMatch = function() {
 };
 
 // Global hook để Dọn Sân (Xoá người chơi hiện tại)
-window.appClearCourt = function() {
+window.appClearCourt = async function() {
   const courtName = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
   const hasAnyPlayer = state.activeMatch && (
     (state.activeMatch.team1 && state.activeMatch.team1.some(Boolean)) ||
@@ -2753,21 +2837,39 @@ window.appClearCourt = function() {
     showToast(`${courtName} hiện đang trống!`, 'info');
     return;
   }
-  if (!confirm(`Bạn có chắc chắn muốn dọn sạch ${courtName} để chọn người mới?`)) {
+  const ok = await showConfirmModal({
+    title: `Dọn Sạch ${courtName}?`,
+    message: `Bạn có chắc chắn muốn dọn sạch ${courtName} để chọn người mới? Các vé cược của trận hiện tại sẽ được hoàn tiền.`,
+    confirmText: 'Dọn Sân',
+    icon: '🧹',
+    isDanger: true
+  });
+  if (!ok) {
     return;
   }
   StorageService.refundMatchBets(state.currentCourtId, 'Dọn sân chọn người mới');
-  const emptyMatch = { team1: [null, null], team2: [null, null] };
+  const emptyMatch = {
+    courtNumber: courtName,
+    team1: [null, null],
+    team2: [null, null],
+    score1: 0,
+    score2: 0,
+    status: 'idle',
+    matchStatus: 'idle',
+    diffElo: 0,
+    isSwappedSides: false
+  };
   state.courtMatches[state.currentCourtId].activeMatch = emptyMatch;
   state.courtMatches[state.currentCourtId].score1 = 0;
   state.courtMatches[state.currentCourtId].score2 = 0;
   state.courtMatches[state.currentCourtId].matchStatus = 'idle';
+  state.courtMatches[state.currentCourtId].isSwappedSides = false;
   state.courtMatches[state.currentCourtId].scoreHistory = [];
-  StorageService.saveActiveMatch(emptyMatch, state.currentCourtId);
+  await StorageService.saveActiveMatch(emptyMatch, state.currentCourtId);
   SoundService.playClick();
   renderCourt();
   updateCourtTabStatusPills();
-  debouncedSyncLiveScore();
+  renderCourtBench();
   showToast(`🗑️ Đã dọn sạch ${courtName}! 4 vị trí đã sẵn sàng thêm mới.`);
 };
 
@@ -2852,7 +2954,7 @@ window.appEditMember = function(memberId) {
 };
 
 // Global hook để Xóa Thành Viên (Chỉ Admin mới có quyền xóa)
-window.appDeleteMember = function(memberId) {
+window.appDeleteMember = async function(memberId) {
   const isAdmin = state.currentUser && state.currentUser.role === 'admin';
   if (!isAdmin) {
     showToast('⛔ Chỉ Quản trị viên (Admin) mới có quyền xóa thành viên!', 'error');
@@ -2860,7 +2962,14 @@ window.appDeleteMember = function(memberId) {
   }
   const mem = StorageService.getMemberById(memberId);
   if (!mem) return;
-  if (confirm(`Bạn có chắc muốn xóa thành viên "${mem.name}" khỏi CLB Thái Thịnh?`)) {
+  const ok = await showConfirmModal({
+    title: 'Xóa Thành Viên?',
+    message: `Bạn có chắc muốn xóa thành viên "${mem.name}" khỏi CLB Thái Thịnh? Dữ liệu thống kê của thành viên này sẽ bị gỡ bỏ.`,
+    confirmText: 'Xóa Thành Viên',
+    icon: '⚠️',
+    isDanger: true
+  });
+  if (ok) {
     StorageService.deleteMember(memberId);
     showToast(`Đã xóa ${mem.name}`);
     renderMembers();
@@ -3035,7 +3144,7 @@ function handleMemberFormSubmit(e) {
  */
 function renderHistory() {
   const matches = StorageService.getMatches();
-  const members = StorageService.getMembers();
+  const allPeople = [...StorageService.getMembers(), ...StorageService.getGuests()];
   const container = document.getElementById('history-matches-container');
   const countBadge = document.getElementById('total-matches-count-badge');
 
@@ -3043,17 +3152,30 @@ function renderHistory() {
   if (!container) return;
 
   if (matches.length === 0) {
-    container.innerHTML = `<div style="text-align: center; padding: 40px; color: var(--text-muted);">
-      Chưa có trận đấu nào được ghi lại.
-    </div>`;
+    container.innerHTML = `
+      <div class="empty-state-card" style="text-align: center; padding: 48px 20px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px; margin: 16px 0;">
+        <div style="font-size: 3rem; margin-bottom: 12px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));">📜</div>
+        <h3 style="margin: 0 0 6px; font-size: 1.1rem; color: var(--text-main);">Chưa Có Trận Đấu Nào</h3>
+        <p style="margin: 0 auto 16px; max-width: 320px; font-size: 0.88rem; color: var(--text-muted); line-height: 1.5;">
+          Các trận đấu diễn ra trên Sân 1 và Sân 2 sau khi xác nhận kết quả sẽ được lưu trữ và thống kê chi tiết tại đây.
+        </p>
+        <button type="button" class="btn btn-primary" onclick="window.appSwitchTab('court')" style="font-size: 0.85rem; padding: 8px 18px;">
+          🏸 Vào Sân Đấu Ngay
+        </button>
+      </div>
+    `;
     return;
   }
 
-  const memberMap = new Map(members.map(m => [m.id, m]));
+  const limit = state.historyLimit || 20;
+  const displayMatches = matches.slice(0, limit);
+  const hasMore = matches.length > limit;
 
-  container.innerHTML = matches.map(m => {
-    const t1Names = m.team1.map(id => memberMap.get(id)?.name || 'VĐV').join(' & ');
-    const t2Names = m.team2.map(id => memberMap.get(id)?.name || 'VĐV').join(' & ');
+  const personMap = new Map(allPeople.map(m => [m.id, m]));
+
+  const cardsHtml = displayMatches.map(m => {
+    const t1Names = m.team1.map(id => personMap.get(id)?.name || 'VĐV').join(' & ');
+    const t2Names = m.team2.map(id => personMap.get(id)?.name || 'VĐV').join(' & ');
     const team1Won = m.score1 > m.score2;
     const dateStr = new Date(m.timestamp).toLocaleDateString('vi-VN', {
       hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
@@ -3089,22 +3211,50 @@ function renderHistory() {
       </div>
     `;
   }).join('');
+
+  const loadMoreHtml = hasMore ? `
+    <div style="text-align: center; padding: 16px 0 8px;">
+      <button type="button" class="btn btn-secondary" onclick="window.appLoadMoreHistory()" style="font-size: 0.85rem; padding: 8px 24px; border-radius: 20px;">
+        🔽 Xem thêm (${matches.length - limit} trận cũ hơn)
+      </button>
+    </div>
+  ` : '';
+
+  container.innerHTML = cardsHtml + loadMoreHtml;
 }
 
+window.appLoadMoreHistory = function() {
+  state.historyLimit = (state.historyLimit || 20) + 20;
+  renderHistory();
+};
+
 // Global hook để Hoàn tác / Xóa trận đấu (Khôi phục toàn diện điểm số & số trận)
-window.appDeleteMatch = function(matchId) {
-  if (confirm('Bạn có chắc muốn hoàn tác và xóa trận đấu này? Điểm Elo và số trận của cả 4 người sẽ được khôi phục nguyên vẹn về trước trận đấu.')) {
-    const reverted = StorageService.undoMatch(matchId);
-    if (reverted) {
-      showToast('Đã hoàn tác trận đấu & khôi phục thông số!');
-      renderHistory();
-      renderLeaderboard();
-      renderMembers();
-      renderCourt();
-      renderBadges();
-      updateSessionStatusBadge();
-    } else {
-      showToast('Không tìm thấy trận đấu cần hoàn tác', 'error');
+window.appDeleteMatch = async function(matchId) {
+  const ok = await showConfirmModal({
+    title: 'Hoàn Tác Trận Đấu?',
+    message: 'Bạn có chắc muốn hoàn tác và xóa trận đấu này? Điểm Elo, số trận, xu thắng/thua và xu điểm danh sẽ được khôi phục nguyên vẹn về trước trận.',
+    confirmText: 'Hoàn Tác',
+    icon: '↩️',
+    isDanger: true
+  });
+  if (ok) {
+    showToast('Đang hoàn tác trận đấu & cập nhật điểm số...', 'info');
+    try {
+      const reverted = await StorageService.undoMatch(matchId);
+      if (reverted) {
+        showToast('Đã hoàn tác trận đấu & khôi phục thông số!');
+        renderHistory();
+        renderLeaderboard();
+        renderMembers();
+        renderCourt();
+        renderBadges();
+        updateSessionStatusBadge();
+      } else {
+        showToast('Không tìm thấy trận đấu cần hoàn tác', 'error');
+      }
+    } catch (err) {
+      console.error('[App] Lỗi hoàn tác trận đấu:', err);
+      showToast('Lỗi khi hoàn tác trận: ' + (err.message || err), 'error');
     }
   }
 };
@@ -3406,11 +3556,87 @@ function showToast(message, type = 'success', duration = null) {
 }
 window.showToast = showToast;
 
-function updateCloudStatusIndicator() {
+/**
+ * Modal Xác Nhận Hiện Đại (Thay thế confirm native của trình duyệt)
+ */
+export function showConfirmModal({
+  title = 'Xác Nhận Thao Tác',
+  message = '',
+  confirmText = 'Đồng Ý',
+  cancelText = 'Hủy',
+  icon = '⚠️',
+  isDanger = false
+} = {}) {
+  return new Promise((resolve) => {
+    const modal = document.getElementById('modal-confirm');
+    if (!modal) {
+      resolve(window.confirm(message));
+      return;
+    }
+    const titleEl = document.getElementById('confirm-modal-title');
+    const msgEl = document.getElementById('confirm-modal-message');
+    const iconEl = document.getElementById('confirm-modal-icon');
+    const okBtn = document.getElementById('confirm-modal-ok');
+    const cancelBtn = document.getElementById('confirm-modal-cancel');
+
+    if (titleEl) titleEl.textContent = title;
+    if (msgEl) msgEl.textContent = message;
+    if (iconEl) iconEl.textContent = icon;
+    if (okBtn) {
+      okBtn.textContent = confirmText;
+      if (isDanger) {
+        okBtn.style.background = 'linear-gradient(135deg, #ef4444, #dc2626)';
+        okBtn.style.borderColor = '#ef4444';
+      } else {
+        okBtn.style.background = '';
+        okBtn.style.borderColor = '';
+      }
+    }
+    if (cancelBtn) cancelBtn.textContent = cancelText;
+
+    let resolved = false;
+    const cleanup = (result) => {
+      if (resolved) return;
+      resolved = true;
+      modal.classList.remove('open');
+      okBtn?.removeEventListener('click', onOk);
+      cancelBtn?.removeEventListener('click', onCancel);
+      modal.removeEventListener('click', onBackdrop);
+      resolve(result);
+    };
+
+    const onOk = () => cleanup(true);
+    const onCancel = () => cleanup(false);
+    const onBackdrop = (e) => {
+      if (e.target === modal) cleanup(false);
+    };
+
+    okBtn?.addEventListener('click', onOk);
+    cancelBtn?.addEventListener('click', onCancel);
+    modal.addEventListener('click', onBackdrop);
+
+    modal.classList.add('open');
+  });
+}
+window.showConfirmModal = showConfirmModal;
+
+function updateCloudStatusIndicator(isSyncing = false) {
   const dot = document.getElementById('cloud-status-dot');
   const text = document.getElementById('cloud-status-text');
   const btn = document.getElementById('btn-cloud-status');
   if (!dot || !text) return;
+
+  if (isSyncing) {
+    dot.style.background = '#06b6d4';
+    dot.style.boxShadow = '0 0 10px #06b6d4';
+    text.textContent = 'Đang đồng bộ...';
+    text.style.color = '#0891b2';
+    if (btn) {
+      btn.style.background = 'rgba(6, 182, 212, 0.15)';
+      btn.style.borderColor = 'rgba(6, 182, 212, 0.4)';
+    }
+    return;
+  }
 
   if (supabaseService.isConfigured()) {
     dot.style.background = '#10b981';
@@ -3441,14 +3667,19 @@ async function initCloudSyncAndRealtime() {
   if (!supabaseService.isConfigured()) return;
 
   // 1. Tự động đồng bộ dữ liệu mới nhất từ Supabase Cloud khi mở app
-  const synced = await StorageService.syncFromCloud();
-  if (synced) {
-    loadInitialState();
-    state.currentUser = StorageService.getCurrentUser();
-    renderUserAuthHeader();
-    switchTab(state.currentTab);
-    updateSessionStatusBadge();
-    console.log('[App] Đã đồng bộ dữ liệu mới nhất từ Supabase Cloud!');
+  updateCloudStatusIndicator(true);
+  try {
+    const synced = await StorageService.syncFromCloud();
+    if (synced) {
+      loadInitialState();
+      state.currentUser = StorageService.getCurrentUser();
+      renderUserAuthHeader();
+      switchTab(state.currentTab);
+      updateSessionStatusBadge();
+      console.log('[App] Đã đồng bộ dữ liệu mới nhất từ Supabase Cloud!');
+    }
+  } finally {
+    updateCloudStatusIndicator(false);
   }
 
   // 2. Lắng nghe thay đổi Realtime (tự động đồng bộ đa thiết bị tức thì)
@@ -3459,31 +3690,105 @@ async function initCloudSyncAndRealtime() {
       const record = payload.new;
       if (record && (record.id === 'court_1' || record.id === 'court_2' || record.id === 'current_court')) {
         const targetCourtId = record.id === 'court_2' ? 'court_2' : 'court_1';
-        const members = StorageService.getMembers();
-        const memberMap = new Map(members.map(m => [m.id, m]));
-        const team1 = (record.team1 || []).map(id => memberMap.get(id)).filter(Boolean);
-        const team2 = (record.team2 || []).map(id => memberMap.get(id)).filter(Boolean);
+        let allPeople = [...StorageService.getMembers(), ...StorageService.getGuests()];
+        let personMap = new Map(allPeople.map(p => [p.id, p]));
 
-        if (team1.length > 0 && team2.length > 0) {
+        // Kiểm tra nếu có người chơi (đặc biệt là khách) chưa có trong local cache
+        const allIds = [...(record.team1 || []), ...(record.team2 || [])].filter(Boolean);
+        const missingPerson = allIds.some(id => !personMap.has(id));
+        if (missingPerson) {
+          await StorageService.syncFromCloud();
+          allPeople = [...StorageService.getMembers(), ...StorageService.getGuests()];
+          personMap = new Map(allPeople.map(p => [p.id, p]));
+        }
+
+        const t1Raw = record.team1 || [];
+        const t2Raw = record.team2 || [];
+        const slotT1 = [
+          t1Raw[0] ? personMap.get(t1Raw[0]) || null : null,
+          t1Raw[1] ? personMap.get(t1Raw[1]) || null : null
+        ];
+        const slotT2 = [
+          t2Raw[0] ? personMap.get(t2Raw[0]) || null : null,
+          t2Raw[1] ? personMap.get(t2Raw[1]) || null : null
+        ];
+
+        const hasAnyPlayer = slotT1.some(Boolean) || slotT2.some(Boolean);
+
+        if (hasAnyPlayer && record.status !== 'idle') {
+          const validT1 = slotT1.filter(Boolean);
+          const validT2 = slotT2.filter(Boolean);
+          const elo1 = validT1.length > 0 ? Math.round(validT1.reduce((sum, p) => sum + p.elo, 0) / validT1.length) : 0;
+          const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
+
+          const s1 = Number(record.score1) || 0;
+          const s2 = Number(record.score2) || 0;
+          let calculatedStatus = record.status;
+          if (s1 > 0 || s2 > 0) {
+            calculatedStatus = 'in_progress';
+          } else if (!calculatedStatus || calculatedStatus === 'idle') {
+            calculatedStatus = (validT1.length + validT2.length === 4) ? 'ready' : 'idle';
+          }
+
           const matchObj = {
             courtNumber: record.court_number || (targetCourtId === 'court_2' ? 'Sân 2' : 'Sân 1'),
-            team1,
-            team2,
-            score1: record.score1 || 0,
-            score2: record.score2 || 0,
+            team1: slotT1,
+            team2: slotT2,
+            score1: s1,
+            score2: s2,
             mode: record.matchmaker_mode || 'balanced',
-            status: record.status || 'in_progress',
-            diffElo: record.diff_elo || 0
+            status: calculatedStatus,
+            matchStatus: calculatedStatus,
+            diffElo: Number(record.diff_elo) || Math.abs(elo1 - elo2)
           };
           state.courtMatches[targetCourtId].activeMatch = matchObj;
-          state.courtMatches[targetCourtId].score1 = record.score1 || 0;
-          state.courtMatches[targetCourtId].score2 = record.score2 || 0;
+          state.courtMatches[targetCourtId].score1 = s1;
+          state.courtMatches[targetCourtId].score2 = s2;
+          state.courtMatches[targetCourtId].matchStatus = calculatedStatus;
           StorageService.saveLocalActiveMatch(matchObj, targetCourtId);
-        } else if (record.status === 'idle') {
-          state.courtMatches[targetCourtId].activeMatch = null;
+        } else if (hasAnyPlayer) {
+          const validT1 = slotT1.filter(Boolean);
+          const validT2 = slotT2.filter(Boolean);
+          const elo1 = validT1.length > 0 ? Math.round(validT1.reduce((sum, p) => sum + p.elo, 0) / validT1.length) : 0;
+          const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
+          const totalValid = validT1.length + validT2.length;
+          const calculatedStatus = totalValid === 4 ? 'ready' : 'idle';
+
+          const matchObj = {
+            courtNumber: record.court_number || (targetCourtId === 'court_2' ? 'Sân 2' : 'Sân 1'),
+            team1: slotT1,
+            team2: slotT2,
+            score1: 0,
+            score2: 0,
+            mode: record.matchmaker_mode || 'balanced',
+            status: calculatedStatus,
+            matchStatus: calculatedStatus,
+            diffElo: Number(record.diff_elo) || Math.abs(elo1 - elo2)
+          };
+          state.courtMatches[targetCourtId].activeMatch = matchObj;
           state.courtMatches[targetCourtId].score1 = 0;
           state.courtMatches[targetCourtId].score2 = 0;
-          StorageService.saveLocalActiveMatch(null, targetCourtId);
+          state.courtMatches[targetCourtId].matchStatus = calculatedStatus;
+          StorageService.saveLocalActiveMatch(matchObj, targetCourtId);
+        } else {
+          const emptyCourt = {
+            courtNumber: targetCourtId === 'court_2' ? 'Sân 2' : 'Sân 1',
+            team1: [null, null],
+            team2: [null, null],
+            score1: 0,
+            score2: 0,
+            status: 'idle',
+            matchStatus: 'idle',
+            diffElo: 0,
+            isSwappedSides: false
+          };
+          state.courtMatches[targetCourtId].activeMatch = emptyCourt;
+          state.courtMatches[targetCourtId].score1 = 0;
+          state.courtMatches[targetCourtId].score2 = 0;
+          state.courtMatches[targetCourtId].matchStatus = 'idle';
+          state.courtMatches[targetCourtId].isSwappedSides = false;
+          state.courtMatches[targetCourtId].scoreHistory = [];
+          StorageService.saveLocalActiveMatch(emptyCourt, targetCourtId);
         }
 
         updateCourtTabStatusPills();
@@ -3492,8 +3797,97 @@ async function initCloudSyncAndRealtime() {
           renderCourt();
           updateScoreboardDisplay();
           renderEloPrediction();
+          renderBettingWidget();
         }
+        renderCourtBench();
       }
+      return;
+    }
+
+    if (table === 'attendance') {
+      const todayStr = getLocalDateStr();
+      const cloudAtt = await supabaseService.fetchAttendance(todayStr);
+      if (cloudAtt) {
+        if (cloudAtt.guests && cloudAtt.guests.length > 0) {
+          const localGuests = StorageService.getGuests();
+          const guestMap = new Map();
+          cloudAtt.guests.forEach(g => guestMap.set(g.id, g));
+          localGuests.forEach(g => {
+            if (!guestMap.has(g.id)) guestMap.set(g.id, g);
+          });
+          const mergedGuests = Array.from(guestMap.values());
+          StorageService.saveGuests(mergedGuests);
+          cloudAtt.guests = mergedGuests;
+        }
+        StorageService.saveLocalAttendance(cloudAtt);
+      }
+
+      renderAttendance();
+      renderCourtBench();
+      updateSessionStatusBadge();
+
+      const now = Date.now();
+      if (!window._lastCloudToastTime || (now - window._lastCloudToastTime > 4000)) {
+        window._lastCloudToastTime = now;
+        showToast('✅ Danh sách điểm danh vừa được cập nhật!', 'info');
+      }
+      return;
+    }
+
+    if (table === 'matches') {
+      const [cloudMatches, cloudMembers] = await Promise.all([
+        supabaseService.fetchMatches(),
+        supabaseService.fetchMembers()
+      ]);
+      if (cloudMatches) StorageService.saveLocalMatches(cloudMatches);
+      if (cloudMembers && cloudMembers.length > 0) {
+        const localMembers = StorageService.getMembers();
+        const localMap = new Map(localMembers.map(m => [m.id, m]));
+        const merged = cloudMembers.map(cm => {
+          const lm = localMap.get(cm.id);
+          return {
+            ...cm,
+            activeFrame: cm.activeFrame || lm?.activeFrame || '',
+            activeEloShield: cm.activeEloShield || lm?.activeEloShield || false
+          };
+        });
+        StorageService.saveLocalMembers(merged);
+      }
+
+      renderHistory();
+      renderLeaderboard();
+      renderMembers();
+      updateSessionStatusBadge();
+
+      const now = Date.now();
+      if (!window._lastCloudToastTime || (now - window._lastCloudToastTime > 4000)) {
+        window._lastCloudToastTime = now;
+        showToast('🏸 Kết quả trận mới vừa được ghi nhận!', 'info');
+      }
+      return;
+    }
+
+    if (table === 'members') {
+      const cloudMembers = await supabaseService.fetchMembers();
+      if (cloudMembers && cloudMembers.length > 0) {
+        const localMembers = StorageService.getMembers();
+        const localMap = new Map(localMembers.map(m => [m.id, m]));
+        const merged = cloudMembers.map(cm => {
+          const lm = localMap.get(cm.id);
+          return {
+            ...cm,
+            activeFrame: cm.activeFrame || lm?.activeFrame || '',
+            activeEloShield: cm.activeEloShield || lm?.activeEloShield || false
+          };
+        });
+        StorageService.saveLocalMembers(merged);
+      }
+
+      renderLeaderboard();
+      renderMembers();
+      renderUserAuthHeader();
+      renderCourt();
+      renderCourtBench();
       return;
     }
 
@@ -3518,24 +3912,24 @@ async function initCloudSyncAndRealtime() {
       return;
     }
 
-    // Với các bảng còn lại (members, sessions, matches, attendance, club_settings)
+    // Với các bảng còn lại (sessions, club_settings)
     await StorageService.syncFromCloud();
-    loadInitialState();
-    switchTab(state.currentTab);
+    renderSessions();
     updateSessionStatusBadge();
+  });
 
-    const now = Date.now();
-    if (!window._lastCloudToastTime || (now - window._lastCloudToastTime > 3000)) {
-      window._lastCloudToastTime = now;
-      if (table === 'members') {
-        showToast('☁️ Bảng xếp hạng và thành viên đã đồng bộ!', 'info');
-      } else if (table === 'sessions') {
-        showToast('📅 Lịch buổi đánh vừa được cập nhật!', 'info');
-      } else if (table === 'matches') {
-        showToast('🏸 Kết quả trận mới vừa được ghi nhận!', 'info');
-      } else if (table === 'attendance') {
-        showToast('✅ Danh sách điểm danh vừa được cập nhật!', 'info');
-      }
+  // 3. Tự động đồng bộ khi người dùng mở lại tab hoặc mở khóa màn hình điện thoại
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'visible') {
+      console.log('[App] Thiết bị hoạt động trở lại, đồng bộ Supabase Cloud...');
+      StorageService.syncFromCloud().then(() => {
+        updateCourtTabStatusPills();
+        renderCourt();
+        updateScoreboardDisplay();
+        renderEloPrediction();
+        renderCourtBench();
+        renderUserAuthHeader();
+      });
     }
   });
 }
@@ -3949,8 +4343,15 @@ window.appStartSession = function(sessionId) {
   updateSessionStatusBadge();
 };
 
-window.appDeleteSession = function(sessionId) {
-  if (confirm('Bạn có chắc chắn muốn xóa lịch buổi đánh này không?')) {
+window.appDeleteSession = async function(sessionId) {
+  const ok = await showConfirmModal({
+    title: 'Xóa Buổi Đánh?',
+    message: 'Bạn có chắc chắn muốn xóa lịch buổi đánh này không?',
+    confirmText: 'Xóa Lịch',
+    icon: '🗑️',
+    isDanger: true
+  });
+  if (ok) {
     StorageService.deleteSession(sessionId);
     showToast('Đã xóa buổi đánh');
     renderSessions();
@@ -4567,6 +4968,8 @@ function renderCoinHistory(filter = null) {
     bet_won: { icon: '🎲', label: 'Thắng cược', color: '#ec4899' },
     bet_placed: { icon: '🎯', label: 'Đặt cược', color: '#6366f1' },
     bet_refund: { icon: '🔁', label: 'Hoàn tiền', color: '#06b6d4' },
+    match_undo: { icon: '↩️', label: 'Hoàn tác trận', color: '#f97316' },
+    session_checkin_undo: { icon: '↩️', label: 'Thu hồi điểm danh', color: '#ef4444' },
     shop_purchase: { icon: '🛒', label: 'Cửa hàng', color: '#f43f5e' },
     system: { icon: '🪙', label: 'Hệ thống', color: '#8b5cf6' }
   };
@@ -4709,7 +5112,7 @@ window.appEquipFrame = function(frameId) {
   renderLeaderboard();
   renderAttendance();
   renderMembers();
-  renderActiveCourtCard();
+  renderCourt();
 };
 
 window.appToggleEloShield = function() {
@@ -4727,14 +5130,20 @@ window.appToggleEloShield = function() {
   showToast(res.activeEloShield ? '🛡️ Đã BẬT Khiên bảo vệ Elo cho trận đấu tiếp theo!' : 'Đã TẮT Khiên bảo vệ Elo', 'info');
 
   renderClubShop();
-  renderActiveCourtCard();
+  renderCourt();
 };
 
-window.appClaimGrip = function() {
+window.appClaimGrip = async function() {
   const user = StorageService.getCurrentUser();
   if (!user) return;
 
-  const confirmClaim = confirm('Bạn có chắc chắn muốn xác nhận đã nhận 1 cuốn cán vợt thật tại sân thi đấu không?');
+  const confirmClaim = await showConfirmModal({
+    title: 'Nhận Cuốn Cán Vợt?',
+    message: 'Bạn có chắc chắn muốn xác nhận đã nhận 1 cuốn cán vợt thật tại sân thi đấu không?',
+    confirmText: 'Đã Nhận Cán Vợt',
+    icon: '🏸',
+    isDanger: false
+  });
   if (!confirmClaim) return;
 
   const res = StorageService.claimGrip(user.id);

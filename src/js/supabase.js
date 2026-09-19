@@ -95,58 +95,96 @@ class SupabaseService {
 
       if (error) throw error;
 
-      return data.map(m => ({
-        id: m.id,
-        name: m.name,
-        nickname: m.nickname || '',
-        gender: m.gender || 'male',
-        frequency: m.frequency || 'regular',
-        elo: m.elo || 1000,
-        matchesPlayed: m.matches_played || 0,
-        wins: m.wins || 0,
-        losses: m.losses || 0,
-        streak: m.streak || 0,
-        avatar: m.avatar || '',
-        joinedDate: m.joined_date || '',
-        pinCode: m.pin_code || '',
-        coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
-        role: m.role || 'member',
-        activeFrame: m.active_frame || '',
-        activeEloShield: !!m.active_elo_shield
-      }));
+      return data.map(m => {
+        let meta = {};
+        if (m.phone && typeof m.phone === 'string' && m.phone.startsWith('{')) {
+          try {
+            meta = JSON.parse(m.phone);
+          } catch (e) {}
+        }
+
+        return {
+          id: m.id,
+          name: m.name,
+          nickname: m.nickname || '',
+          gender: m.gender || 'male',
+          frequency: m.frequency || 'regular',
+          elo: m.elo || 1000,
+          matchesPlayed: m.matches_played || 0,
+          wins: m.wins || 0,
+          losses: m.losses || 0,
+          streak: m.streak || 0,
+          avatar: m.avatar || '',
+          joinedDate: m.joined_date || '',
+          pinCode: m.pin_code || meta.pinCode || '',
+          coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : (meta.coins !== undefined ? Number(meta.coins) : 100),
+          role: m.role || meta.role || 'member',
+          activeFrame: m.active_frame || meta.activeFrame || '',
+          activeEloShield: m.active_elo_shield !== undefined ? !!m.active_elo_shield : !!meta.activeEloShield,
+          _metaInventory: Array.isArray(meta.inventory) ? meta.inventory : []
+        };
+      });
     } catch (err) {
       console.error('[Supabase] Lỗi fetchMembers:', err);
       return null;
     }
   }
 
-  async upsertMember(member) {
+  _buildMemberPayload(member, inv = null) {
+    let userInv = [];
+    if (inv && Array.isArray(inv)) {
+      userInv = inv.filter(i => i.memberId === member.id);
+    } else {
+      try {
+        const raw = localStorage.getItem('cbb_thai_thinh_inventory_v1');
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          if (Array.isArray(parsed)) {
+            userInv = parsed.filter(i => i.memberId === member.id);
+          }
+        }
+      } catch (e) {}
+    }
+
+    const meta = {
+      activeFrame: member.activeFrame || '',
+      activeEloShield: !!member.activeEloShield,
+      coins: member.coins !== undefined ? Number(member.coins) : 100,
+      role: member.role || 'member',
+      pinCode: member.pinCode || '',
+      inventory: userInv
+    };
+
+    return {
+      id: member.id,
+      name: member.name,
+      nickname: member.nickname || '',
+      gender: member.gender || 'male',
+      frequency: member.frequency || 'regular',
+      elo: Math.round(Number(member.elo) || 1000),
+      matches_played: Number(member.matchesPlayed) || 0,
+      wins: Number(member.wins) || 0,
+      losses: Number(member.losses) || 0,
+      streak: Number(member.streak) || 0,
+      avatar: member.avatar || '',
+      phone: JSON.stringify(meta),
+      pin_code: member.pinCode || '',
+      coins: member.coins !== undefined ? Number(member.coins) : 100,
+      role: member.role || 'member',
+      active_frame: member.activeFrame || '',
+      active_elo_shield: !!member.activeEloShield,
+      joined_date: member.joinedDate || (() => {
+        const d = new Date();
+        return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+      })(),
+      updated_at: new Date().toISOString()
+    };
+  }
+
+  async upsertMember(member, inv = null) {
     if (!this.isConfigured()) return false;
     try {
-      const payload = {
-        id: member.id,
-        name: member.name,
-        nickname: member.nickname || '',
-        gender: member.gender || 'male',
-        frequency: member.frequency || 'regular',
-        elo: member.elo || 1000,
-        matches_played: member.matchesPlayed || 0,
-        wins: member.wins || 0,
-        losses: member.losses || 0,
-        streak: member.streak || 0,
-        avatar: member.avatar || '',
-        pin_code: member.pinCode || '',
-        coins: member.coins !== undefined ? Number(member.coins) : 100,
-        role: member.role || 'member',
-        active_frame: member.activeFrame || '',
-        active_elo_shield: !!member.activeEloShield,
-        joined_date: member.joinedDate || (() => {
-          const d = new Date();
-          return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
-        })(),
-        updated_at: new Date().toISOString()
-      };
-
+      const payload = this._buildMemberPayload(member, inv);
       let { error } = await this.client
         .from('members')
         .upsert(payload);
@@ -166,6 +204,34 @@ class SupabaseService {
       return true;
     } catch (err) {
       console.error('[Supabase] Lỗi upsertMember:', err);
+      return false;
+    }
+  }
+
+  async upsertMembers(members, inv = null) {
+    if (!this.isConfigured() || !Array.isArray(members) || members.length === 0) return false;
+    try {
+      const payloads = members.map(m => this._buildMemberPayload(m, inv));
+      let { error } = await this.client
+        .from('members')
+        .upsert(payloads);
+
+      if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role') || error.message?.includes('active_frame') || error.message?.includes('active_elo_shield'))) {
+        payloads.forEach(payload => {
+          delete payload.pin_code;
+          delete payload.coins;
+          delete payload.role;
+          delete payload.active_frame;
+          delete payload.active_elo_shield;
+        });
+        const res = await this.client.from('members').upsert(payloads);
+        error = res.error;
+      }
+
+      if (error) throw error;
+      return true;
+    } catch (err) {
+      console.error('[Supabase] Lỗi batch upsertMembers:', err);
       return false;
     }
   }
@@ -343,10 +409,16 @@ class SupabaseService {
       if (error) throw error;
       if (!data) return null;
 
+      const rawGames = data.games_played_today || {};
+      const guests = Array.isArray(rawGames._guest_profiles) ? rawGames._guest_profiles : [];
+      const cleanGamesPlayed = { ...rawGames };
+      delete cleanGamesPlayed._guest_profiles;
+
       return {
         date: data.date,
         presentIds: data.present_ids || [],
-        gamesPlayedToday: data.games_played_today || {}
+        gamesPlayedToday: cleanGamesPlayed,
+        guests
       };
     } catch (err) {
       console.error('[Supabase] Lỗi fetchAttendance:', err);
@@ -357,10 +429,15 @@ class SupabaseService {
   async saveAttendance(attendance) {
     if (!this.isConfigured()) return false;
     try {
+      const rawGames = { ...(attendance.gamesPlayedToday || {}) };
+      if (Array.isArray(attendance.guests)) {
+        rawGames._guest_profiles = attendance.guests;
+      }
+
       const payload = {
         date: attendance.date,
         present_ids: attendance.presentIds || [],
-        games_played_today: attendance.gamesPlayedToday || {},
+        games_played_today: rawGames,
         updated_at: new Date().toISOString()
       };
 
@@ -410,32 +487,61 @@ class SupabaseService {
   async saveLiveCourt(match, courtId = 'current_court') {
     if (!this.isConfigured()) return false;
     try {
+      const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
       let payload;
-      if (!match || (!match.team1 && !match.team1Ids)) {
+
+      const mapSlotToId = (p) => {
+        if (!p) return '';
+        return typeof p === 'object' ? (p.id || '') : String(p);
+      };
+
+      const rawT1 = Array.isArray(match?.team1) 
+        ? match.team1.map(mapSlotToId) 
+        : (Array.isArray(match?.team1Ids) ? match.team1Ids.map(mapSlotToId) : []);
+
+      const rawT2 = Array.isArray(match?.team2) 
+        ? match.team2.map(mapSlotToId) 
+        : (Array.isArray(match?.team2Ids) ? match.team2Ids.map(mapSlotToId) : []);
+
+      const hasValidT1 = rawT1.some(id => id && id.trim() !== '');
+      const hasValidT2 = rawT2.some(id => id && id.trim() !== '');
+      const hasAnyPlayer = hasValidT1 || hasValidT2;
+
+      const isIdle = !match || !hasAnyPlayer;
+
+      if (isIdle) {
         payload = {
           id: courtId,
-          court_number: 'Sân 1',
+          court_number: match?.courtNumber || courtName,
           team1: [],
           team2: [],
           score1: 0,
           score2: 0,
-          matchmaker_mode: 'balanced',
+          matchmaker_mode: match?.mode || match?.matchmakerMode || 'balanced',
           status: 'idle',
           diff_elo: 0,
           updated_at: new Date().toISOString()
         };
       } else {
-        const team1Ids = match.team1Ids || (match.team1 || []).map(p => typeof p === 'object' ? p.id : p);
-        const team2Ids = match.team2Ids || (match.team2 || []).map(p => typeof p === 'object' ? p.id : p);
+        const score1 = Number(match.score1) || 0;
+        const score2 = Number(match.score2) || 0;
+        let matchStatus = match.status || match.matchStatus;
+        if (score1 > 0 || score2 > 0) {
+          matchStatus = 'in_progress';
+        } else if (!matchStatus || matchStatus === 'idle') {
+          const totalValid = rawT1.filter(Boolean).length + rawT2.filter(Boolean).length;
+          matchStatus = totalValid === 4 ? 'ready' : 'idle';
+        }
+
         payload = {
           id: courtId,
-          court_number: match.courtNumber || 'Sân 1',
-          team1: team1Ids,
-          team2: team2Ids,
-          score1: Number(match.score1) || 0,
-          score2: Number(match.score2) || 0,
+          court_number: match.courtNumber || courtName,
+          team1: rawT1,
+          team2: rawT2,
+          score1,
+          score2,
           matchmaker_mode: match.mode || match.matchmakerMode || 'balanced',
-          status: match.status || 'in_progress',
+          status: matchStatus,
           diff_elo: Number(match.diffElo) || 0,
           updated_at: new Date().toISOString()
         };
@@ -755,15 +861,6 @@ class SupabaseService {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'club_settings' }, (payload) => {
         onChangeCallback('club_settings', payload);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'coin_transactions' }, (payload) => {
-        onChangeCallback('coin_transactions', payload);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, (payload) => {
-        onChangeCallback('bets', payload);
-      })
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_inventory' }, (payload) => {
-        onChangeCallback('user_inventory', payload);
       })
       .subscribe((status) => {
         console.log('[Supabase Realtime] Trạng thái kênh đồng bộ realtime:', status);

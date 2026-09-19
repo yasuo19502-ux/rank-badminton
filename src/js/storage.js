@@ -3,6 +3,7 @@
  */
 
 import { supabaseService } from './supabase.js';
+import { calculateDoublesElo } from './elo.js';
 
 const STORAGE_KEYS = {
   MEMBERS: 'cbb_thai_thinh_members_v2',
@@ -178,7 +179,7 @@ export const SHOP_ITEMS = [
 
 // Dọn dẹp cache dữ liệu mẫu cũ nếu còn tồn tại trong trình duyệt
 try {
-  ['cbb_thai_thinh_members_v1', 'cbb_thai_thinh_matches_v1', 'cbb_thai_thinh_sessions_v1', 'cbb_thai_thinh_attendance_v1', 'cbb_thai_thinh_active_match_v1', 'cbb_thai_thinh_settings_v1'].forEach(k => localStorage.removeItem(k));
+  ['cbb_thai_thinh_members_v1', 'cbb_thai_thinh_matches_v1', 'cbb_thai_thinh_sessions_v1', 'cbb_thai_thinh_attendance_v1', 'cbb_thai_thinh_active_match_v1', 'cbb_thai_thinh_active_match_v2', 'cbb_thai_thinh_settings_v1'].forEach(k => localStorage.removeItem(k));
 } catch (e) {}
 
 // Khởi tạo danh sách rỗng 100% để người dùng tự thêm thành viên thật
@@ -217,12 +218,54 @@ export const StorageService = {
       ]);
 
       if (cloudMembers && cloudMembers.length > 0) {
+        // 1. Đồng bộ Túi đồ (Inventory) từ Cloud
+        const currentInv = this.getLocalInventory();
+        const invMap = new Map();
+        currentInv.forEach(i => {
+          const key = i.id || `${i.memberId}_${i.itemId}`;
+          invMap.set(key, i);
+        });
+
         cloudMembers.forEach(m => {
-          if (m.coins > 100 && (!cloudInv || !cloudInv.some(i => i.user_id === m.id))) {
-            m.coins = 100;
+          if (Array.isArray(m._metaInventory)) {
+            m._metaInventory.forEach(item => {
+              const key = item.id || `${item.memberId}_${item.itemId}`;
+              if (!invMap.has(key)) {
+                invMap.set(key, item);
+              } else {
+                const existing = invMap.get(key);
+                invMap.set(key, { ...existing, ...item });
+              }
+            });
           }
         });
-        this.saveLocalMembers(cloudMembers);
+        this.saveLocalInventory(Array.from(invMap.values()));
+
+        // 2. Đồng bộ thành viên: Bảo toàn activeFrame & activeEloShield
+        const localMembers = this.getMembers();
+        const localMap = new Map(localMembers.map(m => [m.id, m]));
+        let needsCloudUpdate = false;
+
+        const mergedMembers = cloudMembers.map(cm => {
+          const lm = localMap.get(cm.id);
+          const activeFrame = cm.activeFrame || lm?.activeFrame || '';
+          const activeEloShield = cm.activeEloShield || lm?.activeEloShield || false;
+          if (lm?.activeFrame && !cm.activeFrame) {
+            needsCloudUpdate = true;
+          }
+          return {
+            ...cm,
+            activeFrame,
+            activeEloShield
+          };
+        });
+
+        this.saveLocalMembers(mergedMembers);
+
+        if (needsCloudUpdate) {
+          const inv = this.getLocalInventory();
+          supabaseService.upsertMembers(mergedMembers, inv);
+        }
       }
       if (cloudMatches) {
         this.saveLocalMatches(cloudMatches);
@@ -234,8 +277,7 @@ export const StorageService = {
         this.saveLocalSettings(cloudSettings);
       }
       if (cloudCoinTx && cloudCoinTx.length > 0) {
-        const sanitizedTx = cloudCoinTx.filter(t => t.type !== 'session_checkin');
-        this.saveLocalCoinTransactions(sanitizedTx);
+        this.saveLocalCoinTransactions(cloudCoinTx);
       }
       if (cloudBets) {
         this.saveLocalBets(cloudBets);
@@ -247,11 +289,19 @@ export const StorageService = {
       const todayStr = getLocalDateStr();
       const cloudAttendance = await supabaseService.fetchAttendance(todayStr);
       if (cloudAttendance) {
-        // Luôn bảo toàn danh sách khách giao lưu hôm nay, không để cloud sync ghi đè mất khách
+        // Hợp nhất danh sách khách giao lưu giữa Cloud và Local để đồng bộ tức thì đa thiết bị
         const localGuests = this.getGuests();
-        cloudAttendance.guests = localGuests;
+        const guestMap = new Map();
+        (cloudAttendance.guests || []).forEach(g => guestMap.set(g.id, g));
+        localGuests.forEach(g => {
+          if (!guestMap.has(g.id)) guestMap.set(g.id, g);
+        });
+        const mergedGuests = Array.from(guestMap.values());
+        this.saveGuests(mergedGuests);
+        cloudAttendance.guests = mergedGuests;
+
         if (Array.isArray(cloudAttendance.presentIds)) {
-          localGuests.forEach(g => {
+          mergedGuests.forEach(g => {
             if (!cloudAttendance.presentIds.includes(g.id)) {
               cloudAttendance.presentIds.push(g.id);
             }
@@ -260,29 +310,70 @@ export const StorageService = {
         this.saveLocalAttendance(cloudAttendance);
       }
 
-      // Khôi phục activeMatch từ Sân 1 và Sân 2 lên web
+      // Khôi phục activeMatch từ Sân 1 và Sân 2 lên web (Bao gồm cả thành viên & khách giao lưu)
       const currentMembers = this.getMembers();
-      const memberMap = new Map(currentMembers.map(m => [m.id, m]));
+      const currentGuests = this.getGuests();
+      const allPeople = [...currentMembers, ...currentGuests];
+      const personMap = new Map(allPeople.map(m => [m.id, m]));
 
       const restoreCourt = (liveCourt, courtId, defaultCourtName) => {
-        if (liveCourt && liveCourt.team1Ids && liveCourt.team1Ids.length > 0) {
-          const team1 = liveCourt.team1Ids.map(id => memberMap.get(id)).filter(Boolean);
-          const team2 = liveCourt.team2Ids.map(id => memberMap.get(id)).filter(Boolean);
-
-          if (team1.length > 0 && team2.length > 0) {
-            const reconstructedMatch = {
-              courtNumber: liveCourt.courtNumber || defaultCourtName,
-              team1,
-              team2,
-              score1: liveCourt.score1 || 0,
-              score2: liveCourt.score2 || 0,
-              mode: liveCourt.mode || 'balanced',
-              status: liveCourt.status || 'in_progress',
-              diffElo: liveCourt.diffElo || 0
-            };
-            this.saveLocalActiveMatch(reconstructedMatch, courtId);
-          }
+        if (!liveCourt) {
+          return;
         }
+
+        const rawT1 = liveCourt.team1Ids || [];
+        const rawT2 = liveCourt.team2Ids || [];
+        const slotT1 = [
+          rawT1[0] ? personMap.get(rawT1[0]) || null : null,
+          rawT1[1] ? personMap.get(rawT1[1]) || null : null
+        ];
+        const slotT2 = [
+          rawT2[0] ? personMap.get(rawT2[0]) || null : null,
+          rawT2[1] ? personMap.get(rawT2[1]) || null : null
+        ];
+        const hasAnyPlayer = slotT1.some(Boolean) || slotT2.some(Boolean);
+
+        if (!hasAnyPlayer || liveCourt.status === 'idle') {
+          const empty = {
+            courtNumber: liveCourt.courtNumber || defaultCourtName,
+            team1: [null, null],
+            team2: [null, null],
+            score1: 0,
+            score2: 0,
+            status: 'idle',
+            matchStatus: 'idle',
+            diffElo: 0
+          };
+          this.saveLocalActiveMatch(empty, courtId);
+          return;
+        }
+
+        const validT1 = slotT1.filter(Boolean);
+        const validT2 = slotT2.filter(Boolean);
+        const elo1 = validT1.length > 0 ? Math.round(validT1.reduce((sum, p) => sum + p.elo, 0) / validT1.length) : 0;
+        const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
+
+        const s1 = Number(liveCourt.score1) || 0;
+        const s2 = Number(liveCourt.score2) || 0;
+        let calculatedStatus = liveCourt.status;
+        if (s1 > 0 || s2 > 0) {
+          calculatedStatus = 'in_progress';
+        } else if (!calculatedStatus || calculatedStatus === 'idle') {
+          calculatedStatus = (validT1.length + validT2.length === 4) ? 'ready' : 'idle';
+        }
+
+        const reconstructedMatch = {
+          courtNumber: liveCourt.courtNumber || defaultCourtName,
+          team1: slotT1,
+          team2: slotT2,
+          score1: s1,
+          score2: s2,
+          mode: liveCourt.mode || 'balanced',
+          status: calculatedStatus,
+          matchStatus: calculatedStatus,
+          diffElo: Number(liveCourt.diffElo) || Math.abs(elo1 - elo2)
+        };
+        this.saveLocalActiveMatch(reconstructedMatch, courtId);
       };
 
       restoreCourt(liveCourt1, 'court_1', 'Sân 1');
@@ -329,7 +420,8 @@ export const StorageService = {
   saveMembers(members) {
     this.saveLocalMembers(members);
     if (supabaseService.isConfigured()) {
-      members.forEach(m => supabaseService.upsertMember(m));
+      const inv = this.getLocalInventory();
+      supabaseService.upsertMembers(members, inv);
     }
   },
 
@@ -383,7 +475,8 @@ export const StorageService = {
       this.saveLocalMembers(members);
 
       if (supabaseService.isConfigured()) {
-        supabaseService.upsertMember(members[index]);
+        const inv = this.getLocalInventory();
+        supabaseService.upsertMember(members[index], inv);
       }
       return members[index];
     }
@@ -531,14 +624,17 @@ export const StorageService = {
 
   /**
    * Hoàn tác trận đấu: Khôi phục lại Elo, số trận, số thắng/thua, streak và số trận hôm nay
+   * Áp dụng đầy đủ cho cả thành viên chính thức và khách giao lưu
    */
-  undoMatch(id) {
+  async undoMatch(id) {
     let matches = this.getMatches();
     const matchToDelete = matches.find(m => m.id === id);
     if (!matchToDelete) return null;
 
     const members = this.getMembers();
     const memberMap = new Map(members.map(m => [m.id, m]));
+    const guests = this.getGuests();
+    let guestsChanged = false;
 
     // Xác định điểm Elo biến động của từng đội trong trận này
     const score1 = Number(matchToDelete.score1) || 0;
@@ -569,6 +665,18 @@ export const StorageService = {
         } else {
           mem.losses = Math.max(0, (mem.losses || 1) - 1);
         }
+      } else if (String(playerId).startsWith('guest_')) {
+        const guest = guests.find(g => g.id === playerId);
+        if (guest) {
+          guest.elo = Math.max(500, (guest.elo || 1000) - delta1);
+          guest.matchesPlayed = Math.max(0, (guest.matchesPlayed || 1) - 1);
+          if (team1Won) {
+            guest.wins = Math.max(0, (guest.wins || 1) - 1);
+          } else {
+            guest.losses = Math.max(0, (guest.losses || 1) - 1);
+          }
+          guestsChanged = true;
+        }
       }
     });
 
@@ -584,8 +692,24 @@ export const StorageService = {
         } else {
           mem.losses = Math.max(0, (mem.losses || 1) - 1);
         }
+      } else if (String(playerId).startsWith('guest_')) {
+        const guest = guests.find(g => g.id === playerId);
+        if (guest) {
+          guest.elo = Math.max(500, (guest.elo || 1000) - delta2);
+          guest.matchesPlayed = Math.max(0, (guest.matchesPlayed || 1) - 1);
+          if (!team1Won) {
+            guest.wins = Math.max(0, (guest.wins || 1) - 1);
+          } else {
+            guest.losses = Math.max(0, (guest.losses || 1) - 1);
+          }
+          guestsChanged = true;
+        }
       }
     });
+
+    if (guestsChanged) {
+      this.saveGuests(guests);
+    }
 
     // Xóa trận đấu khỏi danh sách matches
     matches = matches.filter(m => m.id !== id);
@@ -599,11 +723,11 @@ export const StorageService = {
         let streak = 0;
         const playerRemainingMatches = matches
           .filter(m => (m.team1 && m.team1.includes(playerId)) || (m.team2 && m.team2.includes(playerId)))
-          .sort((a, b) => new Date(a.timestamp || 0) - new Date(b.timestamp || 0));
+          .sort((a, b) => Number(a.timestamp || 0) - Number(b.timestamp || 0));
 
         playerRemainingMatches.forEach(m => {
           const isTeam1 = m.team1 && m.team1.includes(playerId);
-          const won = isTeam1 ? (m.score1 > m.score2) : (m.score2 > m.score1);
+          const won = isTeam1 ? (Number(m.score1) > Number(m.score2)) : (Number(m.score2) > Number(m.score1));
           if (won) {
             streak = streak > 0 ? streak + 1 : 1;
           } else {
@@ -614,11 +738,65 @@ export const StorageService = {
       }
     });
 
-    // Lưu lại danh sách members (tự động sync sang Supabase)
+    // Lưu lại danh sách members (cả local và batch sync lên Supabase)
     this.saveMembers(members);
 
     // Giảm số trận hôm nay trong điểm danh nếu có
     this.decrementGamePlayedToday(allInvolvedIds);
+
+    // Hoàn tác xu thi đấu (+20 Xu thắng / +5 Xu thua) & xu điểm danh (+50 Xu)
+    let matchDateStr = '';
+    if (matchToDelete.timestamp) {
+      try {
+        const tsNum = Number(matchToDelete.timestamp);
+        if (!isNaN(tsNum) && tsNum > 0) {
+          matchDateStr = new Date(tsNum).toISOString().split('T')[0];
+        } else {
+          matchDateStr = String(matchToDelete.timestamp).split('T')[0];
+        }
+      } catch (e) {
+        matchDateStr = getLocalDateStr();
+      }
+    }
+
+    const winIds = team1Won ? t1Ids : t2Ids;
+    const loseIds = team1Won ? t2Ids : t1Ids;
+
+    winIds.forEach(pId => {
+      if (pId && !String(pId).startsWith('guest_')) {
+        this.addCoins(pId, -20, 'match_undo', 'Hoàn tác trận đấu: Thu hồi 20 Xu thắng trận');
+      }
+    });
+
+    loseIds.forEach(pId => {
+      if (pId && !String(pId).startsWith('guest_')) {
+        this.addCoins(pId, -5, 'match_undo', 'Hoàn tác trận đấu: Thu hồi 5 Xu hoàn thành trận');
+      }
+    });
+
+    // Thu hồi xu điểm danh (+50 Xu) nếu trận này là trận duy nhất của người chơi trong ngày đó
+    allInvolvedIds.forEach(pId => {
+      if (pId && !String(pId).startsWith('guest_') && matchDateStr) {
+        const hasOtherMatchOnDay = matches.some(m => {
+          let mDate = '';
+          if (m.timestamp) {
+            const tsNum = Number(m.timestamp);
+            mDate = (!isNaN(tsNum) && tsNum > 0) ? new Date(tsNum).toISOString().split('T')[0] : String(m.timestamp).split('T')[0];
+          }
+          const inT1 = m.team1 && m.team1.includes(pId);
+          const inT2 = m.team2 && m.team2.includes(pId);
+          return mDate === matchDateStr && (inT1 || inT2);
+        });
+
+        if (!hasOtherMatchOnDay) {
+          const txs = this.getCoinTransactions(pId);
+          const hasDailyCheckin = txs.some(t => t.type === 'session_checkin' && t.createdAt?.startsWith(matchDateStr));
+          if (hasDailyCheckin) {
+            this.addCoins(pId, -50, 'session_checkin_undo', `Hoàn tác trận đấu: Thu hồi 50 Xu điểm danh ngày ${matchDateStr}`);
+          }
+        }
+      }
+    });
 
     // Hoàn tác các vé cược gắn với trận đấu này nếu có
     const allBets = this.getLocalBets();
@@ -640,9 +818,10 @@ export const StorageService = {
     });
     this.saveLocalBets(allBets);
 
-    // Xóa trên Supabase Cloud
+    // Xóa trên Supabase Cloud & Batch update members
     if (supabaseService.isConfigured()) {
-      supabaseService.deleteMatch(id);
+      await supabaseService.deleteMatch(id);
+      await supabaseService.upsertMembers(members);
     }
 
     return matchToDelete;
@@ -842,35 +1021,55 @@ export const StorageService = {
   // Active Match (Trận đấu đang diễn ra trên sân 1 hoặc sân 2)
   getActiveMatch(courtId = 'court_1') {
     try {
+      localStorage.removeItem('cbb_thai_thinh_active_match_v2');
       const key = courtId === 'court_2' ? STORAGE_KEYS.ACTIVE_MATCH_2 : STORAGE_KEYS.ACTIVE_MATCH_1;
       const data = localStorage.getItem(key);
-      if (data) return JSON.parse(data);
-
-      // Fallback cho key v2 cũ nếu đang ở sân 1
-      if (courtId === 'court_1') {
-        const legacy = localStorage.getItem('cbb_thai_thinh_active_match_v2');
-        if (legacy) return JSON.parse(legacy);
+      if (data) {
+        const parsed = JSON.parse(data);
+        if (parsed && Array.isArray(parsed.team1) && Array.isArray(parsed.team2)) {
+          return parsed;
+        }
       }
     } catch (e) {}
-    return null;
+    return {
+      courtNumber: courtId === 'court_2' ? 'Sân 2' : 'Sân 1',
+      team1: [null, null],
+      team2: [null, null],
+      score1: 0,
+      score2: 0,
+      status: 'idle',
+      matchStatus: 'idle',
+      diffElo: 0
+    };
   },
 
   saveLocalActiveMatch(match, courtId = 'court_1') {
     try {
+      localStorage.removeItem('cbb_thai_thinh_active_match_v2');
       const key = courtId === 'court_2' ? STORAGE_KEYS.ACTIVE_MATCH_2 : STORAGE_KEYS.ACTIVE_MATCH_1;
       if (match) {
         localStorage.setItem(key, JSON.stringify(match));
       } else {
-        localStorage.removeItem(key);
+        localStorage.setItem(key, JSON.stringify({
+          courtNumber: courtId === 'court_2' ? 'Sân 2' : 'Sân 1',
+          team1: [null, null],
+          team2: [null, null],
+          score1: 0,
+          score2: 0,
+          status: 'idle',
+          matchStatus: 'idle',
+          diffElo: 0
+        }));
       }
     } catch (e) {}
   },
 
-  saveActiveMatch(match, courtId = 'court_1') {
+  async saveActiveMatch(match, courtId = 'court_1') {
     this.saveLocalActiveMatch(match, courtId);
     if (supabaseService.isConfigured()) {
-      supabaseService.saveLiveCourt(match, courtId);
+      return await supabaseService.saveLiveCourt(match, courtId);
     }
+    return true;
   },
 
   // Club Settings (Cấu hình và thông báo CLB)
@@ -1370,6 +1569,8 @@ export const StorageService = {
 
     if (supabaseService.isConfigured()) {
       supabaseService.upsertInventoryItem(inventoryItem);
+      const members = this.getMembers();
+      supabaseService.upsertMembers(members, allInv);
     }
 
     return { success: true, item: itemDef, balanceAfter: deductRes.balanceAfter };
