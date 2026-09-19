@@ -9,6 +9,28 @@ import { supabaseService } from './supabase.js';
 window.StorageService = StorageService;
 window.getLocalDateStr = getLocalDateStr;
 
+// Khai báo sớm appOpenAddGuestModal để luôn sẵn sàng trên toàn window
+window.appOpenAddGuestModal = function() {
+  try {
+    const modal = document.getElementById('modal-add-guest');
+    if (!modal) {
+      console.warn('Không tìm thấy #modal-add-guest trong DOM');
+      return;
+    }
+    const nameInput = document.getElementById('field-guest-name');
+    const genderInput = document.getElementById('field-guest-gender');
+    const eloInput = document.getElementById('field-guest-elo');
+    if (nameInput) nameInput.value = '';
+    if (genderInput) genderInput.value = 'male';
+    if (eloInput) eloInput.value = '1000';
+    modal.classList.add('open');
+    if (SoundService && SoundService.playClick) SoundService.playClick();
+    if (nameInput) setTimeout(() => nameInput.focus(), 150);
+  } catch (err) {
+    console.error('Lỗi mở modal thêm khách:', err);
+  }
+};
+
 // Trạng thái ứng dụng (Application State)
 const state = {
   currentTab: 'court',
@@ -514,7 +536,27 @@ function setupEventListeners() {
     });
   });
 
-  // 8. Điểm danh Quick Actions
+  // 8a. Thêm Khách Giao Lưu (Hỗ trợ nút ở Điểm Danh và Thành Viên)
+  ['btn-open-add-guest', 'btn-open-add-guest-members'].forEach(id => {
+    const btn = document.getElementById(id);
+    if (btn) {
+      btn.addEventListener('click', (e) => {
+        e.preventDefault();
+        window.appOpenAddGuestModal();
+      });
+    }
+  });
+
+  // Ủy quyền sự kiện click toàn trang cho mọi nút mở modal thêm khách
+  document.addEventListener('click', (e) => {
+    const trigger = e.target.closest('#btn-open-add-guest, #btn-open-add-guest-members, .btn-open-add-guest, [data-action="open-add-guest"]');
+    if (trigger) {
+      e.preventDefault();
+      window.appOpenAddGuestModal();
+    }
+  });
+
+  // 8b. Điểm danh Quick Actions
   const btnReg = document.getElementById('btn-checkin-regulars');
   if (btnReg) {
     btnReg.addEventListener('click', () => {
@@ -2259,7 +2301,7 @@ function renderLeaderboard() {
               ${p.nickname ? `<span style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">(${p.nickname})</span>` : ''}
               ${hasPlayed 
                 ? `
-                  <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
+                  <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
                     ${tier.icon} ${tier.name}
                   </span>
                 ` 
@@ -2636,8 +2678,8 @@ function renderMembers() {
               ${m.name} ${isMe ? '<span style="font-size: 0.7rem; color: var(--cyan); background: rgba(6,182,212,0.12); padding: 1px 6px; border-radius: 4px; margin-left: 4px;">Tôi</span>' : ''}
             </div>
             <div style="font-size: 0.78rem; color: var(--text-muted);">${m.nickname || 'Chưa có biệt danh'}</div>
-            <div style="margin-top: 4px;">
-              <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
+            <div style="margin-top: 6px;">
+              <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
                 ${tier.icon} ${tier.name}
               </span>
             </div>
@@ -3928,18 +3970,18 @@ window.appViewPlayerProfile = function(memberId) {
       <div class="profile-hero-card">
         <div class="profile-avatar-large-wrap">
           ${renderAvatarHtml(m, { size: 'xl' })}
-          <span class="gender-badge-dot ${isMale ? 'gender-male' : 'gender-female'}" style="width: 24px; height: 24px; font-size: 13px;">
+          <span class="gender-badge-dot ${isMale ? 'gender-male' : 'gender-female'}">
             ${isMale ? '♂' : '♀'}
           </span>
         </div>
         <div class="profile-hero-details">
           <div class="profile-hero-name">${m.name}</div>
           <div class="profile-hero-nick">${m.nickname || 'Chiến binh CLB Thái Thịnh'}</div>
-          <div style="display: flex; align-items: center; gap: 8px; margin-top: 6px;">
-            <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor}; font-size: 0.8rem; padding: 2px 10px;">
+          <div class="profile-hero-badges">
+            <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
               ${tier.icon} ${tier.name}
             </span>
-            <span style="font-size: 0.75rem; color: var(--text-dim); font-weight: 700;">
+            <span class="profile-freq-pill">
               ${m.frequency === 'regular' ? '⚡ Nòng cốt' : '🍃 Thỉnh thoảng'}
             </span>
           </div>
@@ -3949,8 +3991,8 @@ window.appViewPlayerProfile = function(memberId) {
       <!-- Elo & Next Tier Progress -->
       <div class="profile-rank-progress-box">
         <div class="progress-header">
-          <span>Hạng <strong>#${stats.rank}</strong> • <span style="color: var(--volt); font-weight: 900;">${m.elo} Elo</span></span>
-          <span style="color: var(--text-muted); font-size: 0.75rem;">
+          <span class="progress-rank-text">Hạng <strong>#${stats.rank}</strong> • <span class="progress-elo-val">${m.elo} Elo</span></span>
+          <span class="progress-next-tier">
             ${nextTier.tier ? `Cần +${nextTier.pointsNeeded} Elo lên ${nextTier.tier.name}` : '👑 Bậc Tối Thượng'}
           </span>
         </div>
@@ -3962,38 +4004,44 @@ window.appViewPlayerProfile = function(memberId) {
       <!-- 4 Stats Dials -->
       <div class="profile-stats-grid">
         <div class="profile-stat-box">
-          <div class="profile-stat-num" style="color: var(--volt);">${m.elo}</div>
+          <div class="profile-stat-icon">📈</div>
+          <div class="profile-stat-num stat-elo">${m.elo}</div>
           <div class="profile-stat-label">Điểm Elo</div>
         </div>
         <div class="profile-stat-box">
+          <div class="profile-stat-icon">🏸</div>
           <div class="profile-stat-num">${m.matchesPlayed}</div>
           <div class="profile-stat-label">Tổng Trận</div>
         </div>
         <div class="profile-stat-box">
-          <div class="profile-stat-num" style="color: #4ade80;">${stats.winRate}%</div>
+          <div class="profile-stat-icon">🎯</div>
+          <div class="profile-stat-num stat-winrate">${stats.winRate}%</div>
           <div class="profile-stat-label">Tỷ Lệ Thắng</div>
         </div>
         <div class="profile-stat-box">
-          <div class="profile-stat-num" style="color: ${m.streak >= 0 ? '#ef4444' : 'var(--text-dim)'};">
+          <div class="profile-stat-icon">🔥</div>
+          <div class="profile-stat-num ${m.streak >= 0 ? 'streak-pos' : 'streak-neg'}">
             ${m.streak > 0 ? `+${m.streak}` : m.streak}
           </div>
           <div class="profile-stat-label">Chuỗi Trận</div>
         </div>
       </div>
 
-      <!-- Best Partner Box -->
+      <!-- Best Partner Box (Sử dụng hệ thống avatar chuẩn, tránh ảnh vỡ) -->
       ${stats.bestPartner ? `
         <div class="best-partner-box">
           <div class="bp-left">
-            <img class="bp-avatar" src="${getAvatarUrl(stats.bestPartner.player)}" alt="${stats.bestPartner.player.name}">
+            <div style="flex-shrink: 0;">
+              ${renderAvatarHtml(stats.bestPartner.player, { size: 'md' })}
+            </div>
             <div class="bp-info">
               <div class="bp-tag">💘 BẠN DIỄN ĂN Ý NHẤT</div>
               <div class="bp-name">${stats.bestPartner.player.name}</div>
             </div>
           </div>
           <div class="bp-stats">
-            <div style="color: var(--gold); font-size: 1.1rem; font-weight: 900;">${stats.bestPartner.rate}%</div>
-            <div style="font-size: 0.72rem; color: var(--text-muted);">${stats.bestPartner.won}/${stats.bestPartner.played} Trận Thắng</div>
+            <div style="color: #f59e0b; font-size: 1.15rem; font-weight: 900; font-family: var(--font-heading);">${stats.bestPartner.rate}%</div>
+            <div style="font-size: 0.72rem; color: var(--text-dim); font-weight: 600;">${stats.bestPartner.won}/${stats.bestPartner.played} Trận Thắng</div>
           </div>
         </div>
       ` : ''}

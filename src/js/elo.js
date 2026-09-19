@@ -5,47 +5,47 @@
 export const TIERS = [
   {
     id: 'ga_nhat_cau',
-    name: 'Gà Nhặt Cầu',
+    name: 'Tân Binh Tiềm Năng',
     icon: '🐣',
     minElo: 0,
     maxElo: 999,
-    color: '#94a3b8',
-    bgColor: 'rgba(148, 163, 184, 0.15)',
-    borderColor: '#64748b',
-    description: 'Khởi động vui vẻ, vợt chạm đất nhiều hơn chạm cầu'
+    color: '#0284c7',
+    bgColor: 'rgba(2, 132, 199, 0.08)',
+    borderColor: 'rgba(2, 132, 199, 0.28)',
+    description: 'Thành viên mới gia nhập, đang từng bước nâng cao kỹ thuật và cảm giác cầu'
   },
   {
     id: 'chat_cau_phui',
-    name: 'Chặt Cầu Phủi',
+    name: 'Tay Vợt Phong Trào',
     icon: '🏸',
     minElo: 1000,
     maxElo: 1199,
-    color: '#38bdf8',
-    bgColor: 'rgba(56, 189, 248, 0.15)',
-    borderColor: '#0284c7',
-    description: 'Biết điều cầu cơ bản, thỉnh thoảng phát cầu rúc lưới'
+    color: '#0d9488',
+    bgColor: 'rgba(13, 148, 136, 0.08)',
+    borderColor: 'rgba(13, 148, 136, 0.28)',
+    description: 'Nền tảng kỹ thuật vững vàng, điều cầu linh hoạt và phối hợp ăn ý'
   },
   {
     id: 'cat_cau_bay',
-    name: 'Cắt Cầu Bay',
+    name: 'Thiện Chiến Sân Đôi',
     icon: '⚡',
     minElo: 1200,
     maxElo: 1349,
-    color: '#a3e635',
-    bgColor: 'rgba(163, 230, 53, 0.15)',
-    borderColor: '#65a30d',
-    description: 'Phản xạ nhanh, biết gài lưới và chụp góc hiểm'
+    color: '#16a34a',
+    bgColor: 'rgba(22, 163, 74, 0.08)',
+    borderColor: 'rgba(22, 163, 74, 0.28)',
+    description: 'Phản xạ nhanh nhạy, gài lưới hiểm hóc và chớp thời cơ dứt điểm'
   },
   {
     id: 'smash_chay_san',
-    name: 'Smash Cháy Sân',
+    name: 'Chủ Lực Smash',
     icon: '💥',
     minElo: 1350,
     maxElo: 1499,
-    color: '#fb923c',
-    bgColor: 'rgba(251, 146, 60, 0.15)',
-    borderColor: '#ea580c',
-    description: 'Tay to cắm vạch, đối thủ nghe tiếng vợt là giật mình'
+    color: '#ea580c',
+    bgColor: 'rgba(234, 88, 12, 0.08)',
+    borderColor: 'rgba(234, 88, 12, 0.28)',
+    description: 'Lực cổ tay uy lực, đập cầu cắm vạch, trụ cột tấn công của cặp đôi'
   },
   {
     id: 'chien_than',
@@ -53,10 +53,10 @@ export const TIERS = [
     icon: '👑',
     minElo: 1500,
     maxElo: 9999,
-    color: '#f43f5e',
-    bgColor: 'rgba(244, 63, 94, 0.2)',
-    borderColor: '#e11d48',
-    description: 'Gánh mọi loại tạ, hào quang sân cầu lông Thái Thịnh'
+    color: '#e11d48',
+    bgColor: 'rgba(225, 29, 72, 0.1)',
+    borderColor: 'rgba(225, 29, 72, 0.35)',
+    description: 'Bản lĩnh thi đấu vững vàng, đẳng cấp và kỹ thuật hàng đầu CLB'
   }
 ];
 

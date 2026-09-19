@@ -1596,6 +1596,95 @@ button {
   line-height: 1;
 }
 
+/* =========================================================================
+   TIER PILL SYSTEM (HUY HIỆU BẬC RANK & DANH HIỆU CHUYÊN NGHIỆP)
+   ========================================================================= */
+.tier-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border-radius: var(--radius-full);
+  font-family: var(--font-heading);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.2px;
+  line-height: 1.35;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.04);
+  transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  white-space: nowrap;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.tier-pill:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 3px 8px rgba(0, 0, 0, 0.08);
+}
+
+/* Tier Specific Badges */
+.tier-pill.tier-ga_nhat_cau {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.08), rgba(14, 165, 233, 0.14)) !important;
+  color: #0284c7 !important;
+  border: 1px solid rgba(2, 132, 199, 0.32) !important;
+}
+
+[data-theme="dark"] .tier-pill.tier-ga_nhat_cau {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.15), rgba(14, 165, 233, 0.22)) !important;
+  color: #38bdf8 !important;
+  border-color: rgba(56, 189, 248, 0.38) !important;
+}
+
+.tier-pill.tier-chat_cau_phui {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.08), rgba(20, 184, 166, 0.14)) !important;
+  color: #0d9488 !important;
+  border: 1px solid rgba(13, 148, 136, 0.32) !important;
+}
+
+[data-theme="dark"] .tier-pill.tier-chat_cau_phui {
+  background: linear-gradient(135deg, rgba(13, 148, 136, 0.15), rgba(20, 184, 166, 0.22)) !important;
+  color: #2dd4bf !important;
+  border-color: rgba(45, 212, 191, 0.38) !important;
+}
+
+.tier-pill.tier-cat_cau_bay {
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.08), rgba(34, 197, 94, 0.14)) !important;
+  color: #16a34a !important;
+  border: 1px solid rgba(22, 163, 74, 0.32) !important;
+}
+
+[data-theme="dark"] .tier-pill.tier-cat_cau_bay {
+  background: linear-gradient(135deg, rgba(22, 163, 74, 0.15), rgba(34, 197, 94, 0.22)) !important;
+  color: #4ade80 !important;
+  border-color: rgba(74, 222, 128, 0.38) !important;
+}
+
+.tier-pill.tier-smash_chay_san {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.08), rgba(249, 115, 22, 0.15)) !important;
+  color: #ea580c !important;
+  border: 1px solid rgba(234, 88, 12, 0.32) !important;
+}
+
+[data-theme="dark"] .tier-pill.tier-smash_chay_san {
+  background: linear-gradient(135deg, rgba(234, 88, 12, 0.15), rgba(249, 115, 22, 0.22)) !important;
+  color: #fb923c !important;
+  border-color: rgba(251, 146, 60, 0.38) !important;
+}
+
+.tier-pill.tier-chien_than {
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.1), rgba(244, 63, 94, 0.18)) !important;
+  color: #e11d48 !important;
+  border: 1px solid rgba(225, 29, 72, 0.38) !important;
+  box-shadow: 0 0 8px rgba(225, 29, 72, 0.15);
+}
+
+[data-theme="dark"] .tier-pill.tier-chien_than {
+  background: linear-gradient(135deg, rgba(225, 29, 72, 0.18), rgba(244, 63, 94, 0.28)) !important;
+  color: #fb7185 !important;
+  border-color: rgba(251, 113, 133, 0.45) !important;
+  box-shadow: 0 0 12px rgba(225, 29, 72, 0.3);
+}
+
 .court-player-card .tier-pill {
   font-size: 0.62rem;
   font-weight: 700;
@@ -3601,6 +3690,367 @@ button {
   0% { transform: rotate(0deg) scale(1); }
   50% { transform: rotate(180deg) scale(1.15); }
   100% { transform: rotate(360deg) scale(1); }
+}
+
+/* =========================================================================
+   HỒ SƠ VẬN ĐỘNG VIÊN CHUYÊN NGHIỆP (PLAYER PROFILE PRO MODAL)
+   ========================================================================= */
+.profile-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 16px 20px 10px;
+  border-bottom: 1px solid var(--border-glass);
+}
+
+.profile-modal-title {
+  font-family: var(--font-heading);
+  font-size: 0.85rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: #0284c7;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+[data-theme="dark"] .profile-modal-title {
+  color: var(--volt);
+}
+
+.profile-pro-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.profile-hero-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.05), rgba(99, 102, 241, 0.08));
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  box-shadow: var(--shadow-sm);
+  position: relative;
+  overflow: hidden;
+}
+
+[data-theme="dark"] .profile-hero-card {
+  background: linear-gradient(135deg, rgba(2, 132, 199, 0.12), rgba(99, 102, 241, 0.15));
+  border-color: rgba(255, 255, 255, 0.08);
+}
+
+.profile-avatar-large-wrap {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.profile-avatar-large-wrap .gender-badge-dot {
+  position: absolute;
+  bottom: 0;
+  right: 0;
+  width: 22px;
+  height: 22px;
+  font-size: 11px;
+  border: 2px solid var(--bg-surface);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-hero-details {
+  flex: 1;
+  min-width: 0;
+}
+
+.profile-hero-name {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 800;
+  color: var(--text-main);
+  line-height: 1.25;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.profile-hero-nick {
+  font-size: 0.82rem;
+  color: var(--text-dim);
+  font-weight: 600;
+  margin-top: 2px;
+}
+
+.profile-hero-badges {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 8px;
+  flex-wrap: wrap;
+}
+
+.profile-freq-pill {
+  font-size: 0.72rem;
+  font-weight: 700;
+  color: var(--text-dim);
+  background: rgba(148, 163, 184, 0.12);
+  padding: 2px 8px;
+  border-radius: var(--radius-full);
+  border: 1px solid rgba(148, 163, 184, 0.25);
+}
+
+/* Rank & Next Tier Progress */
+.profile-rank-progress-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 0.82rem;
+  margin-bottom: 8px;
+  gap: 8px;
+}
+
+.progress-rank-text {
+  font-weight: 700;
+  color: var(--text-main);
+}
+
+.progress-elo-val {
+  color: #0284c7;
+  font-weight: 800;
+}
+
+[data-theme="dark"] .progress-elo-val {
+  color: var(--volt);
+}
+
+.progress-next-tier {
+  color: var(--text-dim);
+  font-size: 0.74rem;
+  font-weight: 600;
+  text-align: right;
+}
+
+.progress-bar-track {
+  height: 8px;
+  background: rgba(0, 0, 0, 0.08);
+  border-radius: var(--radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+[data-theme="dark"] .progress-bar-track {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #0284c7, #10b981);
+  border-radius: var(--radius-full);
+  transition: width 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 0 0 8px rgba(16, 185, 129, 0.4);
+}
+
+/* 4 Stats Grid */
+.profile-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 8px;
+}
+
+.profile-stat-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-md);
+  padding: 10px 6px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.profile-stat-box:hover {
+  transform: translateY(-2px);
+  border-color: rgba(2, 132, 199, 0.35);
+}
+
+.profile-stat-icon {
+  font-size: 0.95rem;
+  margin-bottom: 2px;
+}
+
+.profile-stat-num {
+  font-family: var(--font-heading);
+  font-size: 1.25rem;
+  font-weight: 800;
+  line-height: 1.2;
+  color: var(--text-main);
+}
+
+.profile-stat-num.stat-elo {
+  color: #0284c7;
+}
+
+[data-theme="dark"] .profile-stat-num.stat-elo {
+  color: var(--volt);
+}
+
+.profile-stat-num.stat-winrate {
+  color: #10b981;
+}
+
+.profile-stat-num.streak-pos {
+  color: #ef4444;
+}
+
+.profile-stat-num.streak-neg {
+  color: var(--text-dim);
+}
+
+.profile-stat-label {
+  font-size: 0.66rem;
+  color: var(--text-dim);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  margin-top: 4px;
+}
+
+/* Best Partner Box - FIXED IMAGE SIZE & LAYOUT */
+.best-partner-box {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: linear-gradient(135deg, rgba(245, 158, 11, 0.08), rgba(236, 72, 153, 0.08));
+  border: 1px solid rgba(245, 158, 11, 0.3);
+  border-radius: var(--radius-md);
+  padding: 12px 14px;
+  gap: 12px;
+}
+
+.bp-left {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+  flex: 1;
+}
+
+.bp-avatar {
+  width: 44px !important;
+  height: 44px !important;
+  min-width: 44px !important;
+  max-width: 44px !important;
+  border-radius: 50% !important;
+  object-fit: cover !important;
+  border: 2px solid #f59e0b !important;
+  box-shadow: 0 2px 8px rgba(245, 158, 11, 0.3);
+  flex-shrink: 0;
+}
+
+.bp-info {
+  min-width: 0;
+  flex: 1;
+}
+
+.bp-tag {
+  font-size: 0.68rem;
+  font-weight: 800;
+  color: #d97706;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+[data-theme="dark"] .bp-tag {
+  color: #fbbf24;
+}
+
+.bp-name {
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: var(--text-main);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  margin-top: 2px;
+}
+
+.bp-stats {
+  text-align: right;
+  flex-shrink: 0;
+}
+
+/* Personal Match History List */
+.personal-history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-height: 220px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.personal-match-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: var(--bg-card);
+  border: 1px solid var(--border-glass);
+  border-radius: var(--radius-sm);
+  padding: 8px 12px;
+  gap: 10px;
+  transition: all 0.15s ease;
+}
+
+.personal-match-item.win {
+  border-left: 3px solid #10b981;
+}
+
+.personal-match-item.loss {
+  border-left: 3px solid #ef4444;
+}
+
+.pm-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  flex: 1;
+}
+
+.pm-status-pill {
+  font-size: 0.65rem;
+  font-weight: 800;
+  padding: 2px 6px;
+  border-radius: 4px;
+  letter-spacing: 0.3px;
+  flex-shrink: 0;
+}
+
+.pm-win-pill {
+  background: rgba(16, 185, 129, 0.15);
+  color: #10b981;
+  border: 1px solid rgba(16, 185, 129, 0.35);
+}
+
+.pm-loss-pill {
+  background: rgba(239, 68, 68, 0.15);
+  color: #ef4444;
+  border: 1px solid rgba(239, 68, 68, 0.35);
 }
 
 /* =========================================================================

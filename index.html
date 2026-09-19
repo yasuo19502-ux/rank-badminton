@@ -463,9 +463,14 @@
             <span class="search-icon">🔍</span>
             <input type="text" id="member-search-input" class="search-input" placeholder="Tìm tên hoặc biệt danh...">
           </div>
-          <button id="btn-open-add-member" class="btn-primary" style="padding: 10px 18px; font-size: 0.9rem;">
-            <span>➕</span> Thêm Thành Viên
-          </button>
+          <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: center;">
+            <button id="btn-open-add-member" class="btn-primary" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
+              <span>➕</span> Thêm Thành Viên
+            </button>
+            <button id="btn-open-add-guest-members" class="btn-secondary btn-open-add-guest" data-action="open-add-guest" onclick="window.appOpenAddGuestModal()" style="padding: 10px 13px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+              <span>👤</span> Thêm Khách
+            </button>
+          </div>
         </div>
 
         <div id="members-grid-container" class="members-grid">
@@ -787,13 +792,13 @@
   <!-- Modal 5: Hồ Sơ Vận Động Viên Chuyên Nghiệp (Player Profile Pro) -->
   <div id="modal-player-profile" class="modal-backdrop">
     <div class="modal-content" style="max-width: 520px;">
-      <div class="modal-header" style="border-bottom: none; padding-bottom: 0;">
-        <div style="font-size: 0.8rem; font-weight: 800; text-transform: uppercase; color: var(--volt); letter-spacing: 0.05em;">
-          HỒ SƠ VẬN ĐỘNG VIÊN
+      <div class="profile-modal-header">
+        <div class="profile-modal-title">
+          <span>🏸</span> Hồ Sơ Vận Động Viên
         </div>
         <button class="btn-icon btn-close-modal">✕</button>
       </div>
-      <div class="modal-body" id="player-profile-modal-body" style="padding-top: 10px;">
+      <div class="modal-body" id="player-profile-modal-body" style="padding-top: 14px;">
         <!-- Injected via JS -->
       </div>
     </div>
