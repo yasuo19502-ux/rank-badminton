@@ -837,9 +837,12 @@ class SupabaseService {
   // --- REALTIME SUBSCRIPTIONS (TỰ ĐỘNG ĐỒNG BỘ CÁC BẢNG DỮ LIỆU) ---
   subscribeToChanges(onChangeCallback) {
     if (!this.isConfigured()) return;
+    this.lastOnChangeCallback = onChangeCallback;
 
     if (this.realtimeChannel) {
-      this.client.removeChannel(this.realtimeChannel);
+      try {
+        this.client.removeChannel(this.realtimeChannel);
+      } catch (e) {}
     }
 
     this.realtimeChannel = this.client
@@ -865,6 +868,15 @@ class SupabaseService {
       .subscribe((status) => {
         console.log('[Supabase Realtime] Trạng thái kênh đồng bộ realtime:', status);
       });
+  }
+
+  ensureRealtimeSubscription() {
+    if (!this.isConfigured() || !this.lastOnChangeCallback) return;
+    const channelState = this.realtimeChannel?.state;
+    if (!this.realtimeChannel || channelState === 'closed' || channelState === 'errored') {
+      console.log('[Supabase Realtime] Tự động kết nối lại kênh Realtime sau trạng thái:', channelState);
+      this.subscribeToChanges(this.lastOnChangeCallback);
+    }
   }
 }
 

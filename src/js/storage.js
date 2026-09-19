@@ -280,24 +280,10 @@ export const StorageService = {
       const todayStr = getLocalDateStr();
       const cloudAttendance = await supabaseService.fetchAttendance(todayStr);
       if (cloudAttendance) {
-        // Hợp nhất danh sách khách giao lưu giữa Cloud và Local để đồng bộ tức thì đa thiết bị
-        const localGuests = this.getGuests();
-        const guestMap = new Map();
-        (cloudAttendance.guests || []).forEach(g => guestMap.set(g.id, g));
-        localGuests.forEach(g => {
-          if (!guestMap.has(g.id)) guestMap.set(g.id, g);
-        });
-        const mergedGuests = Array.from(guestMap.values());
-        this.saveGuests(mergedGuests);
-        cloudAttendance.guests = mergedGuests;
-
-        if (Array.isArray(cloudAttendance.presentIds)) {
-          mergedGuests.forEach(g => {
-            if (!cloudAttendance.presentIds.includes(g.id)) {
-              cloudAttendance.presentIds.push(g.id);
-            }
-          });
-        }
+        // Đồng bộ danh sách khách giao lưu từ Cloud (Cloud là nguồn chân lý cho buổi đánh)
+        const cloudGuests = Array.isArray(cloudAttendance.guests) ? cloudAttendance.guests : [];
+        this.saveGuests(cloudGuests);
+        cloudAttendance.guests = cloudGuests;
         this.saveLocalAttendance(cloudAttendance);
       }
 
@@ -848,32 +834,41 @@ export const StorageService = {
 
   // --- ATTENDANCE ---
   getAttendance() {
+    let current = null;
     try {
       const data = localStorage.getItem(STORAGE_KEYS.ATTENDANCE);
       if (data) {
         const parsed = JSON.parse(data);
         const todayStr = getLocalDateStr();
         if (parsed.date === todayStr) {
-          if (!Array.isArray(parsed.guests)) parsed.guests = [];
-          return parsed;
+          current = parsed;
         }
       }
     } catch (e) {}
 
     const todayStr = getLocalDateStr();
-    const members = this.getMembers();
-    const defaultPresentIds = members
-      .filter(m => m.frequency === 'regular')
-      .map(m => m.id);
+    if (!current) {
+      const members = this.getMembers();
+      const defaultPresentIds = members
+        .filter(m => m.frequency === 'regular')
+        .map(m => m.id);
 
-    const defaultAttendance = {
-      date: todayStr,
-      presentIds: defaultPresentIds,
-      gamesPlayedToday: {},
-      guests: []
-    };
-    this.saveLocalAttendance(defaultAttendance);
-    return defaultAttendance;
+      current = {
+        date: todayStr,
+        presentIds: defaultPresentIds,
+        gamesPlayedToday: {},
+        guests: []
+      };
+      this.saveLocalAttendance(current);
+    }
+
+    const guests = this.getGuests();
+    current.guests = guests;
+    if (!Array.isArray(current.presentIds)) current.presentIds = [];
+    if (!current.gamesPlayedToday || typeof current.gamesPlayedToday !== 'object') {
+      current.gamesPlayedToday = {};
+    }
+    return current;
   },
 
   // --- GUEST MANAGEMENT (KHÁCH VÃNG LAI) ---
@@ -882,21 +877,16 @@ export const StorageService = {
       const data = localStorage.getItem(STORAGE_KEYS.GUESTS);
       if (data) {
         const parsed = JSON.parse(data);
-        if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+        if (Array.isArray(parsed)) return parsed;
       }
     } catch (e) {}
-
-    const attendance = this.getAttendance();
-    return Array.isArray(attendance.guests) ? attendance.guests : [];
+    return [];
   },
 
   saveGuests(guests) {
     try {
-      localStorage.setItem(STORAGE_KEYS.GUESTS, JSON.stringify(guests));
+      localStorage.setItem(STORAGE_KEYS.GUESTS, JSON.stringify(Array.isArray(guests) ? guests : []));
     } catch (e) {}
-    const attendance = this.getAttendance();
-    attendance.guests = guests;
-    this.saveLocalAttendance(attendance);
   },
 
   addGuest(guestData) {
@@ -925,6 +915,7 @@ export const StorageService = {
     }
 
     this.saveGuests(guests);
+    attendance.guests = guests;
     this.saveAttendance(attendance);
     return newGuest;
   },
@@ -935,9 +926,7 @@ export const StorageService = {
     this.saveGuests(guests);
 
     const attendance = this.getAttendance();
-    if (attendance.guests) {
-      attendance.guests = attendance.guests.filter(g => g.id !== guestId);
-    }
+    attendance.guests = guests;
     if (attendance.presentIds) {
       attendance.presentIds = attendance.presentIds.filter(id => id !== guestId);
     }
@@ -973,6 +962,12 @@ export const StorageService = {
   },
 
   saveAttendance(attendance) {
+    if (!attendance.guests || !Array.isArray(attendance.guests) || attendance.guests.length === 0) {
+      const currentGuests = this.getGuests();
+      if (currentGuests.length > 0) {
+        attendance.guests = currentGuests;
+      }
+    }
     this.saveLocalAttendance(attendance);
     if (supabaseService.isConfigured()) {
       supabaseService.saveAttendance(attendance);

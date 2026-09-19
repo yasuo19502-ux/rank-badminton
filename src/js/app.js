@@ -2620,12 +2620,6 @@ window.appRemoveGuest = async function(guestId) {
 
 // Global hook để gọi từ HTML onclick
 window.appToggleAttendance = function(memberId) {
-  // QUY TẮC: Chỉ buổi đánh CÓ LỊCH TRÊN APP mới được điểm danh
-  if (!StorageService.hasScheduledSessionToday()) {
-    showToast('⛔ Hôm nay CLB không có lịch đánh nào được tạo trên app! Vui lòng tạo lịch trong tab Lịch Sân trước khi điểm danh.', 'error');
-    return;
-  }
-
   const attendanceBefore = StorageService.getAttendance();
   const wasPresent = attendanceBefore.presentIds?.includes(memberId);
 
@@ -3815,29 +3809,40 @@ async function initCloudSyncAndRealtime() {
     }
 
     if (table === 'attendance') {
-      const todayStr = getLocalDateStr();
-      const cloudAtt = await supabaseService.fetchAttendance(todayStr);
-      if (cloudAtt) {
-        if (cloudAtt.guests && cloudAtt.guests.length > 0) {
-          const localGuests = StorageService.getGuests();
-          const guestMap = new Map();
-          cloudAtt.guests.forEach(g => guestMap.set(g.id, g));
-          localGuests.forEach(g => {
-            if (!guestMap.has(g.id)) guestMap.set(g.id, g);
-          });
-          const mergedGuests = Array.from(guestMap.values());
-          StorageService.saveGuests(mergedGuests);
-          cloudAtt.guests = mergedGuests;
+      const record = payload.new;
+      if (record && Array.isArray(record.present_ids)) {
+        // Cập nhật tức thì trực tiếp từ WebSocket payload, không phụ thuộc vào REST API
+        const rawGames = record.games_played_today || {};
+        const guests = Array.isArray(rawGames._guest_profiles) ? rawGames._guest_profiles : [];
+        const cleanGames = { ...rawGames };
+        delete cleanGames._guest_profiles;
+
+        const updatedAtt = {
+          date: record.date || getLocalDateStr(),
+          presentIds: record.present_ids,
+          gamesPlayedToday: cleanGames,
+          guests: guests
+        };
+
+        StorageService.saveGuests(guests);
+        StorageService.saveLocalAttendance(updatedAtt);
+      } else {
+        // Fallback đọc từ Supabase nếu payload không chứa record
+        const todayStr = getLocalDateStr();
+        const cloudAtt = await supabaseService.fetchAttendance(todayStr);
+        if (cloudAtt) {
+          StorageService.saveGuests(cloudAtt.guests || []);
+          StorageService.saveLocalAttendance(cloudAtt);
         }
-        StorageService.saveLocalAttendance(cloudAtt);
       }
 
       renderAttendance();
+      renderCourt();
       renderCourtBench();
       updateSessionStatusBadge();
 
       const now = Date.now();
-      if (!window._lastCloudToastTime || (now - window._lastCloudToastTime > 4000)) {
+      if (!window._lastCloudToastTime || (now - window._lastCloudToastTime > 3000)) {
         window._lastCloudToastTime = now;
         showToast('✅ Danh sách điểm danh vừa được cập nhật!', 'info');
       }
@@ -3867,6 +3872,7 @@ async function initCloudSyncAndRealtime() {
       renderHistory();
       renderLeaderboard();
       renderMembers();
+      renderAttendance();
       updateSessionStatusBadge();
 
       const now = Date.now();
@@ -3895,9 +3901,19 @@ async function initCloudSyncAndRealtime() {
 
       renderLeaderboard();
       renderMembers();
+      renderAttendance();
       renderUserAuthHeader();
       renderCourt();
       renderCourtBench();
+      updateSessionStatusBadge();
+      return;
+    }
+
+    if (table === 'sessions') {
+      const cloudSessions = await supabaseService.fetchSessions();
+      if (cloudSessions) StorageService.saveLocalSessions(cloudSessions);
+      renderSessions();
+      updateSessionStatusBadge();
       return;
     }
 
@@ -3922,9 +3938,10 @@ async function initCloudSyncAndRealtime() {
       return;
     }
 
-    // Với các bảng còn lại (sessions, club_settings)
+    // Với các bảng còn lại (club_settings...)
     await StorageService.syncFromCloud();
     renderSessions();
+    renderAttendance();
     updateSessionStatusBadge();
   });
 
@@ -3932,6 +3949,9 @@ async function initCloudSyncAndRealtime() {
   document.addEventListener('visibilitychange', () => {
     if (document.visibilityState === 'visible') {
       console.log('[App] Thiết bị hoạt động trở lại, đồng bộ Supabase Cloud...');
+      if (supabaseService.ensureRealtimeSubscription) {
+        supabaseService.ensureRealtimeSubscription();
+      }
       StorageService.syncFromCloud().then(() => {
         updateCourtTabStatusPills();
         renderCourt();
@@ -3939,6 +3959,11 @@ async function initCloudSyncAndRealtime() {
         renderEloPrediction();
         renderCourtBench();
         renderUserAuthHeader();
+        renderAttendance();
+        renderLeaderboard();
+        renderMembers();
+        renderSessions();
+        updateSessionStatusBadge();
       });
     }
   });
