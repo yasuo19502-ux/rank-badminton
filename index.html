@@ -5,7 +5,13 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CLB Cầu Lông Thái Thịnh - Bảng Xếp Hạng & Ghép Sân</title>
   <meta name="description" content="Ứng dụng xếp hạng Elo đánh đôi, ghép cặp tự động thông minh và quản lý buổi đánh cho CLB Cầu Lông Thái Thịnh">
-  <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🏸</text></svg>">
+  <link rel="icon" href="/icons/icon.svg">
+  <link rel="manifest" href="/manifest.json">
+  <meta name="theme-color" content="#0a0f1d">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Cầu Lông TT">
+  <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/src/styles/main.css">
 </head>
 <body>
@@ -1207,6 +1213,39 @@
           <button type="submit" class="btn btn-primary" style="font-weight: 700;">➕ Thêm Khách Vào Sân</button>
         </div>
       </form>
+    </div>
+  </div>
+
+  <!-- Modal Đăng Ký Lịch Sân Chuyên Nghiệp (Quick RSVP Modal) -->
+  <div id="modal-quick-rsvp" class="modal-backdrop">
+    <div class="modal-content" style="max-width: 460px; border-radius: 16px;">
+      <div class="modal-header">
+        <h3 id="quick-rsvp-modal-title">🏸 Đăng Ký Tham Gia Buổi Đánh</h3>
+        <button type="button" class="modal-close" onclick="document.getElementById('modal-quick-rsvp').classList.remove('open')">✕</button>
+      </div>
+      <div class="modal-body" style="padding-top: 10px;">
+        <p id="quick-rsvp-modal-desc" style="font-size: 0.85rem; color: var(--text-dim); margin-bottom: 14px;">
+          Chọn thành viên đăng ký có mặt thi đấu buổi này:
+        </p>
+
+        <!-- Nút 1-Chạm đăng ký cho chính mình nếu đã đăng nhập -->
+        <div id="quick-rsvp-self-box" style="margin-bottom: 14px; display: none;">
+          <button id="btn-quick-rsvp-self" class="btn-primary" style="width: 100%; padding: 12px; font-weight: 700; display: flex; align-items: center; justify-content: center; gap: 8px;">
+            <span>✋</span> <span>Tôi Tham Gia Buổi Này!</span>
+          </button>
+        </div>
+
+        <!-- Danh sách thành viên chọn nhanh -->
+        <div style="font-size: 0.78rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; margin-bottom: 8px;">
+          Hoặc chọn thành viên khác:
+        </div>
+        <div id="quick-rsvp-members-list" style="max-height: 280px; overflow-y: auto; display: flex; flex-direction: column; gap: 6px; padding-right: 4px;">
+          <!-- Injected via JS -->
+        </div>
+      </div>
+      <div class="modal-footer" style="justify-content: flex-end;">
+        <button type="button" class="btn btn-secondary" onclick="document.getElementById('modal-quick-rsvp').classList.remove('open')">Đóng</button>
+      </div>
     </div>
   </div>
 

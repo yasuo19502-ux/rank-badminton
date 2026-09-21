@@ -241,10 +241,17 @@ function updateCourtTabStatusPills() {
   const p2 = document.getElementById('court-2-status-text');
   const m1 = state.courtMatches.court_1.activeMatch;
   const m2 = state.courtMatches.court_2.activeMatch;
+  const s1_1 = Number(state.courtMatches.court_1.score1) || 0;
+  const s1_2 = Number(state.courtMatches.court_1.score2) || 0;
+  const s2_1 = Number(state.courtMatches.court_2.score1) || 0;
+  const s2_2 = Number(state.courtMatches.court_2.score2) || 0;
+
+  const hasP1 = m1 && ((Array.isArray(m1.team1) && m1.team1.some(Boolean)) || (Array.isArray(m1.team2) && m1.team2.some(Boolean)));
+  const hasP2 = m2 && ((Array.isArray(m2.team1) && m2.team1.some(Boolean)) || (Array.isArray(m2.team2) && m2.team2.some(Boolean)));
 
   if (p1) {
-    if (m1 && m1.team1 && m1.team2) {
-      p1.textContent = `Đang đấu (${state.courtMatches.court_1.score1} - ${state.courtMatches.court_1.score2})`;
+    if (hasP1) {
+      p1.innerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s1_1} - ${s1_2}</strong>`;
       p1.style.color = 'var(--volt)';
     } else {
       p1.textContent = 'Đang trống';
@@ -253,8 +260,8 @@ function updateCourtTabStatusPills() {
   }
 
   if (p2) {
-    if (m2 && m2.team1 && m2.team2) {
-      p2.textContent = `Đang đấu (${state.courtMatches.court_2.score1} - ${state.courtMatches.court_2.score2})`;
+    if (hasP2) {
+      p2.innerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s2_1} - ${s2_2}</strong>`;
       p2.style.color = 'var(--cyan)';
     } else {
       p2.textContent = 'Đang trống';
@@ -1539,8 +1546,8 @@ function renderBettingWidget() {
   const currentUser = StorageService.getCurrentUser();
   const isOnCourt = currentUser && (t1Ids.includes(currentUser.id) || t2Ids.includes(currentUser.id));
 
-  // Tỷ số và kiểm tra khóa cược (khóa khi trận đang thi đấu hoặc score1 >= 10 || score2 >= 10)
-  const isLocked = state.matchStatus === 'in_progress' || state.score1 >= 10 || state.score2 >= 10;
+  // Tỷ số và kiểm tra khóa cược (cho phép cược linh hoạt nửa đầu hiệp, đóng khi score1 >= 10 || score2 >= 10)
+  const isLocked = state.score1 >= 10 || state.score2 >= 10;
 
   // Tính tỷ lệ Odds (Kèo dưới kẹp tối đa 1 ăn 3.00, kèo trên tối thiểu 1.20)
   const oddsData = calculateBettingOdds(t1, t2);
@@ -1573,11 +1580,11 @@ function renderBettingWidget() {
         <span>🎯</span> Dự Đoán Trận Đấu (${courtName})
         ${isLocked ? `
           <span class="live-locked-badge">
-            <span>🔒</span> ĐÃ ĐÓNG ${state.matchStatus === 'in_progress' ? '(Đang đấu)' : '(≥10đ)'}
+            <span>🔒</span> ĐÃ ĐÓNG (≥10đ)
           </span>
         ` : `
           <span class="live-pulse-badge">
-            <span class="live-pulse-dot"></span> ĐANG MỞ
+            <span class="live-pulse-dot"></span> ĐANG MỞ (Cược trước 10đ)
           </span>
         `}
       </div>
@@ -3919,7 +3926,33 @@ async function initCloudSyncAndRealtime() {
 
     if (table === 'bets') {
       const cloudBets = await supabaseService.fetchBets();
-      if (cloudBets) StorageService.saveLocalBets(cloudBets);
+      if (cloudBets) {
+        // Kiểm tra xem người dùng hiện tại có vé cược nào vừa chuyển trạng thái (won / lost / refunded)
+        if (state.currentUser) {
+          const oldBets = StorageService.getLocalBets();
+          const oldPending = oldBets.find(b => b.memberId === state.currentUser.id && b.status === 'pending');
+          if (oldPending) {
+            const updated = cloudBets.find(b => b.id === oldPending.id);
+            if (updated && updated.status !== 'pending') {
+              if (updated.status === 'won') {
+                SoundService.playLevelUp();
+                confetti({
+                  particleCount: 90,
+                  spread: 75,
+                  origin: { y: 0.5 }
+                });
+                showToast(`🎯 CHÚC MỪNG BẠN ĐOÁN ĐÚNG! Nhận thưởng +${updated.potentialPayout} Xu!`, 'success');
+              } else if (updated.status === 'lost') {
+                showToast('Tiếc quá, bạn đoán chưa đúng trận này! Chúc bạn may mắn ở trận sau.', 'info');
+              } else if (updated.status === 'refunded') {
+                showToast(`Vé cược của bạn đã được hoàn trả (+${updated.amount} Xu) do trận đấu làm lại/dọn sân.`, 'info');
+              }
+            }
+          }
+        }
+        StorageService.saveLocalBets(cloudBets);
+      }
+
       renderBettingWidget();
       const modalBets = document.getElementById('modal-court-bets');
       if (modalBets && modalBets.classList.contains('open')) {
@@ -3930,10 +3963,23 @@ async function initCloudSyncAndRealtime() {
 
     if (table === 'coin_transactions') {
       const cloudTx = await supabaseService.fetchCoinTransactions();
-      if (cloudTx) StorageService.saveLocalCoinTransactions(cloudTx);
-      if (state.currentUser) {
-        state.currentUser = StorageService.getCurrentUser();
-        renderUserAuthHeader();
+      if (cloudTx) {
+        StorageService.saveLocalCoinTransactions(cloudTx);
+        if (state.currentUser) {
+          const myLatestTx = cloudTx.find(t => t.memberId === state.currentUser.id);
+          if (myLatestTx && myLatestTx.balanceAfter !== undefined) {
+            const members = StorageService.getMembers();
+            const mem = members.find(m => m.id === state.currentUser.id);
+            if (mem) {
+              mem.coins = myLatestTx.balanceAfter;
+              StorageService.saveLocalMembers(members);
+            }
+            state.currentUser.coins = myLatestTx.balanceAfter;
+          } else {
+            state.currentUser = StorageService.getCurrentUser();
+          }
+          renderUserAuthHeader();
+        }
       }
       return;
     }
@@ -4336,26 +4382,78 @@ function handleSessionFormSubmit(e) {
 }
 
 window.appQuickRSVP = function(sessionId) {
-  const members = StorageService.getMembers();
   const session = StorageService.getSessions().find(s => s.id === sessionId);
   if (!session) return;
 
-  const chosenName = prompt('Nhập tên thành viên đăng ký tham gia buổi này:\n(Ví dụ: gõ "Long", "Hương", "Huy"...)');
-  if (!chosenName) return;
+  const modal = document.getElementById('modal-quick-rsvp');
+  if (!modal) return;
 
-  const matched = members.find(m => 
-    m.name.toLowerCase().includes(chosenName.toLowerCase().trim()) ||
-    (m.nickname && m.nickname.toLowerCase().includes(chosenName.toLowerCase().trim()))
-  );
+  const title = document.getElementById('quick-rsvp-modal-title');
+  const desc = document.getElementById('quick-rsvp-modal-desc');
+  if (title) title.textContent = `🏸 Đăng Ký: ${session.title || 'Buổi Đánh'}`;
+  if (desc) desc.textContent = `Ngày: ${session.date} • Giờ: ${session.startTime || '19:00'} - ${session.endTime || '21:00'} • Sân: ${session.venueName || 'Sân CLB'}`;
 
-  if (matched) {
-    StorageService.rsvpSession(sessionId, matched.id, 'attending');
-    SoundService.playClick();
-    showToast(`✅ ${matched.name} đã đăng ký tham gia!`);
-    renderSessions();
-  } else {
-    showToast('Không tìm thấy thành viên có tên tương tự', 'error');
+  const selfBox = document.getElementById('quick-rsvp-self-box');
+  const btnSelf = document.getElementById('btn-quick-rsvp-self');
+  const list = document.getElementById('quick-rsvp-members-list');
+
+  const rsvps = session.rsvps || {};
+  const members = StorageService.getMembers();
+
+  // Nút 1-chạm nếu người dùng hiện tại đã đăng nhập
+  if (state.currentUser && selfBox && btnSelf) {
+    selfBox.style.display = 'block';
+    const isAttending = rsvps[state.currentUser.id] === 'attending';
+    btnSelf.innerHTML = isAttending
+      ? `<span>✅</span> <span>Bạn (${state.currentUser.name}) Đã Đăng Ký (Bấm để huỷ)</span>`
+      : `<span>✋</span> <span>Tôi (${state.currentUser.name}) Tham Gia Buổi Này!</span>`;
+    btnSelf.className = isAttending ? 'btn btn-secondary' : 'btn btn-primary';
+    btnSelf.style.width = '100%';
+    btnSelf.onclick = () => {
+      const newStatus = isAttending ? 'declined' : 'attending';
+      StorageService.rsvpSession(sessionId, state.currentUser.id, newStatus);
+      SoundService.playClick();
+      modal.classList.remove('open');
+      showToast(newStatus === 'attending' ? `✅ Bạn đã đăng ký tham gia!` : `Đã huỷ đăng ký buổi đánh`);
+      renderSessions();
+    };
+  } else if (selfBox) {
+    selfBox.style.display = 'none';
   }
+
+  // Danh sách thành viên chọn nhanh
+  if (list) {
+    list.innerHTML = members.map(m => {
+      const isAtt = rsvps[m.id] === 'attending';
+      return `
+        <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; cursor: pointer; transition: all 0.15s ease;"
+             onclick="window.appToggleMemberRSVP('${sessionId}', '${m.id}', ${isAtt ? "'declined'" : "'attending'"})">
+          <div style="display: flex; align-items: center; gap: 10px;">
+            ${renderAvatarHtml(m, { size: 'sm' })}
+            <div>
+              <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${m.name}</div>
+              <div style="font-size: 0.74rem; color: var(--text-dim);">${m.elo} Elo • ${m.frequency === 'regular' ? '⚡ Nòng cốt' : '🍃 Giao lưu'}</div>
+            </div>
+          </div>
+          <button type="button" class="${isAtt ? 'btn btn-secondary' : 'btn btn-primary'}" style="font-size: 0.78rem; padding: 6px 12px; pointer-events: none; font-weight: 700;">
+            ${isAtt ? '✓ Có mặt' : '+ Đăng ký'}
+          </button>
+        </div>
+      `;
+    }).join('');
+  }
+
+  modal.classList.add('open');
+};
+
+window.appToggleMemberRSVP = function(sessionId, memberId, status) {
+  const modal = document.getElementById('modal-quick-rsvp');
+  StorageService.rsvpSession(sessionId, memberId, status);
+  SoundService.playClick();
+  if (modal) modal.classList.remove('open');
+  const mem = StorageService.getMemberById(memberId);
+  showToast(status === 'attending' ? `✅ ${mem ? mem.name : 'Thành viên'} đã đăng ký tham gia!` : `Đã huỷ đăng ký`);
+  renderSessions();
 };
 
 window.appStartSession = function(sessionId) {
