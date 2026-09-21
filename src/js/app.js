@@ -4,7 +4,7 @@ import { calculateDoublesElo, calculateBadges, getTierByElo, getNextTier, getPla
 import { processImageFile, generateDefaultAvatar, getAvatarUrl, renderAvatarHtml } from './avatar.js';
 import { MatchmakerService } from './matchmaker.js';
 import { SoundService } from './sound.js';
-import { supabaseService, parseServerMode } from './supabase.js';
+import { supabaseService } from './supabase.js';
 
 window.StorageService = StorageService;
 window.getLocalDateStr = getLocalDateStr;
@@ -31,12 +31,12 @@ window.appOpenAddGuestModal = function() {
   }
 };
 
-// Application State
-export const state = {
-  currentCourtId: 'court_1', // 'court_1' | 'court_2'
+// Trạng thái ứng dụng (Application State)
+const state = {
   currentTab: 'court',
+  currentCourtId: 'court_1', // 'court_1' | 'court_2'
   betting: {
-    selectedTeam: null, // 'team1' | 'team2'
+    selectedTeam: 'team1', // 'team1' | 'team2'
     selectedAmount: 20 // 10 | 20 | 30
   },
   courtMatches: {
@@ -47,11 +47,7 @@ export const state = {
       mode: 'balanced',
       matchStatus: 'idle',
       scoreHistory: [],
-      isSwappedSides: false,
-      serverId: null,
-      servingTeam: 'team1',
-      team1Courts: {},
-      team2Courts: {}
+      isSwappedSides: false
     },
     court_2: {
       activeMatch: { team1: [null, null], team2: [null, null] },
@@ -60,11 +56,7 @@ export const state = {
       mode: 'balanced',
       matchStatus: 'idle',
       scoreHistory: [],
-      isSwappedSides: false,
-      serverId: null,
-      servingTeam: 'team1',
-      team1Courts: {},
-      team2Courts: {}
+      isSwappedSides: false
     }
   },
   get activeMatch() {
@@ -124,44 +116,6 @@ export const state = {
   set scoreHistory(val) {
     if (this.courtMatches[this.currentCourtId]) {
       this.courtMatches[this.currentCourtId].scoreHistory = val;
-    }
-  },
-  get serverId() {
-    return this.courtMatches[this.currentCourtId]?.serverId || null;
-  },
-  set serverId(val) {
-    if (this.courtMatches[this.currentCourtId]) {
-      this.courtMatches[this.currentCourtId].serverId = val;
-    }
-  },
-  get servingTeam() {
-    return this.courtMatches[this.currentCourtId]?.servingTeam || 'team1';
-  },
-  set servingTeam(val) {
-    if (this.courtMatches[this.currentCourtId]) {
-      this.courtMatches[this.currentCourtId].servingTeam = val;
-    }
-  },
-  get team1Courts() {
-    if (!this.courtMatches[this.currentCourtId].team1Courts) {
-      this.courtMatches[this.currentCourtId].team1Courts = {};
-    }
-    return this.courtMatches[this.currentCourtId].team1Courts;
-  },
-  set team1Courts(val) {
-    if (this.courtMatches[this.currentCourtId]) {
-      this.courtMatches[this.currentCourtId].team1Courts = val;
-    }
-  },
-  get team2Courts() {
-    if (!this.courtMatches[this.currentCourtId].team2Courts) {
-      this.courtMatches[this.currentCourtId].team2Courts = {};
-    }
-    return this.courtMatches[this.currentCourtId].team2Courts;
-  },
-  set team2Courts(val) {
-    if (this.courtMatches[this.currentCourtId]) {
-      this.courtMatches[this.currentCourtId].team2Courts = val;
     }
   },
   leaderboardSort: 'elo',
@@ -250,21 +204,13 @@ function loadInitialState() {
         status: st,
         matchStatus: st,
         diffElo: Number(saved.diffElo) || 0,
-        isSwappedSides: !!saved.isSwappedSides,
-        serverId: saved.serverId || null,
-        servingTeam: saved.servingTeam || 'team1',
-        team1Courts: saved.team1Courts || {},
-        team2Courts: saved.team2Courts || {}
+        isSwappedSides: !!saved.isSwappedSides
       };
       state.courtMatches[courtId].score1 = s1;
       state.courtMatches[courtId].score2 = s2;
       state.courtMatches[courtId].mode = saved.mode || 'balanced';
       state.courtMatches[courtId].matchStatus = st;
       state.courtMatches[courtId].isSwappedSides = !!saved.isSwappedSides;
-      state.courtMatches[courtId].serverId = saved.serverId || null;
-      state.courtMatches[courtId].servingTeam = saved.servingTeam || 'team1';
-      state.courtMatches[courtId].team1Courts = saved.team1Courts || {};
-      state.courtMatches[courtId].team2Courts = saved.team2Courts || {};
       state.courtMatches[courtId].scoreHistory = [];
     } else {
       state.courtMatches[courtId].activeMatch = {
@@ -448,73 +394,6 @@ function setupEventListeners() {
     });
   }
 
-  // Đảm bảo trạng thái Người Giao Cầu (Server) cho sân
-  function ensureCourtServerState(courtId = state.currentCourtId) {
-    const court = state.courtMatches[courtId];
-    if (!court || !court.activeMatch) return;
-    const t1 = (court.activeMatch.team1 || []).filter(Boolean);
-    const t2 = (court.activeMatch.team2 || []).filter(Boolean);
-
-    if (t1.length < 2 || t2.length < 2) return;
-
-    if (!court.team1Courts || typeof court.team1Courts !== 'object') court.team1Courts = {};
-    if (!court.team2Courts || typeof court.team2Courts !== 'object') court.team2Courts = {};
-
-    const p0 = t1[0].id;
-    const p1 = t1[1].id;
-    const p2 = t2[0].id;
-    const p3 = t2[1].id;
-
-    if (!court.team1Courts[p0] || !court.team1Courts[p1] || court.team1Courts[p0] === court.team1Courts[p1]) {
-      court.team1Courts[p0] = 'even';
-      court.team1Courts[p1] = 'odd';
-    }
-    if (!court.team2Courts[p2] || !court.team2Courts[p3] || court.team2Courts[p2] === court.team2Courts[p3]) {
-      court.team2Courts[p2] = 'even';
-      court.team2Courts[p3] = 'odd';
-    }
-
-    const allPlayers = [t1[0], t1[1], t2[0], t2[1]];
-    const hasServer = allPlayers.some(p => p.id === court.serverId);
-    if (!hasServer) {
-      court.serverId = p0;
-      court.servingTeam = 'team1';
-      court.team1Courts[p0] = 'even';
-      court.team1Courts[p1] = 'odd';
-    }
-  }
-
-  // Chuyển quyền giao cầu theo chuẩn Luật Cầu Lông Đôi (BWF Doubles Rules)
-  function applyBwfServeTransition(scoringTeam) {
-    const court = state.courtMatches[state.currentCourtId];
-    if (!court || !court.activeMatch) return;
-    const t1 = (court.activeMatch.team1 || []).filter(Boolean);
-    const t2 = (court.activeMatch.team2 || []).filter(Boolean);
-    if (t1.length < 2 || t2.length < 2) return;
-
-    const currentServingTeam = court.servingTeam || 'team1';
-    if (scoringTeam === currentServingTeam) {
-      // Đội đang giao cầu ghi điểm: người giao cầu giữ nguyên, 2 người đổi ô chẵn / lẻ
-      const courts = scoringTeam === 'team1' ? court.team1Courts : court.team2Courts;
-      const players = scoringTeam === 'team1' ? t1 : t2;
-      const p0 = players[0].id;
-      const p1 = players[1].id;
-      const c0 = courts[p0] || 'even';
-      courts[p0] = c0 === 'even' ? 'odd' : 'even';
-      courts[p1] = courts[p0] === 'even' ? 'odd' : 'even';
-    } else {
-      // Đội đỡ cầu ghi điểm: Đổi quyền giao cầu (Service Over)
-      court.servingTeam = scoringTeam;
-      const newScore = scoringTeam === 'team1' ? court.score1 : court.score2;
-      const targetCourt = (newScore % 2 === 0) ? 'even' : 'odd';
-      const courts = scoringTeam === 'team1' ? court.team1Courts : court.team2Courts;
-      const players = scoringTeam === 'team1' ? t1 : t2;
-
-      const nextServer = players.find(p => courts[p.id] === targetCourt);
-      court.serverId = nextServer ? nextServer.id : players[0].id;
-    }
-  }
-
   // 5. Điều chỉnh Tỷ số & Bấm điểm Trong Sân (Realtime)
   let syncScoreTimeout = null;
   debouncedSyncLiveScore = () => {
@@ -523,10 +402,6 @@ function setupEventListeners() {
     state.activeMatch.score2 = state.score2;
     state.activeMatch.matchStatus = state.matchStatus;
     state.activeMatch.isSwappedSides = state.isSwappedSides;
-    state.activeMatch.serverId = state.serverId;
-    state.activeMatch.servingTeam = state.servingTeam;
-    state.activeMatch.team1Courts = state.team1Courts;
-    state.activeMatch.team2Courts = state.team2Courts;
     StorageService.saveLocalActiveMatch(state.activeMatch, state.currentCourtId);
     updateCourtTabStatusPills();
 
@@ -537,30 +412,12 @@ function setupEventListeners() {
   };
 
   const recordScoreChange = (newS1, newS2, pulseTeam = null) => {
-    ensureCourtServerState(state.currentCourtId);
-
     if (!state.scoreHistory) state.scoreHistory = [];
-    state.scoreHistory.push({
-      score1: state.score1,
-      score2: state.score2,
-      serverId: state.serverId,
-      servingTeam: state.servingTeam,
-      team1Courts: { ...state.team1Courts },
-      team2Courts: { ...state.team2Courts }
-    });
-    if (state.scoreHistory.length > 30) state.scoreHistory.shift();
+    state.scoreHistory.push({ score1: state.score1, score2: state.score2 });
+    if (state.scoreHistory.length > 20) state.scoreHistory.shift();
 
-    const oldS1 = state.score1;
-    const oldS2 = state.score2;
     state.score1 = Math.max(0, Math.min(30, newS1));
     state.score2 = Math.max(0, Math.min(30, newS2));
-
-    // Cập nhật người phát cầu theo luật BWF nếu có điểm số tăng lên
-    if (state.score1 > oldS1 && state.score2 === oldS2) {
-      applyBwfServeTransition('team1');
-    } else if (state.score2 > oldS2 && state.score1 === oldS1) {
-      applyBwfServeTransition('team2');
-    }
 
     if (state.matchStatus === 'ready') {
       state.matchStatus = 'in_progress';
@@ -584,7 +441,6 @@ function setupEventListeners() {
     updateScoreboardDisplay();
     renderEloPrediction();
     renderBettingWidget();
-    renderCourt();
     debouncedSyncLiveScore();
   };
 
@@ -1336,18 +1192,11 @@ function renderCourt() {
   const t1 = state.activeMatch.team1.map(p => p ? (personMap.get(p.id) || p) : null);
   const t2 = state.activeMatch.team2.map(p => p ? (personMap.get(p.id) || p) : null);
 
-  const validT1 = t1.filter(Boolean);
-  const validT2 = t2.filter(Boolean);
-  const totalPlayers = validT1.length + validT2.length;
-
-  if (totalPlayers === 4) {
-    ensureCourtServerState(state.currentCourtId);
-  }
-
   // Render Team 1 (2 slots)
   if (team1Grid) {
     team1Grid.innerHTML = t1.map((p, idx) => renderCourtPlayerCard(p, 'team1', idx)).join('');
   }
+  const validT1 = t1.filter(Boolean);
   const elo1 = validT1.length > 0 ? Math.round(validT1.reduce((sum, p) => sum + p.elo, 0) / validT1.length) : 0;
   if (t1AvgLabel) t1AvgLabel.innerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo1}</span>`;
 
@@ -1355,10 +1204,12 @@ function renderCourt() {
   if (team2Grid) {
     team2Grid.innerHTML = t2.map((p, idx) => renderCourtPlayerCard(p, 'team2', idx)).join('');
   }
+  const validT2 = t2.filter(Boolean);
   const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
   if (t2AvgLabel) t2AvgLabel.innerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo2}</span>`;
 
   // Quản lý trạng thái thi đấu & badge
+  const totalPlayers = validT1.length + validT2.length;
   if (statusBadge) {
     if (state.score1 > 0 || state.score2 > 0) {
       statusBadge.className = 'court-status-tag live';
@@ -1376,25 +1227,6 @@ function renderCourt() {
       statusBadge.className = 'court-status-tag empty';
       statusBadge.textContent = 'Đang trống';
       state.matchStatus = 'idle';
-    }
-  }
-
-  // Cập nhật nhãn Người Giao Cầu trên thanh công cụ sân đấu
-  const serverPill = document.getElementById('court-server-pill');
-  const serverNameEl = document.getElementById('court-server-name');
-  if (serverPill && serverNameEl) {
-    if (totalPlayers === 4 && state.serverId) {
-      const allPlayers = [...t1, ...t2].filter(Boolean);
-      const serverPerson = allPlayers.find(p => p.id === state.serverId);
-      if (serverPerson) {
-        const teamLabel = state.servingTeam === 'team1' ? 'Đội 1' : 'Đội 2';
-        serverNameEl.textContent = `${serverPerson.name} (${teamLabel})`;
-        serverPill.style.display = 'inline-flex';
-      } else {
-        serverPill.style.display = 'none';
-      }
-    } else {
-      serverPill.style.display = 'none';
     }
   }
 
@@ -1614,12 +1446,11 @@ function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
     `;
   }
 
-  const isServer = state.serverId === player.id;
   const tier = getTierByElo(player.elo);
   const isMale = player.gender === 'male';
 
   return `
-    <div class="court-player-card court-slot-occupied ${isServer ? 'is-serving' : ''}" onclick="window.appOpenSwapPlayerModal('${teamKey}', ${slotIndex})" title="Chạm để đổi VĐV khác">
+    <div class="court-player-card court-slot-occupied" onclick="window.appOpenSwapPlayerModal('${teamKey}', ${slotIndex})" title="Chạm để đổi VĐV khác">
       <div class="player-avatar-wrap" onclick="event.stopPropagation(); window.appUnassignSlot('${teamKey}', ${slotIndex})" title="Chạm vào avatar để gỡ ${player.name} về hàng chờ">
         ${renderAvatarHtml(player, { size: 'sm' })}
         <span class="gender-badge-dot ${isMale ? 'gender-male' : 'gender-female'}">
@@ -1629,7 +1460,6 @@ function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
       <div class="player-info">
         <div class="player-name">
           <span class="player-name-text">${player.name}</span>
-          ${isServer ? '<span class="serving-badge-pill" title="Đang giữ quyền phát cầu">🏸 GIAO</span>' : ''}
           ${player.activeEloShield ? '<span title="Khiên bảo vệ Elo đang BẬT (Giảm 50% điểm trừ nếu thua)" style="font-size: 0.82rem; flex-shrink: 0;">🛡️</span>' : ''}
         </div>
         <div class="player-meta-row">
@@ -1640,14 +1470,9 @@ function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
           <span class="elo-pill">${player.elo}</span>
         </div>
       </div>
-      <div class="court-player-actions">
-        <button type="button" class="btn-court-server ${isServer ? 'is-active' : ''}" onclick="event.stopPropagation(); window.appSetServer('${player.id}')" title="${isServer ? 'Đang giao cầu' : 'Chạm để chọn ' + player.name + ' phát cầu'}">
-          <span>🏸</span>
-        </button>
-        <button type="button" class="btn-swap-player-slot" onclick="event.stopPropagation(); window.appOpenSwapPlayerModal('${teamKey}', ${slotIndex})" title="Đổi VĐV">
-          <span>🔄</span><span class="btn-swap-label"> Đổi</span>
-        </button>
-      </div>
+      <button type="button" class="btn-swap-player-slot" onclick="event.stopPropagation(); window.appOpenSwapPlayerModal('${teamKey}', ${slotIndex})" title="Đổi VĐV">
+        <span>🔄</span><span class="btn-swap-label"> Đổi</span>
+      </button>
     </div>
   `;
 }
@@ -2404,15 +2229,11 @@ function finishMatch() {
 
   // Đặt lại sân về trạng thái trống (idle) sẵn sàng cho trận tiếp theo
   const finishedCourtId = state.currentCourtId;
-  const emptyMatch = { team1: [null, null], team2: [null, null], serverId: null, servingTeam: 'team1', team1Courts: {}, team2Courts: {} };
+  const emptyMatch = { team1: [null, null], team2: [null, null] };
   state.courtMatches[finishedCourtId].activeMatch = emptyMatch;
   state.courtMatches[finishedCourtId].score1 = 0;
   state.courtMatches[finishedCourtId].score2 = 0;
   state.courtMatches[finishedCourtId].matchStatus = 'idle';
-  state.courtMatches[finishedCourtId].serverId = null;
-  state.courtMatches[finishedCourtId].servingTeam = 'team1';
-  state.courtMatches[finishedCourtId].team1Courts = {};
-  state.courtMatches[finishedCourtId].team2Courts = {};
   state.courtMatches[finishedCourtId].scoreHistory = [];
   StorageService.saveActiveMatch(emptyMatch, finishedCourtId);
   renderCourt();
@@ -3047,21 +2868,13 @@ window.appClearCourt = async function() {
     status: 'idle',
     matchStatus: 'idle',
     diffElo: 0,
-    isSwappedSides: false,
-    serverId: null,
-    servingTeam: 'team1',
-    team1Courts: {},
-    team2Courts: {}
+    isSwappedSides: false
   };
   state.courtMatches[state.currentCourtId].activeMatch = emptyMatch;
   state.courtMatches[state.currentCourtId].score1 = 0;
   state.courtMatches[state.currentCourtId].score2 = 0;
   state.courtMatches[state.currentCourtId].matchStatus = 'idle';
   state.courtMatches[state.currentCourtId].isSwappedSides = false;
-  state.courtMatches[state.currentCourtId].serverId = null;
-  state.courtMatches[state.currentCourtId].servingTeam = 'team1';
-  state.courtMatches[state.currentCourtId].team1Courts = {};
-  state.courtMatches[state.currentCourtId].team2Courts = {};
   state.courtMatches[state.currentCourtId].scoreHistory = [];
   await StorageService.saveActiveMatch(emptyMatch, state.currentCourtId);
   SoundService.playClick();
@@ -3087,61 +2900,6 @@ window.appSwapCourtSides = function() {
   showToast('🔄 Đã đổi bên sân hiển thị (Trái ⇋ Phải)!');
 };
 
-// Global hook để Chọn Người Phát Cầu Trực Tiếp
-window.appSetServer = function(playerId) {
-  const court = state.courtMatches[state.currentCourtId];
-  if (!court || !court.activeMatch) return;
-  const t1 = (court.activeMatch.team1 || []).filter(Boolean);
-  const t2 = (court.activeMatch.team2 || []).filter(Boolean);
-
-  const inT1 = t1.find(p => p.id === playerId);
-  const inT2 = t2.find(p => p.id === playerId);
-  if (!inT1 && !inT2) return;
-
-  if (!court.team1Courts) court.team1Courts = {};
-  if (!court.team2Courts) court.team2Courts = {};
-
-  if (inT1) {
-    court.servingTeam = 'team1';
-    court.serverId = playerId;
-    const partner = t1.find(p => p.id !== playerId);
-    if (court.score1 % 2 === 0) {
-      court.team1Courts[playerId] = 'even';
-      if (partner) court.team1Courts[partner.id] = 'odd';
-    } else {
-      court.team1Courts[playerId] = 'odd';
-      if (partner) court.team1Courts[partner.id] = 'even';
-    }
-    if (t2.length >= 2 && (!court.team2Courts[t2[0].id] || !court.team2Courts[t2[1].id])) {
-      court.team2Courts[t2[0].id] = 'even';
-      court.team2Courts[t2[1].id] = 'odd';
-    }
-    SoundService.playClick();
-    renderCourt();
-    debouncedSyncLiveScore();
-    showToast(`🏸 Đã chọn ${inT1.name} (Đội 1) phát cầu!`);
-  } else if (inT2) {
-    court.servingTeam = 'team2';
-    court.serverId = playerId;
-    const partner = t2.find(p => p.id !== playerId);
-    if (court.score2 % 2 === 0) {
-      court.team2Courts[playerId] = 'even';
-      if (partner) court.team2Courts[partner.id] = 'odd';
-    } else {
-      court.team2Courts[playerId] = 'odd';
-      if (partner) court.team2Courts[partner.id] = 'even';
-    }
-    if (t1.length >= 2 && (!court.team1Courts[t1[0].id] || !court.team1Courts[t1[1].id])) {
-      court.team1Courts[t1[0].id] = 'even';
-      court.team1Courts[t1[1].id] = 'odd';
-    }
-    SoundService.playClick();
-    renderCourt();
-    debouncedSyncLiveScore();
-    showToast(`🏸 Đã chọn ${inT2.name} (Đội 2) phát cầu!`);
-  }
-};
-
 // Global hook để Hoàn Tác Điểm Vừa Bấm (Undo)
 window.appUndoScore = function() {
   const hist = state.scoreHistory;
@@ -3152,17 +2910,10 @@ window.appUndoScore = function() {
   const prev = hist.pop();
   state.score1 = prev.score1;
   state.score2 = prev.score2;
-  if (prev.serverId !== undefined) {
-    state.serverId = prev.serverId;
-    state.servingTeam = prev.servingTeam;
-    state.team1Courts = prev.team1Courts ? { ...prev.team1Courts } : {};
-    state.team2Courts = prev.team2Courts ? { ...prev.team2Courts } : {};
-  }
   SoundService.playClick();
   updateScoreboardDisplay();
   renderEloPrediction();
   renderBettingWidget();
-  renderCourt();
   debouncedSyncLiveScore();
   showToast(`↩️ Đã hoàn tác về tỷ số: ${state.score1} - ${state.score2}`);
 };
@@ -3179,14 +2930,7 @@ window.appPromptManualScore = function(isTeam1) {
     return;
   }
   if (!state.scoreHistory) state.scoreHistory = [];
-  state.scoreHistory.push({
-    score1: state.score1,
-    score2: state.score2,
-    serverId: state.serverId,
-    servingTeam: state.servingTeam,
-    team1Courts: { ...state.team1Courts },
-    team2Courts: { ...state.team2Courts }
-  });
+  state.scoreHistory.push({ score1: state.score1, score2: state.score2 });
   if (isTeam1) {
     state.score1 = val;
   } else {
@@ -3200,7 +2944,6 @@ window.appPromptManualScore = function(isTeam1) {
   updateScoreboardDisplay();
   renderEloPrediction();
   renderBettingWidget();
-  renderCourt();
   debouncedSyncLiveScore();
   showToast(`Đã đổi điểm ${teamLabel}: ${val}`);
 };
@@ -3982,7 +3725,6 @@ async function initCloudSyncAndRealtime() {
         ];
 
         const hasAnyPlayer = slotT1.some(Boolean) || slotT2.some(Boolean);
-        const { baseMode, serverInfo } = parseServerMode(record.matchmaker_mode);
 
         if (hasAnyPlayer && record.status !== 'idle') {
           const validT1 = slotT1.filter(Boolean);
@@ -4005,25 +3747,15 @@ async function initCloudSyncAndRealtime() {
             team2: slotT2,
             score1: s1,
             score2: s2,
-            mode: baseMode,
+            mode: record.matchmaker_mode || 'balanced',
             status: calculatedStatus,
             matchStatus: calculatedStatus,
-            diffElo: Number(record.diff_elo) || Math.abs(elo1 - elo2),
-            serverId: serverInfo?.serverId || null,
-            servingTeam: serverInfo?.servingTeam || 'team1',
-            team1Courts: serverInfo?.team1Courts || {},
-            team2Courts: serverInfo?.team2Courts || {}
+            diffElo: Number(record.diff_elo) || Math.abs(elo1 - elo2)
           };
           state.courtMatches[targetCourtId].activeMatch = matchObj;
           state.courtMatches[targetCourtId].score1 = s1;
           state.courtMatches[targetCourtId].score2 = s2;
           state.courtMatches[targetCourtId].matchStatus = calculatedStatus;
-          if (serverInfo) {
-            state.courtMatches[targetCourtId].serverId = serverInfo.serverId;
-            state.courtMatches[targetCourtId].servingTeam = serverInfo.servingTeam;
-            state.courtMatches[targetCourtId].team1Courts = serverInfo.team1Courts;
-            state.courtMatches[targetCourtId].team2Courts = serverInfo.team2Courts;
-          }
           StorageService.saveLocalActiveMatch(matchObj, targetCourtId);
         } else if (hasAnyPlayer) {
           const validT1 = slotT1.filter(Boolean);
@@ -4039,25 +3771,15 @@ async function initCloudSyncAndRealtime() {
             team2: slotT2,
             score1: 0,
             score2: 0,
-            mode: baseMode,
+            mode: record.matchmaker_mode || 'balanced',
             status: calculatedStatus,
             matchStatus: calculatedStatus,
-            diffElo: Number(record.diff_elo) || Math.abs(elo1 - elo2),
-            serverId: serverInfo?.serverId || null,
-            servingTeam: serverInfo?.servingTeam || 'team1',
-            team1Courts: serverInfo?.team1Courts || {},
-            team2Courts: serverInfo?.team2Courts || {}
+            diffElo: Number(record.diff_elo) || Math.abs(elo1 - elo2)
           };
           state.courtMatches[targetCourtId].activeMatch = matchObj;
           state.courtMatches[targetCourtId].score1 = 0;
           state.courtMatches[targetCourtId].score2 = 0;
           state.courtMatches[targetCourtId].matchStatus = calculatedStatus;
-          if (serverInfo) {
-            state.courtMatches[targetCourtId].serverId = serverInfo.serverId;
-            state.courtMatches[targetCourtId].servingTeam = serverInfo.servingTeam;
-            state.courtMatches[targetCourtId].team1Courts = serverInfo.team1Courts;
-            state.courtMatches[targetCourtId].team2Courts = serverInfo.team2Courts;
-          }
           StorageService.saveLocalActiveMatch(matchObj, targetCourtId);
         } else {
           const emptyCourt = {
@@ -4069,21 +3791,13 @@ async function initCloudSyncAndRealtime() {
             status: 'idle',
             matchStatus: 'idle',
             diffElo: 0,
-            isSwappedSides: false,
-            serverId: null,
-            servingTeam: 'team1',
-            team1Courts: {},
-            team2Courts: {}
+            isSwappedSides: false
           };
           state.courtMatches[targetCourtId].activeMatch = emptyCourt;
           state.courtMatches[targetCourtId].score1 = 0;
           state.courtMatches[targetCourtId].score2 = 0;
           state.courtMatches[targetCourtId].matchStatus = 'idle';
           state.courtMatches[targetCourtId].isSwappedSides = false;
-          state.courtMatches[targetCourtId].serverId = null;
-          state.courtMatches[targetCourtId].servingTeam = 'team1';
-          state.courtMatches[targetCourtId].team1Courts = {};
-          state.courtMatches[targetCourtId].team2Courts = {};
           state.courtMatches[targetCourtId].scoreHistory = [];
           StorageService.saveLocalActiveMatch(emptyCourt, targetCourtId);
         }

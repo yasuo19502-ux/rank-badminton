@@ -348,11 +348,7 @@ export const StorageService = {
           mode: liveCourt.mode || 'balanced',
           status: calculatedStatus,
           matchStatus: calculatedStatus,
-          diffElo: Number(liveCourt.diffElo) || Math.abs(elo1 - elo2),
-          serverId: liveCourt.serverId || null,
-          servingTeam: liveCourt.servingTeam || 'team1',
-          team1Courts: liveCourt.team1Courts || {},
-          team2Courts: liveCourt.team2Courts || {}
+          diffElo: Number(liveCourt.diffElo) || Math.abs(elo1 - elo2)
         };
         this.saveLocalActiveMatch(reconstructedMatch, courtId);
       };

@@ -466,8 +466,6 @@ class SupabaseService {
       if (error) throw error;
       if (!data) return null;
 
-      const { baseMode, serverInfo } = parseServerMode(data.matchmaker_mode);
-
       return {
         id: data.id,
         courtNumber: data.court_number || 'Sân 1',
@@ -475,11 +473,7 @@ class SupabaseService {
         team2Ids: data.team2 || [],
         score1: data.score1 || 0,
         score2: data.score2 || 0,
-        mode: baseMode,
-        serverId: serverInfo?.serverId || null,
-        servingTeam: serverInfo?.servingTeam || 'team1',
-        team1Courts: serverInfo?.team1Courts || {},
-        team2Courts: serverInfo?.team2Courts || {},
+        mode: data.matchmaker_mode || 'balanced',
         status: data.status || 'in_progress',
         diffElo: data.diff_elo || 0,
         updatedAt: data.updated_at
@@ -515,14 +509,6 @@ class SupabaseService {
 
       const isIdle = !match || !hasAnyPlayer;
 
-      const serverInfo = match?.serverId ? {
-        serverId: match.serverId,
-        servingTeam: match.servingTeam || 'team1',
-        team1Courts: match.team1Courts || {},
-        team2Courts: match.team2Courts || {}
-      } : null;
-      const encodedMode = encodeServerMode(match?.mode || match?.matchmakerMode || 'balanced', serverInfo);
-
       if (isIdle) {
         payload = {
           id: courtId,
@@ -554,7 +540,7 @@ class SupabaseService {
           team2: rawT2,
           score1,
           score2,
-          matchmaker_mode: encodedMode,
+          matchmaker_mode: match.mode || match.matchmakerMode || 'balanced',
           status: matchStatus,
           diff_elo: Number(match.diffElo) || 0,
           updated_at: new Date().toISOString()
@@ -895,36 +881,3 @@ class SupabaseService {
 }
 
 export const supabaseService = new SupabaseService();
-
-export function encodeServerMode(mode = 'balanced', serverInfo = null) {
-  const baseMode = typeof mode === 'string' && mode.includes('::srv::') ? mode.split('::srv::')[0] : (mode || 'balanced');
-  if (!serverInfo || !serverInfo.serverId) return baseMode;
-  try {
-    const payload = JSON.stringify({
-      serverId: serverInfo.serverId,
-      servingTeam: serverInfo.servingTeam || 'team1',
-      team1Courts: serverInfo.team1Courts || {},
-      team2Courts: serverInfo.team2Courts || {}
-    });
-    return `${baseMode}::srv::${payload}`;
-  } catch (e) {
-    return baseMode;
-  }
-}
-
-export function parseServerMode(rawMode) {
-  if (!rawMode || typeof rawMode !== 'string') {
-    return { baseMode: 'balanced', serverInfo: null };
-  }
-  const parts = rawMode.split('::srv::');
-  const baseMode = parts[0] || 'balanced';
-  if (parts.length > 1 && parts[1]) {
-    try {
-      const serverInfo = JSON.parse(parts[1]);
-      return { baseMode, serverInfo };
-    } catch (e) {
-      return { baseMode, serverInfo: null };
-    }
-  }
-  return { baseMode, serverInfo: null };
-}

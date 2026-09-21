@@ -957,26 +957,6 @@ button {
   border: 1px solid rgba(100, 116, 139, 0.3);
 }
 
-.court-server-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  background: rgba(16, 185, 129, 0.2);
-  border: 1px solid rgba(16, 185, 129, 0.45);
-  color: #34d399;
-  padding: 2px 9px;
-  border-radius: var(--radius-full);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.02em;
-  white-space: nowrap;
-}
-
-.court-server-pill strong {
-  color: #ffffff;
-  font-weight: 800;
-}
-
 .court-referee-actions {
   display: flex;
   align-items: center;
@@ -1496,24 +1476,6 @@ button {
   border-color: rgba(255, 255, 255, 0.45);
 }
 
-.court-player-card.is-serving {
-  border-color: #10b981 !important;
-  background: linear-gradient(135deg, rgba(16, 185, 129, 0.2), rgba(15, 23, 42, 0.94)) !important;
-  box-shadow: 0 0 16px rgba(16, 185, 129, 0.4), inset 0 0 10px rgba(16, 185, 129, 0.18) !important;
-  animation: pulse-serving 2.4s infinite ease-in-out;
-}
-
-@keyframes pulse-serving {
-  0%, 100% {
-    box-shadow: 0 0 12px rgba(16, 185, 129, 0.35), inset 0 0 8px rgba(16, 185, 129, 0.15);
-    border-color: #10b981;
-  }
-  50% {
-    box-shadow: 0 0 22px rgba(16, 185, 129, 0.65), inset 0 0 14px rgba(16, 185, 129, 0.3);
-    border-color: #34d399;
-  }
-}
-
 .court-player-card .player-avatar-wrap {
   position: relative;
   width: 38px;
@@ -1625,23 +1587,6 @@ button {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-}
-
-.serving-badge-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  background: linear-gradient(135deg, #10b981, #059669);
-  color: #ffffff;
-  font-size: 0.62rem;
-  font-weight: 800;
-  padding: 1px 6px;
-  border-radius: var(--radius-full);
-  box-shadow: 0 2px 6px rgba(16, 185, 129, 0.45);
-  white-space: nowrap;
-  letter-spacing: 0.02em;
-  flex-shrink: 0;
-  line-height: 1.2;
 }
 
 .court-player-card .player-meta-row {
@@ -1782,52 +1727,6 @@ button {
   color: var(--volt);
 }
 
-/* Bộ nút hành động VĐV trên sân (Giao cầu + Đổi người) */
-.court-player-actions {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  margin-left: auto;
-  flex-shrink: 0;
-}
-
-.court-player-card .btn-court-server {
-  flex-shrink: 0;
-  width: 28px;
-  height: 28px;
-  min-width: 28px;
-  padding: 0;
-  font-size: 0.82rem;
-  border-radius: var(--radius-sm);
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  background: rgba(255, 255, 255, 0.1);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-  color: #cbd5e1;
-  transition: all 0.18s ease;
-  line-height: 1;
-}
-
-.court-player-card .btn-court-server:hover {
-  background: rgba(16, 185, 129, 0.3);
-  border-color: #10b981;
-  color: #ffffff;
-  transform: scale(1.1);
-}
-
-.court-player-card .btn-court-server:active {
-  transform: scale(0.95);
-}
-
-.court-player-card .btn-court-server.is-active {
-  background: #10b981;
-  border-color: #34d399;
-  color: #ffffff;
-  box-shadow: 0 0 10px rgba(16, 185, 129, 0.6);
-}
-
 /* Nút Đổi / Tùy chỉnh Cầu thủ trên Sân */
 .court-player-card .btn-swap-player-slot {
   flex-shrink: 0;
@@ -1845,6 +1744,7 @@ button {
   align-items: center;
   gap: 3px;
   transition: all 0.18s ease;
+  margin-left: auto;
 }
 
 .court-player-card .btn-swap-player-slot:hover {
@@ -4667,25 +4567,6 @@ button {
     padding: 0;
     font-size: 0.7rem;
     border-radius: 6px;
-  }
-
-  .court-player-card .btn-court-server {
-    width: 26px;
-    height: 26px;
-    min-width: 26px;
-    font-size: 0.74rem;
-    border-radius: 6px;
-  }
-
-  .serving-badge-pill {
-    font-size: 0.54rem;
-    padding: 1px 4px;
-    gap: 1px;
-  }
-
-  .court-server-pill {
-    font-size: 0.65rem;
-    padding: 1px 6px;
   }
 
   .btn-swap-label {
