@@ -174,6 +174,19 @@ export const SHOP_ITEMS = [
     badge: 'Nam / Unisex',
     tierBadge: 'Thần Thoại Thách Đấu ⚜️',
     description: 'Bảo vật tối thượng của CLB Thái Thịnh. Đôi cánh hoàng kim nâng đỡ những cú nhảy đập đỉnh cao, chỉ trao tay những nhà vô địch khắc tên mình vào lịch sử giải đấu.'
+  },
+  {
+    id: 'frame_master_econ',
+    name: 'Mũ Thạc Sĩ Đỏ Cute',
+    price: 9999,
+    icon: '🎓',
+    type: 'frame',
+    category: 'female',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Độc Bản / Thạc Sĩ',
+    tierBadge: 'Tân Thạc Sĩ 🎓',
+    description: 'Mũ cử nhân/thạc sĩ nhung đỏ đính ngôi sao vàng cute dành riêng cho tân Thạc Sĩ Kinh Tế Khánh Hằng (Cún). Thiết kế tinh gọn, thanh lịch, tôn trọn nét xinh xắn của avatar!'
   }
 ];
 

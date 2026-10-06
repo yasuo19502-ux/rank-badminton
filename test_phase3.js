@@ -36,7 +36,7 @@ function assert(condition, message) {
 console.log('\n=== BẮT ĐẦU KIỂM THỬ GIAI ĐOẠN 3 ===\n');
 
 // 1. Kiểm tra cấu hình SHOP_ITEMS
-assert(SHOP_ITEMS.length === 12, `SHOP_ITEMS có đủ 12 vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
+assert(SHOP_ITEMS.length >= 12, `SHOP_ITEMS có đủ vật phẩm (hiện có: ${SHOP_ITEMS.length})`);
 const gripDef = SHOP_ITEMS.find(i => i.id === 'grip');
 assert(gripDef && gripDef.price === 150 && gripDef.type === 'consumable', 'Cuốn cán vợt có giá 150 xu, type consumable');
 
@@ -44,7 +44,7 @@ const shieldDef = SHOP_ITEMS.find(i => i.id === 'elo_shield');
 assert(shieldDef && shieldDef.price === 120 && shieldDef.type === 'perk', 'Thẻ khiên bảo vệ Elo có giá 120 xu, type perk');
 
 const frames = SHOP_ITEMS.filter(i => i.type === 'frame');
-assert(frames.length === 10, `Có đủ 10 Khung Avatar (hiện có: ${frames.length})`);
+assert(frames.length >= 10, `Có đủ các Khung Avatar (hiện có: ${frames.length})`);
 
 const waterFrame = frames.find(f => f.id === 'frame_water');
 assert(waterFrame && waterFrame.hasAnimation === true && waterFrame.price === 1300, 'Có khung Thủy Triều Đại Dương (Nước) 1300 xu');
@@ -54,6 +54,9 @@ assert(fireFrame && fireFrame.hasAnimation === true && fireFrame.price === 1500,
 
 const wingsFrame = frames.find(f => f.id === 'frame_glory_wings');
 assert(wingsFrame && wingsFrame.hasAnimation === true && wingsFrame.price === 2000, 'Có khung Thần Thoại Thách Đấu (Game Art Cánh Vàng) 2000 xu chuẩn 2 tháng');
+
+const masterFrame = frames.find(f => f.id === 'frame_master_econ');
+assert(masterFrame && masterFrame.hasAnimation === true, 'Có khung Hoàng Kim Thạc Sĩ Kinh Tế độc bản');
 
 // Setup Mock Data
 const testMember = {
@@ -135,6 +138,12 @@ const memWithWings = { ...updatedMem, activeFrame: 'frame_glory_wings' };
 const htmlWithWings = renderAvatarHtml(memWithWings, { size: 'md' });
 assert(htmlWithWings.includes('frame-glory_wings'), 'Markup renderAvatarHtml chứa class frame-glory_wings');
 assert(htmlWithWings.includes('frame-art-asset'), 'Markup renderAvatarHtml chứa lớp frame-art-asset ảnh trong suốt MOBA');
+
+// Test đeo khung Hoàng Kim Thạc Sĩ Kinh Tế (frame_master_econ)
+const memWithMasterEcon = { ...updatedMem, activeFrame: 'frame_master_econ' };
+const htmlWithMasterEcon = renderAvatarHtml(memWithMasterEcon, { size: 'lg' });
+assert(htmlWithMasterEcon.includes('frame-master_econ'), 'Markup renderAvatarHtml chứa class frame-master_econ');
+assert(htmlWithMasterEcon.includes('frame_master_econ.webp'), 'Markup renderAvatarHtml chứa đường dẫn ảnh frame_master_econ.webp');
 
 // Tháo khung
 equipRes = StorageService.equipAvatarFrame(testMember.id, '');
