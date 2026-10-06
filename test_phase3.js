@@ -195,6 +195,16 @@ const rawLossOdd = -15;
 const shieldedLossOdd = Math.min(-1, Math.round(rawLossOdd * 0.5));
 assert(shieldedLossOdd === -7 || shieldedLossOdd === -8, `Khiên làm tròn số nguyên không bị số thập phân (${shieldedLossOdd})`);
 
+// 10. Kiểm tra quyền Quản trị viên (Chỉ Đỗ Long mới là Admin duy nhất)
+const doLongAdmin = { id: 'mem_1789569517045', name: 'Đỗ Long', nickname: 'Nhạc trưởng', role: 'admin' };
+assert(StorageService.isAdmin(doLongAdmin) === true, 'Đỗ Long được nhận diện đúng là Admin CLB');
+
+const regularMember = { id: 'mem_123', name: 'Nguyễn Văn A', role: 'member' };
+assert(StorageService.isAdmin(regularMember) === false, 'Thành viên thường không có quyền Admin');
+
+const fakeAdmin = { id: 'mem_456', name: 'Nguyễn Văn B', role: 'admin' };
+assert(StorageService.isAdmin(fakeAdmin) === false, 'Thành viên khác cố tình mạo danh role admin bị chặn hoàn toàn');
+
 console.log(`\n=== TỔNG KẾT: ${passed} PASS, ${failed} FAIL ===\n`);
 if (failed > 0) process.exit(1);
 

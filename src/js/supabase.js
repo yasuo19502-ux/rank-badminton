@@ -118,7 +118,7 @@ class SupabaseService {
           joinedDate: m.joined_date || '',
           pinCode: m.pin_code || meta.pinCode || '',
           coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : (meta.coins !== undefined ? Number(meta.coins) : 100),
-          role: m.role || meta.role || 'member',
+          role: (m.id === 'mem_1789569517045' || (m.name && m.name.toLowerCase().includes('đỗ long'))) ? 'admin' : 'member',
           activeFrame: m.active_frame || meta.activeFrame || '',
           activeEloShield: m.active_elo_shield !== undefined ? !!m.active_elo_shield : !!meta.activeEloShield,
           _metaInventory: Array.isArray(meta.inventory) ? meta.inventory : []
@@ -146,11 +146,12 @@ class SupabaseService {
       } catch (e) {}
     }
 
+    const isLong = member.id === 'mem_1789569517045' || (member.name && member.name.toLowerCase().includes('đỗ long'));
     const meta = {
       activeFrame: member.activeFrame || '',
       activeEloShield: !!member.activeEloShield,
       coins: member.coins !== undefined ? Number(member.coins) : 100,
-      role: member.role || 'member',
+      role: isLong ? 'admin' : 'member',
       pinCode: member.pinCode || '',
       inventory: userInv
     };

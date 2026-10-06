@@ -835,6 +835,11 @@ function setupEventListeners() {
   const inputImport = document.getElementById('input-import-json');
   if (inputImport) {
     inputImport.addEventListener('change', (e) => {
+      if (!StorageService.isAdmin()) {
+        showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền nhập dữ liệu đè CLB!', 'error');
+        e.target.value = '';
+        return;
+      }
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
@@ -860,6 +865,10 @@ function setupEventListeners() {
   const btnReset = document.getElementById('btn-reset-default');
   if (btnReset) {
     btnReset.addEventListener('click', async () => {
+      if (!StorageService.isAdmin()) {
+        showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền xóa dữ liệu CLB!', 'error');
+        return;
+      }
       const ok = await showConfirmModal({
         title: 'Xóa Toàn Bộ Dữ Liệu?',
         message: 'Bạn có chắc chắn muốn xóa sạch thành viên, lịch sử trận và điểm danh để làm mới 100% không? Thao tác này không thể hoàn tác!',
@@ -947,6 +956,11 @@ function setupEventListeners() {
   const inputSettingsImport = document.getElementById('input-settings-import-json');
   if (inputSettingsImport) {
     inputSettingsImport.addEventListener('change', (e) => {
+      if (!StorageService.isAdmin()) {
+        showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền nhập dữ liệu đè CLB!', 'error');
+        e.target.value = '';
+        return;
+      }
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
@@ -969,6 +983,10 @@ function setupEventListeners() {
   const btnSettingsReset = document.getElementById('btn-settings-reset');
   if (btnSettingsReset) {
     btnSettingsReset.addEventListener('click', async () => {
+      if (!StorageService.isAdmin()) {
+        showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền xóa dữ liệu CLB!', 'error');
+        return;
+      }
       const ok = await showConfirmModal({
         title: 'Xóa Toàn Bộ Dữ Liệu?',
         message: 'Bạn có chắc chắn muốn xóa sạch thành viên, lịch sử trận và điểm danh để làm mới 100% không? Thao tác này không thể hoàn tác!',
@@ -1045,6 +1063,10 @@ function setupEventListeners() {
   const btnSaveCloud = document.getElementById('btn-save-supabase');
   if (btnSaveCloud) {
     btnSaveCloud.addEventListener('click', async () => {
+      if (!StorageService.isAdmin()) {
+        showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền thay đổi kết nối Cloud Database!', 'error');
+        return;
+      }
       const url = document.getElementById('input-supabase-url').value.trim();
       const key = document.getElementById('input-supabase-key').value.trim();
 
@@ -2742,7 +2764,7 @@ function renderMembers() {
     const avatarUrl = getAvatarUrl(m);
     const winRate = m.matchesPlayed > 0 ? Math.round((m.wins / m.matchesPlayed) * 100) : 0;
     const isMe = state.currentUser && state.currentUser.id === m.id;
-    const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+    const isAdmin = StorageService.isAdmin(state.currentUser);
 
     let actionsHtml = '';
     if (isMe) {
@@ -2953,10 +2975,10 @@ window.appSwitchTab = function(tabName) {
   switchTab(tabName);
 };
 
-// Global hook để Sửa Thành Viên (Chỉ sửa được của chính mình hoặc nếu là admin)
+// Global hook để Sửa Thành Viên (Chỉ sửa được của chính mình hoặc nếu là admin Đỗ Long)
 window.appEditMember = function(memberId) {
   const isMe = state.currentUser && state.currentUser.id === memberId;
-  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  const isAdmin = StorageService.isAdmin(state.currentUser);
   if (!isMe && !isAdmin) {
     showToast('⛔ Bạn chỉ có thể chỉnh sửa thông tin của chính bản thân!', 'error');
     return;
@@ -2964,11 +2986,10 @@ window.appEditMember = function(memberId) {
   openMemberModal(memberId);
 };
 
-// Global hook để Xóa Thành Viên (Chỉ Admin mới có quyền xóa)
+// Global hook để Xóa Thành Viên (Chỉ Admin Đỗ Long mới có quyền xóa)
 window.appDeleteMember = async function(memberId) {
-  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
-  if (!isAdmin) {
-    showToast('⛔ Chỉ Quản trị viên (Admin) mới có quyền xóa thành viên!', 'error');
+  if (!StorageService.isAdmin()) {
+    showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền xóa thành viên!', 'error');
     return;
   }
   const mem = StorageService.getMemberById(memberId);
@@ -2993,7 +3014,7 @@ window.appDeleteMember = async function(memberId) {
 // Global hook để kích hoạt Upload Avatar nhanh cho thành viên
 window.appTriggerAvatarUpload = function(memberId) {
   const isMe = state.currentUser && state.currentUser.id === memberId;
-  const isAdmin = state.currentUser && state.currentUser.role === 'admin';
+  const isAdmin = StorageService.isAdmin(state.currentUser);
   if (!isMe && !isAdmin) {
     showToast('⛔ Bạn chỉ có thể đổi ảnh đại diện của chính mình!', 'error');
     return;
@@ -3184,6 +3205,8 @@ function renderHistory() {
 
   const personMap = new Map(allPeople.map(m => [m.id, m]));
 
+  const isAdmin = StorageService.isAdmin(state.currentUser);
+
   const cardsHtml = displayMatches.map(m => {
     const t1Names = m.team1.map(id => personMap.get(id)?.name || 'VĐV').join(' & ');
     const t2Names = m.team2.map(id => personMap.get(id)?.name || 'VĐV').join(' & ');
@@ -3215,9 +3238,11 @@ function renderHistory() {
               ? (team1Won ? `+${m.deltaTeam1} / ${m.deltaTeam2}` : `+${m.deltaTeam2} / ${m.deltaTeam1}`)
               : `±${m.eloChange || 16}`} Elo ${m.isDeuce ? '• Deuce' : ''}
           </div>
-          <button onclick="window.appDeleteMatch('${m.id}')" style="background: none; border: none; color: var(--coral); cursor: pointer; font-size: 0.75rem; margin-top: 4px;">
-            Hoàn tác trận
-          </button>
+          ${isAdmin ? `
+            <button onclick="window.appDeleteMatch('${m.id}')" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: var(--coral); cursor: pointer; font-size: 0.75rem; margin-top: 5px; padding: 2px 7px; border-radius: 4px; font-weight: 600;" title="Quản trị: Hoàn tác trận đấu">
+              ↩️ Hoàn tác trận
+            </button>
+          ` : ''}
         </div>
       </div>
     `;
@@ -3239,8 +3264,12 @@ window.appLoadMoreHistory = function() {
   renderHistory();
 };
 
-// Global hook để Hoàn tác / Xóa trận đấu (Khôi phục toàn diện điểm số & số trận)
+// Global hook để Hoàn tác / Xóa trận đấu (Chỉ Quản trị viên Đỗ Long mới có quyền)
 window.appDeleteMatch = async function(matchId) {
+  if (!StorageService.isAdmin()) {
+    showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền hoàn tác trận đấu!', 'error');
+    return;
+  }
   const ok = await showConfirmModal({
     title: 'Hoàn Tác Trận Đấu?',
     message: 'Bạn có chắc muốn hoàn tác và xóa trận đấu này? Điểm Elo, số trận, xu thắng/thua và xu điểm danh sẽ được khôi phục nguyên vẹn về trước trận.',
@@ -4525,6 +4554,7 @@ window.appViewPlayerProfile = function(memberId) {
           <div class="profile-hero-name">${m.name}</div>
           <div class="profile-hero-nick">${m.nickname || 'Chiến binh CLB Thái Thịnh'}</div>
           <div class="profile-hero-badges">
+            ${StorageService.isAdmin(m) ? '<span class="tier-pill" style="background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.4); font-weight: 700;">👑 Quản Trị Viên</span>' : ''}
             <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
               ${tier.icon} ${tier.name}
             </span>
@@ -4650,10 +4680,11 @@ function renderUserAuthHeader() {
 
   if (currentUser) {
     const coins = currentUser.coins !== undefined ? currentUser.coins : 100;
+    const isCurrentUserAdmin = StorageService.isAdmin(currentUser);
     container.innerHTML = `
       <div id="header-user-widget" class="header-user-pill" onclick="window.appOpenUserWallet()" title="Xem ví xu & hồ sơ cá nhân">
         ${renderAvatarHtml(currentUser, { size: 'xs', className: 'header-user-avatar' })}
-        <span class="header-user-name">${currentUser.name}</span>
+        <span class="header-user-name">${currentUser.name}${isCurrentUserAdmin ? ' <span style="font-size: 0.68rem; background: rgba(239,68,68,0.2); color: #f87171; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 2px;">👑 Admin</span>' : ''}</span>
         <span class="header-coin-badge">🪙 <span id="header-user-coins">${coins}</span></span>
       </div>
     `;

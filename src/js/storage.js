@@ -385,12 +385,15 @@ export const StorageService = {
         const parsed = JSON.parse(data);
         // Lọc bỏ triệt để các ID mẫu mem_1 -> mem_16 nếu còn sót trong cache
         const cleaned = parsed.filter(m => !m.id || !m.id.match(/^mem_[0-9]{1,2}$/));
-        const normalized = cleaned.map(m => ({
-          ...m,
-          coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
-          role: m.role || 'member',
-          pinCode: m.pinCode || ''
-        }));
+        const normalized = cleaned.map(m => {
+          const isLong = m.id === 'mem_1789569517045' || (m.name && m.name.toLowerCase().includes('đỗ long'));
+          return {
+            ...m,
+            coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
+            role: isLong ? 'admin' : (m.role === 'admin' ? 'member' : (m.role || 'member')),
+            pinCode: m.pinCode || ''
+          };
+        });
         if (cleaned.length !== parsed.length) {
           this.saveLocalMembers(normalized);
         }
@@ -1177,6 +1180,31 @@ export const StorageService = {
     const userId = this.getCurrentUserId();
     if (!userId) return null;
     return this.getMemberById(userId);
+  },
+
+  /**
+   * Kiểm tra quyền Quản trị viên (Chỉ duy nhất Đỗ Long là Admin của CLB)
+   * @param {Object|string|null} userOrId - Đối tượng member hoặc memberId (mặc định là người dùng đang đăng nhập)
+   * @returns {boolean} true nếu là Đỗ Long (Admin)
+   */
+  isAdmin(userOrId = null) {
+    let user = null;
+    if (typeof userOrId === 'string') {
+      user = this.getMemberById(userOrId);
+    } else if (userOrId && typeof userOrId === 'object') {
+      user = userOrId;
+    } else {
+      user = this.getCurrentUser();
+    }
+    if (!user) return false;
+
+    // Chỉ duy nhất Đỗ Long (ID: mem_1789569517045 hoặc tên Long có quyền admin) mới là Admin
+    const isLongId = user.id === 'mem_1789569517045';
+    const isLongName = Boolean(user.name && user.name.toLowerCase().includes('đỗ long'));
+    const isLongNick = Boolean(user.nickname && user.nickname.toLowerCase().includes('nhạc trưởng'));
+    const hasAdminRole = user.role === 'admin';
+
+    return (isLongId || isLongName || isLongNick) && hasAdminRole;
   },
 
   setCurrentUser(memberId) {
