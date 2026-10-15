@@ -4833,7 +4833,27 @@ window.appOpenUserWallet = function() {
     }
   }
 
+  // Nút Tiện Ích Quản Trị chỉ hiển thị cho Admin Đỗ Long
+  const adminTools = document.getElementById('wallet-admin-tools');
+  if (adminTools) {
+    adminTools.style.display = StorageService.isAdmin(user) ? 'block' : 'none';
+  }
+
   if (modal) modal.classList.add('open');
+};
+
+// Global hook để Admin Đỗ Long mở Tiện Ích Quản Trị từ trong hồ sơ ví
+window.appOpenAdminSettings = function() {
+  if (!StorageService.isAdmin()) {
+    showToast('⛔ Chỉ Quản trị viên (Đỗ Long) mới có quyền truy cập!', 'error');
+    return;
+  }
+  closeAllModals();
+  const soundLabel = document.getElementById('settings-sound-label');
+  if (soundLabel) {
+    soundLabel.textContent = SoundService.isMuted() ? 'Tắt 🔇' : 'Bật 🔊';
+  }
+  document.getElementById('modal-club-settings')?.classList.add('open');
 };
 
 window.appLogout = function() {

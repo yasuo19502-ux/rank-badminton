@@ -76,11 +76,6 @@
         <button id="btn-toggle-theme" class="btn-icon" title="Đổi giao diện Sáng / Tối">
           ☀️
         </button>
-
-        <!-- 3. Cài Đặt & Tiện Ích CLB (Âm thanh, Sao lưu, Cloud) -->
-        <button id="btn-open-settings" class="btn-icon" title="Cài đặt & Tiện ích CLB">
-          ⚙️
-        </button>
       </div>
     </header>
 
@@ -1026,8 +1021,15 @@
           <!-- Render danh sách giao dịch -->
         </div>
 
+        <!-- Tiện Ích Quản Trị (Chỉ hiển thị kín đáo cho Admin Đỗ Long trong hồ sơ ví) -->
+        <div id="wallet-admin-tools" style="display: none; margin-top: 14px; text-align: center;">
+          <button type="button" class="btn-secondary" onclick="window.appOpenAdminSettings()" style="width: 100%; font-size: 0.8rem; padding: 7px; border-color: rgba(239,68,68,0.3); color: #f87171; background: rgba(239,68,68,0.06); font-weight: 600; border-radius: 8px;">
+            ⚙️ Tiện Ích Quản Trị CLB (Admin)
+          </button>
+        </div>
+
         <!-- Nút Đăng Xuất -->
-        <div style="margin-top: 20px; text-align: center; border-top: 1px solid var(--border-glass); padding-top: 14px;">
+        <div style="margin-top: 14px; text-align: center; border-top: 1px solid var(--border-glass); padding-top: 14px;">
           <button class="btn-text-coral" onclick="window.appLogout()" style="font-size: 0.85rem; font-weight: 700; background: none; border: none; cursor: pointer; color: var(--coral);">
             🚪 Đăng Xuất Khỏi Thiết Bị Này
           </button>
