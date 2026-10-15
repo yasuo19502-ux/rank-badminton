@@ -2154,8 +2154,9 @@ function finishMatch() {
     });
   }
 
-  // Lưu trận đấu vào lịch sử
+  // Lưu trận đấu vào lịch sử (kèm thông tin trọng tài / người xác nhận kết quả)
   const activeCourt = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+  const currentUser = StorageService.getCurrentUser() || state.currentUser;
   const savedMatch = StorageService.addMatch({
     courtNumber: activeCourt,
     team1: team1.map(p => p.id),
@@ -2165,7 +2166,9 @@ function finishMatch() {
     deltaTeam1: result.deltaTeam1,
     deltaTeam2: result.deltaTeam2,
     eloChange: team1Won ? result.deltaTeam1 : result.deltaTeam2,
-    isDeuce: result.isDeuce
+    isDeuce: result.isDeuce,
+    refereeId: currentUser ? currentUser.id : null,
+    refereeName: currentUser ? currentUser.name : null
   });
 
   // Ghi nhận số trận chơi hôm nay
@@ -3214,6 +3217,7 @@ function renderHistory() {
     const dateStr = new Date(m.timestamp).toLocaleDateString('vi-VN', {
       hour: '2-digit', minute: '2-digit', day: '2-digit', month: '2-digit'
     });
+    const refName = m.refereeName || (m.refereeId ? personMap.get(m.refereeId)?.name : null);
 
     return `
       <div class="match-history-card">
@@ -3233,6 +3237,11 @@ function renderHistory() {
         <div class="history-meta-col">
           <div style="font-weight: 800; color: var(--cyan); margin-bottom: 2px;">🏸 ${m.courtNumber || 'Sân 1'}</div>
           <div>${dateStr}</div>
+          ${refName ? `
+            <div style="font-size: 0.72rem; color: var(--text-dim); margin-top: 1px;" title="Người xác nhận kết quả">
+              👨‍⚖️ TT: ${refName}
+            </div>
+          ` : ''}
           <div style="color: var(--volt); font-weight: 700; margin-top: 2px;">
             ${m.deltaTeam1 !== undefined && m.deltaTeam2 !== undefined
               ? (team1Won ? `+${m.deltaTeam1} / ${m.deltaTeam2}` : `+${m.deltaTeam2} / ${m.deltaTeam1}`)

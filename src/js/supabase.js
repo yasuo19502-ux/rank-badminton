@@ -337,17 +337,32 @@ class SupabaseService {
 
       if (error) throw error;
 
-      return data.map(m => ({
-        id: m.id,
-        timestamp: Number(m.timestamp),
-        courtNumber: m.court_number || '',
-        team1: m.team1,
-        team2: m.team2,
-        score1: m.score1,
-        score2: m.score2,
-        eloChange: m.elo_change,
-        isDeuce: m.is_deuce
-      }));
+      return data.map(m => {
+        let courtNumber = m.court_number || '';
+        let refereeId = null;
+        let refereeName = null;
+        if (courtNumber.includes('|ref:')) {
+          const parts = courtNumber.split('|ref:');
+          courtNumber = parts[0];
+          const refParts = (parts[1] || '').split('|');
+          refereeId = refParts[0] || null;
+          refereeName = refParts[1] || null;
+        }
+
+        return {
+          id: m.id,
+          timestamp: Number(m.timestamp),
+          courtNumber: courtNumber || '',
+          team1: m.team1,
+          team2: m.team2,
+          score1: m.score1,
+          score2: m.score2,
+          eloChange: m.elo_change,
+          isDeuce: m.is_deuce,
+          refereeId,
+          refereeName
+        };
+      });
     } catch (err) {
       console.error('[Supabase] Lỗi fetchMatches:', err);
       return null;
@@ -357,10 +372,16 @@ class SupabaseService {
   async insertMatch(match) {
     if (!this.isConfigured()) return false;
     try {
+      const baseCourt = (match.courtNumber || 'Sân 1').split('|ref:')[0];
+      const refStr = (match.refereeName || match.refereeId)
+        ? `|ref:${match.refereeId || ''}|${match.refereeName || ''}`
+        : '';
+      const courtNumberStr = baseCourt + refStr;
+
       const payload = {
         id: match.id,
         timestamp: match.timestamp,
-        court_number: match.courtNumber || '',
+        court_number: courtNumberStr,
         team1: match.team1,
         team2: match.team2,
         score1: match.score1,

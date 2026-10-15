@@ -205,6 +205,52 @@ assert(StorageService.isAdmin(regularMember) === false, 'Thành viên thường 
 const fakeAdmin = { id: 'mem_456', name: 'Nguyễn Văn B', role: 'admin' };
 assert(StorageService.isAdmin(fakeAdmin) === false, 'Thành viên khác cố tình mạo danh role admin bị chặn hoàn toàn');
 
+// 11. Kiểm tra ghi nhận trọng tài / người xác nhận kết quả trận đấu
+const matchWithRef = StorageService.addMatch({
+  courtNumber: 'Sân 1',
+  team1: ['m1', 'm2'],
+  team2: ['m3', 'm4'],
+  score1: 21,
+  score2: 19,
+  deltaTeam1: 16,
+  deltaTeam2: -16,
+  refereeId: 'mem_1789569517045',
+  refereeName: 'Đỗ Long'
+});
+assert(matchWithRef.refereeName === 'Đỗ Long' && matchWithRef.refereeId === 'mem_1789569517045', 'Trận đấu lưu thành công tên và ID trọng tài');
+
+// Kiểm tra tính tương thích ngược cho trận đấu cũ không có trọng tài
+const matchOld = StorageService.addMatch({
+  courtNumber: 'Sân 2',
+  team1: ['m1', 'm3'],
+  team2: ['m2', 'm4'],
+  score1: 21,
+  score2: 15
+});
+assert(!matchOld.refereeName && !matchOld.refereeId, 'Trận đấu cũ không có trọng tài vẫn hoạt động an toàn');
+
+// Kiểm tra giải mã định dạng court_number từ Supabase
+const parseCourtRef = (courtRaw) => {
+  let courtNumber = courtRaw || '';
+  let refereeId = null;
+  let refereeName = null;
+  if (courtNumber.includes('|ref:')) {
+    const parts = courtNumber.split('|ref:');
+    courtNumber = parts[0];
+    const refParts = (parts[1] || '').split('|');
+    refereeId = refParts[0] || null;
+    refereeName = refParts[1] || null;
+  }
+  return { courtNumber, refereeId, refereeName };
+};
+
+const parsed1 = parseCourtRef('Sân 1|ref:mem_1789569517045|Đỗ Long');
+assert(parsed1.courtNumber === 'Sân 1' && parsed1.refereeName === 'Đỗ Long' && parsed1.refereeId === 'mem_1789569517045', 'Giải mã đúng sân và trọng tài từ Cloud Supabase');
+
+const parsedOld = parseCourtRef('Sân 2');
+assert(parsedOld.courtNumber === 'Sân 2' && parsedOld.refereeName === null, 'Dữ liệu Cloud cũ không có trọng tài giải mã chính xác');
+
 console.log(`\n=== TỔNG KẾT: ${passed} PASS, ${failed} FAIL ===\n`);
 if (failed > 0) process.exit(1);
+
 
