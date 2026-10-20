@@ -250,7 +250,35 @@ assert(parsed1.courtNumber === 'Sân 1' && parsed1.refereeName === 'Đỗ Long' 
 const parsedOld = parseCourtRef('Sân 2');
 assert(parsedOld.courtNumber === 'Sân 2' && parsedOld.refereeName === null, 'Dữ liệu Cloud cũ không có trọng tài giải mã chính xác');
 
+// 12. Kiểm tra tính năng Kỷ Niệm 20-10 (Khung Nơ Hồng Duyên Dáng)
+const ribbonItem = SHOP_ITEMS.find(i => i.id === 'frame_ribbon_2010');
+assert(ribbonItem && ribbonItem.type === 'frame' && ribbonItem.category === 'female', 'Có cấu hình Khung Nơ Hồng 20-10 trong SHOP_ITEMS');
+
+const femaleUser = { id: 'usr_f1', name: 'Mai Phương', gender: 'female', coins: 100 };
+const maleUser = { id: 'usr_m5', name: 'Hoàng Nam', gender: 'male', coins: 100 };
+StorageService.saveMembers([femaleUser, maleUser]);
+
+// Chạy tặng quà 20-10
+const giftResult = StorageService.giftOctober20Frames();
+assert(giftResult.success === true, 'Hàm giftOctober20Frames chạy thành công');
+
+// Kiểm tra Túi đồ của bạn nữ
+const fInv = StorageService.getUserInventory('usr_f1');
+const hasRibbon = fInv.some(i => i.itemId === 'frame_ribbon_2010');
+assert(hasRibbon === true, 'Bạn nữ nhận được Khung Nơ Hồng 20-10 trong Túi Đồ');
+
+// Kiểm tra Túi đồ của bạn nam (không nhận nhầm)
+const mInv = StorageService.getUserInventory('usr_m5');
+assert(!mInv.some(i => i.itemId === 'frame_ribbon_2010'), 'Bạn nam không nhận nhầm khung 20-10 của nữ');
+
+// Kiểm tra renderAvatarHtml với frame_ribbon_2010
+const memWithRibbon = { id: 'usr_f1', name: 'Mai Phương', activeFrame: 'frame_ribbon_2010' };
+const ribbonHtml = renderAvatarHtml(memWithRibbon);
+assert(ribbonHtml.includes('frame-ribbon_2010'), 'renderAvatarHtml chứa class frame-ribbon_2010');
+assert(ribbonHtml.includes('frame_ribbon_2010.webp'), 'renderAvatarHtml chứa art asset frame_ribbon_2010.webp');
+
 console.log(`\n=== TỔNG KẾT: ${passed} PASS, ${failed} FAIL ===\n`);
 if (failed > 0) process.exit(1);
+
 
 

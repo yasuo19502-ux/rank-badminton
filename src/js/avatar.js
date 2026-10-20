@@ -122,7 +122,8 @@ export function renderAvatarHtml(member, options = {}) {
   const frameType = activeFrame.replace(/^frame_/, '');
   const artFrameMap = {
     glory_wings: '/images/frame_glory_wings.webp',
-    master_econ: '/images/frame_master_econ.webp'
+    master_econ: '/images/frame_master_econ.webp',
+    ribbon_2010: '/images/frame_ribbon_2010.webp'
   };
   const artFrameSrc = artFrameMap[frameType] || '';
   const isArtFrame = Boolean(artFrameSrc);

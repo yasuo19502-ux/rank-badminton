@@ -187,6 +187,19 @@ export const SHOP_ITEMS = [
     badge: 'Độc Bản / Thạc Sĩ',
     tierBadge: 'Tân Thạc Sĩ 🎓',
     description: 'Mũ cử nhân/thạc sĩ nhung đỏ đính ngôi sao vàng cute dành riêng cho tân Thạc Sĩ Kinh Tế Khánh Hằng (Cún). Thiết kế tinh gọn, thanh lịch, tôn trọn nét xinh xắn của avatar!'
+  },
+  {
+    id: 'frame_ribbon_2010',
+    name: 'Khung Nơ Hồng Duyên Dáng 20/10',
+    price: 0,
+    icon: '🎀',
+    type: 'frame',
+    category: 'female',
+    rarity: 'legendary',
+    hasAnimation: true,
+    badge: 'Quà Tặng 20-10 🌸',
+    tierBadge: 'Kỷ Niệm 20-10 🎀',
+    description: 'Món quà kỷ niệm đặc biệt mừng ngày Phụ nữ Việt Nam 20-10. Chiếc nơ lụa hồng pastel đính hoa hồng nhung kiêu sa, tôn vinh nét rạng rỡ và duyên dáng của các bóng hồng sân cầu Thái Thịnh!'
   }
 ];
 
@@ -271,6 +284,9 @@ export const StorageService = {
 
         this.saveLocalMembers(mergedMembers);
       }
+
+      // Tự động tặng Khung Avatar 20-10 cho thành viên nữ
+      this.giftOctober20Frames();
       if (cloudMatches) {
         this.saveLocalMatches(cloudMatches);
       }
@@ -448,6 +464,24 @@ export const StorageService = {
       coins: initialCoins,
       role: memberData.role || 'member'
     };
+
+    // Tặng quà khung 20-10 nếu là thành viên nữ
+    if (newMember.gender === 'female') {
+      newMember.activeFrame = 'frame_ribbon_2010';
+      const inv = this.getLocalInventory();
+      inv.push({
+        id: `inv_${newMember.id}_frame_ribbon_2010`,
+        memberId: newMember.id,
+        itemId: 'frame_ribbon_2010',
+        itemType: 'frame',
+        quantity: 1,
+        status: 'available',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      });
+      this.saveLocalInventory(inv);
+    }
+
     members.push(newMember);
     this.saveLocalMembers(members);
 
@@ -1727,5 +1761,66 @@ export const StorageService = {
       supabaseService.upsertInventoryItem(gripItem);
     }
     return { success: true, remaining: gripItem.quantity };
+  },
+
+  /**
+   * Tặng quà Kỷ niệm ngày Phụ nữ Việt Nam 20-10:
+   * Tự động thêm Khung Nơ Hồng Duyên Dáng 20/10 vào Túi Đồ của tất cả bạn nữ
+   * và kích hoạt đeo khung avatar nếu chưa có khung riêng biệt
+   */
+  giftOctober20Frames() {
+    try {
+      const members = this.getMembers();
+      let inv = this.getLocalInventory();
+      let membersChanged = false;
+      let invChanged = false;
+      const updatedFemales = [];
+
+      members.forEach(m => {
+        if (m.gender === 'female') {
+          // 1. Kiểm tra Túi Đồ cá nhân
+          const hasItem = inv.some(i => i.memberId === m.id && i.itemId === 'frame_ribbon_2010');
+          if (!hasItem) {
+            inv.push({
+              id: `inv_${m.id}_frame_ribbon_2010`,
+              memberId: m.id,
+              itemId: 'frame_ribbon_2010',
+              itemType: 'frame',
+              quantity: 1,
+              status: 'available',
+              createdAt: '2026-10-20T00:00:00.000Z',
+              updatedAt: new Date().toISOString()
+            });
+            invChanged = true;
+          }
+
+          // 2. Tự động kích hoạt đeo khung nếu chưa có khung riêng
+          if (!m.activeFrame) {
+            m.activeFrame = 'frame_ribbon_2010';
+            membersChanged = true;
+          }
+          updatedFemales.push(m);
+        }
+      });
+
+      if (invChanged) {
+        this.saveLocalInventory(inv);
+      }
+      if (membersChanged) {
+        this.saveLocalMembers(members);
+      }
+
+      // Đồng bộ Cloud Supabase
+      if (supabaseService.isConfigured() && (invChanged || membersChanged)) {
+        updatedFemales.forEach(f => {
+          supabaseService.upsertMember(f, inv);
+        });
+      }
+
+      return { success: true, count: updatedFemales.length };
+    } catch (e) {
+      console.error('[20-10] Lỗi tặng quà khung avatar:', e);
+      return { success: false, error: e.message };
+    }
   }
 };

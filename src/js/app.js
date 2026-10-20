@@ -144,6 +144,11 @@ function initApp() {
   loadInitialState();
   state.currentUser = StorageService.getCurrentUser();
   renderUserAuthHeader();
+
+  // Tặng quà 20-10 & hiển thị banner tuần lễ chúc mừng Phụ Nữ Việt Nam
+  StorageService.giftOctober20Frames();
+  checkAndRenderOctober20Banner();
+
   const urlTab = new URLSearchParams(window.location.search).get('tab') || window.location.hash.replace('#', '');
   if (['court', 'sessions', 'leaderboard', 'attendance', 'members', 'history'].includes(urlTab)) {
     switchTab(urlTab);
@@ -4782,6 +4787,13 @@ window.appSubmitAuthPin = function() {
     showToast(`👋 Chào mừng trở lại, ${state.currentUser.name}!`);
   }
 
+  // Chúc mừng ngày 20-10 đặc biệt cho thành viên nữ
+  if (state.currentUser?.gender === 'female') {
+    setTimeout(() => {
+      showToast(`💐 Chúc mừng ngày 20-10, ${state.currentUser.name}! CLB đã gửi tặng bạn Khung Avatar Nơ Hồng Kỷ Niệm trong Túi Đồ 🎀`, 'success');
+    }, 600);
+  }
+
   renderUserAuthHeader();
   renderMembers();
 };
@@ -5204,10 +5216,10 @@ window.appFilterCoinHistory = function(filter) {
   renderCoinHistory(filter);
 };
 
-window.appOpenShopModal = function() {
+window.appOpenShopModal = function(initialTab = 'store') {
   const user = StorageService.getCurrentUser();
   if (!user) {
-    showToast('Vui lòng đăng nhập hoặc chọn hồ sơ của bạn trước khi vào Cửa Hàng!', 'info');
+    showToast('Vui lòng đăng nhập hoặc chọn hồ sơ của bạn trước khi vào Cửa Hàng / Túi Đồ!', 'info');
     window.appOpenLoginModal();
     return;
   }
@@ -5215,8 +5227,49 @@ window.appOpenShopModal = function() {
   const modal = document.getElementById('modal-club-shop');
   if (modal) {
     modal.classList.add('open');
-    window.appSwitchShopTab('store');
+    window.appSwitchShopTab(initialTab || 'store');
     renderClubShop();
+  }
+};
+
+/**
+ * Quản lý Banner Chúc Mừng 20-10 (Tuần Lễ Phụ Nữ Việt Nam: 20/10 - 27/10)
+ */
+function checkAndRenderOctober20Banner() {
+  const banner = document.getElementById('banner-celebrate-2010');
+  if (!banner) return;
+
+  const now = new Date();
+  const year = now.getFullYear();
+  // Tuần lễ 20-10: Từ 00:00 ngày 20/10 đến hết 23:59:59 ngày 27/10 (1 tuần)
+  const start = new Date(year, 9, 20, 0, 0, 0);
+  const end = new Date(year, 9, 27, 23, 59, 59);
+
+  if (now < start || now > end) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  // Nếu người dùng đã tạm đóng banner trong vòng 12 tiếng qua thì ẩn
+  const dismissedUntil = localStorage.getItem('cbb_dismissed_2010_until');
+  if (dismissedUntil && now.getTime() < Number(dismissedUntil)) {
+    banner.style.display = 'none';
+    return;
+  }
+
+  banner.style.display = 'block';
+}
+
+window.appDismissBanner2010 = function() {
+  const banner = document.getElementById('banner-celebrate-2010');
+  if (banner) {
+    banner.classList.add('banner-closing');
+    setTimeout(() => {
+      banner.style.display = 'none';
+      // Ẩn 12 tiếng sau khi bấm đóng
+      const twelveHoursLater = Date.now() + 12 * 60 * 60 * 1000;
+      localStorage.setItem('cbb_dismissed_2010_until', String(twelveHoursLater));
+    }, 250);
   }
 };
 
