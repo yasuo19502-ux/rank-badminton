@@ -200,6 +200,7 @@ function loadInitialState() {
       else if (!st || st === 'idle') st = validTotal === 4 ? 'ready' : 'idle';
 
       state.courtMatches[courtId].activeMatch = {
+        matchId: saved.matchId,
         courtNumber: saved.courtNumber || courtName,
         team1: Array.isArray(saved.team1) ? saved.team1 : [null, null],
         team2: Array.isArray(saved.team2) ? saved.team2 : [null, null],
@@ -1508,8 +1509,9 @@ function renderEloPrediction() {
   const previewBox = document.getElementById('elo-preview-box');
   if (!previewBox) return;
 
-  const t1 = state.activeMatch?.team1 || [];
-  const t2 = state.activeMatch?.team2 || [];
+  const refreshPlayer = player => player ? StorageService.getMemberById(player.id) || player : null;
+  const t1 = (state.activeMatch?.team1 || []).map(refreshPlayer);
+  const t2 = (state.activeMatch?.team2 || []).map(refreshPlayer);
 
   if (!state.activeMatch || t1.length < 2 || t2.length < 2 || t1.some(p => !p) || t2.some(p => !p)) {
     previewBox.innerHTML = '<span>Dự đoán Elo sẽ xuất hiện khi có đủ 4 VĐV</span>';
@@ -1768,7 +1770,8 @@ window.appSelectBetAmount = function(amt) {
   renderBettingWidget();
 };
 
-window.appConfirmBet = function() {
+window.appConfirmBet = async function() {
+  if (state.betting.submitting) return;
   if (!state.currentUser) {
     showToast('Vui lòng đăng nhập để tham gia dự đoán nhận Xu!', 'error');
     openAuthModal();
@@ -1797,13 +1800,17 @@ window.appConfirmBet = function() {
   const oddsData = calculateBettingOdds(state.activeMatch.team1, state.activeMatch.team2);
   const selectedOdds = state.betting.selectedTeam === 'team1' ? oddsData.oddsTeam1 : oddsData.oddsTeam2;
 
-  const res = StorageService.placeBet(
+  state.betting.submitting = true;
+  let res;
+  try { res = await StorageService.placeBet(
     state.currentCourtId,
     state.currentUser.id,
     state.betting.selectedTeam,
     state.betting.selectedAmount,
-    selectedOdds
-  );
+    selectedOdds,
+    state.activeMatch.matchId
+  ); } catch { res = {success:false,message:'Chưa xác nhận được vé. Vui lòng kiểm tra mạng và thử lại.'}; }
+  finally { state.betting.submitting = false; }
 
   if (!res.success) {
     showToast(res.message || 'Không thể đặt cược!', 'error');
@@ -2059,7 +2066,8 @@ function spinBothCourts() {
 /**
  * Xác nhận kết quả trận đấu & Cập nhật điểm Elo
  */
-function finishMatch() {
+async function finishMatch() {
+  if (state.finishingMatch) return;
   if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2 ||
       state.activeMatch.team1.some(p => !p) || state.activeMatch.team2.some(p => !p)) {
     showToast('Cần có đủ 4 VĐV trên sân để lưu kết quả trận đấu!', 'error');
@@ -2098,31 +2106,61 @@ function finishMatch() {
     return;
   }
 
-  const team1 = state.activeMatch.team1;
-  const team2 = state.activeMatch.team2;
-  const result = calculateDoublesElo(team1, team2, state.score1, state.score2);
-
-  const team1Won = state.score1 > state.score2;
+  const courtId = state.currentCourtId;
+  const active = state.activeMatch;
+  const cloudWallet = supabaseService.isConfigured();
+  state.finishingMatch = true;
+  try {
+  if (cloudWallet && await supabaseService.checkWalletVersion() !== 2) {
+    showToast('Hệ thống xu chưa sẵn sàng. Chưa lưu kết quả, vui lòng thử lại sau.', 'error');
+    return;
+  }
+  if (cloudWallet && !active.matchId) {
+    showToast('Trận chưa đồng bộ. Vui lòng tải lại sân trước khi lưu kết quả.', 'error');
+    return;
+  }
   const members = StorageService.getMembers();
+  const inventoryBefore = StorageService.getLocalInventory();
+  const guestsBefore = StorageService.getGuests();
+  const personMap = new Map([...members, ...StorageService.getGuests()].map(p => [p.id, p]));
+  const refreshPlayer = player => personMap.get(player.id);
+  const team1 = active.team1.map(refreshPlayer);
+  const team2 = active.team2.map(refreshPlayer);
+  const playerIds = [...team1, ...team2].map(p => p?.id);
+  if (playerIds.some(id => !id) || new Set(playerIds).size !== 4) {
+    showToast('Danh sách VĐV đã thay đổi. Vui lòng chọn lại đủ 4 người khác nhau trước khi lưu.', 'error');
+    return;
+  }
+  const result = calculateDoublesElo(team1, team2, s1, s2);
+
+  const team1Won = s1 > s2;
+  const playerResults = {};
   let leveledUpPlayer = null;
 
   // Cập nhật từng người chơi
   const updatePlayer = (player, delta, won) => {
     const mem = members.find(m => m.id === player.id);
     if (mem) {
+      const eloBefore = mem.elo;
       let finalDelta = delta;
+      let shieldUsed = false;
+      let shieldItemId = null;
       // Giai đoạn 3: Quyền lợi Thẻ Khiên Bảo Vệ Elo
       if (!won && delta < 0 && mem.activeEloShield) {
-        // Giảm 50% số điểm trừ (làm tròn số nguyên)
-        finalDelta = Math.min(-1, Math.round(delta * 0.5));
-        StorageService.consumeEloShield(mem.id);
-        setTimeout(() => {
-          showToast(`🛡️ Khiên bảo vệ Elo của ${mem.name} đã kích hoạt! Giảm 50% điểm trừ (${delta} ➔ ${finalDelta})!`, 'info');
-        }, 500);
+        const item = StorageService.getUserInventory(mem.id).find(i => i.itemId === 'elo_shield' && i.quantity > 0);
+        shieldUsed = StorageService.consumeEloShield(mem.id, members, !cloudWallet);
+        if (shieldUsed) {
+          shieldItemId = item.id;
+          finalDelta = Math.min(-1, Math.round(delta * 0.5));
+          setTimeout(() => {
+            showToast(`🛡️ Khiên bảo vệ Elo của ${mem.name} đã kích hoạt! Giảm 50% điểm trừ (${delta} ➔ ${finalDelta})!`, 'info');
+          }, 500);
+        }
       }
 
       const oldTier = getTierByElo(mem.elo);
       mem.elo = Math.max(500, mem.elo + finalDelta);
+      playerResults[mem.id] = { eloBefore, eloAfter: mem.elo, eloDelta: mem.elo - eloBefore, shieldUsed, shieldItemId };
       const newTier = getTierByElo(mem.elo);
 
       mem.matchesPlayed = (mem.matchesPlayed || 0) + 1;
@@ -2138,8 +2176,9 @@ function finishMatch() {
         leveledUpPlayer = { player: mem, newTier };
       }
     } else if (player.id && player.id.startsWith('guest_')) {
-      // Cập nhật điểm Elo tạm thời cho khách giao lưu trong buổi hôm nay
-      StorageService.updateGuestElo(player.id, delta, won);
+      const eloAfter = Math.max(500,player.elo+delta);
+      if (!cloudWallet) StorageService.updateGuestElo(player.id, delta, won);
+      playerResults[player.id] = { eloBefore: player.elo, eloAfter, eloDelta: eloAfter-player.elo, shieldUsed: false };
     }
   };
 
@@ -2149,32 +2188,40 @@ function finishMatch() {
   // Lưu members đã cập nhật vào LocalStorage
   StorageService.saveLocalMembers(members);
 
-  // Chỉ cập nhật các thành viên thực sự tham gia trận đấu lên Cloud Supabase (bảo vệ tuyệt đối các thành viên khác không bị ghi đè)
-  if (supabaseService.isConfigured()) {
-    const inv = StorageService.getLocalInventory();
-    const matchMemberIds = [...team1, ...team2].map(p => p.id).filter(id => id && !id.startsWith('guest_'));
-    matchMemberIds.forEach(id => {
-      const m = members.find(mem => mem.id === id);
-      if (m) supabaseService.upsertMember(m, inv);
-    });
-  }
-
   // Lưu trận đấu vào lịch sử (kèm thông tin trọng tài / người xác nhận kết quả)
-  const activeCourt = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+  const activeCourt = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
   const currentUser = StorageService.getCurrentUser() || state.currentUser;
-  const savedMatch = StorageService.addMatch({
+  const matchData = {
+    ...(active.matchId ? {id:active.matchId} : {}),
+    timestamp: Date.now(),
     courtNumber: activeCourt,
     team1: team1.map(p => p.id),
     team2: team2.map(p => p.id),
-    score1: state.score1,
-    score2: state.score2,
+    score1: s1,
+    score2: s2,
     deltaTeam1: result.deltaTeam1,
     deltaTeam2: result.deltaTeam2,
+    playerResults,
     eloChange: team1Won ? result.deltaTeam1 : result.deltaTeam2,
     isDeuce: result.isDeuce,
     refereeId: currentUser ? currentUser.id : null,
     refereeName: currentUser ? currentUser.name : null
-  });
+  };
+  if (cloudWallet) {
+    if (!await supabaseService.insertMatch(matchData)) {
+      StorageService.saveLocalInventory(inventoryBefore);
+      StorageService.saveGuests(guestsBefore);
+      await StorageService.syncFromCloud();
+      showToast('Chưa lưu được kết quả hoặc trận đã được chốt. Vui lòng tải lại để kiểm tra.', 'error');
+      return;
+    }
+    // Elo, shield consumption, player rewards and all bets commit together.
+    for (const p of [...team1,...team2].filter(p=>p.id.startsWith('guest_'))) {
+      StorageService.updateGuestElo(p.id,playerResults[p.id].eloDelta,team1.includes(p)===team1Won);
+    }
+    await StorageService.refreshWallet();
+  }
+  const savedMatch = StorageService.addMatch(matchData, false);
 
   // Ghi nhận số trận chơi hôm nay
   const allIds = [...team1.map(p => p.id), ...team2.map(p => p.id)];
@@ -2187,10 +2234,10 @@ function finishMatch() {
 
   // 1. Thưởng xu điểm danh buổi đánh: +50 Xu
   // QUY TẮC MỚI: Chỉ cộng vào TRẬN ĐẦU TIÊN TRONG NGÀY (phải thực sự có mặt thi đấu ít nhất 1 trận)
+  if (!cloudWallet) {
   allMatchPlayers.forEach(p => {
     if (p.id && !p.id.startsWith('guest_')) {
-      const existingTxs = StorageService.getCoinTransactions(p.id);
-      const alreadyGotDaily = existingTxs.some(t => t.type === 'session_checkin' && t.createdAt?.startsWith(todayStr));
+      const alreadyGotDaily = StorageService.getDailyCheckinBalance(p.id, todayStr) > 0;
       if (!alreadyGotDaily) {
         StorageService.addCoins(p.id, 50, 'session_checkin', `Thưởng điểm danh & thi đấu trận đầu tiên ngày ${todayStr}`);
         if (state.currentUser && state.currentUser.id === p.id) {
@@ -2205,18 +2252,22 @@ function finishMatch() {
   // 2. Thưởng xu thi đấu (Giai đoạn 1): Thắng +20 Xu, Thua +5 Xu (Chỉ thành viên chính thức)
   winningTeam.forEach(p => {
     if (p.id && !p.id.startsWith('guest_')) {
-      StorageService.addCoins(p.id, 20, 'match_win', `Thắng trận ${activeCourt} (${state.score1}-${state.score2})`);
+      StorageService.addCoins(p.id, 20, 'match_win', `Thắng trận ${activeCourt} (${s1}-${s2})`);
     }
   });
   losingTeam.forEach(p => {
     if (p.id && !p.id.startsWith('guest_')) {
-      StorageService.addCoins(p.id, 5, 'match_loss', `Hoàn thành trận ${activeCourt} (${state.score1}-${state.score2})`);
+      StorageService.addCoins(p.id, 5, 'match_loss', `Hoàn thành trận ${activeCourt} (${s1}-${s2})`);
     }
   });
+  }
 
   // Quyết toán vé cược Giai đoạn 2
   const winningTeamKey = team1Won ? 'team1' : 'team2';
-  const betResults = StorageService.settleMatchBets(state.currentCourtId, winningTeamKey, savedMatch?.id || '');
+  const betResults = cloudWallet ? {
+    wonBets:StorageService.getLocalBets().filter(b=>b.matchId===savedMatch.id&&b.status==='won'),
+    lostBets:StorageService.getLocalBets().filter(b=>b.matchId===savedMatch.id&&b.status==='lost')
+  } : StorageService.settleMatchBets(courtId, winningTeamKey, savedMatch?.id || '');
 
   if (state.currentUser) {
     state.currentUser = StorageService.getCurrentUser();
@@ -2255,19 +2306,28 @@ function finishMatch() {
     }, 800);
   }
 
-  showToast(`🏆 Trận đấu ${activeCourt} kết thúc! ${team1Won ? 'Đội 1' : 'Đội 2'} Thắng (${state.score1} - ${state.score2})`);
+  showToast(`🏆 Trận đấu ${activeCourt} kết thúc! ${team1Won ? 'Đội 1' : 'Đội 2'} Thắng (${s1} - ${s2})`);
 
   // Đặt lại sân về trạng thái trống (idle) sẵn sàng cho trận tiếp theo
-  const finishedCourtId = state.currentCourtId;
+  const finishedCourtId = courtId;
   const emptyMatch = { team1: [null, null], team2: [null, null] };
+  const latest = state.courtMatches[finishedCourtId].activeMatch;
+  if (!latest?.matchId || latest.matchId===active.matchId) {
   state.courtMatches[finishedCourtId].activeMatch = emptyMatch;
   state.courtMatches[finishedCourtId].score1 = 0;
   state.courtMatches[finishedCourtId].score2 = 0;
   state.courtMatches[finishedCourtId].matchStatus = 'idle';
   state.courtMatches[finishedCourtId].scoreHistory = [];
-  StorageService.saveActiveMatch(emptyMatch, finishedCourtId);
+  if (cloudWallet) StorageService.saveLocalActiveMatch(emptyMatch, finishedCourtId);
+  else StorageService.saveActiveMatch(emptyMatch, finishedCourtId);
+  }
   renderCourt();
   updateCourtTabStatusPills();
+  } catch (error) {
+    console.error('[App] Không lưu được kết quả:',error);
+    if (cloudWallet) await StorageService.syncFromCloud();
+    showToast('Chưa xác nhận được kết quả. Vui lòng tải lại để kiểm tra trước khi thử tiếp.', 'error');
+  } finally { state.finishingMatch = false; }
 }
 
 /**
@@ -3250,7 +3310,7 @@ function renderHistory() {
           <div style="color: var(--volt); font-weight: 700; margin-top: 2px;">
             ${m.deltaTeam1 !== undefined && m.deltaTeam2 !== undefined
               ? (team1Won ? `+${m.deltaTeam1} / ${m.deltaTeam2}` : `+${m.deltaTeam2} / ${m.deltaTeam1}`)
-              : `±${m.eloChange || 16}`} Elo ${m.isDeuce ? '• Deuce' : ''}
+              : `±${m.eloChange ?? 16}`} Elo ${m.isDeuce ? '• Deuce' : ''}
           </div>
           ${isAdmin ? `
             <button onclick="window.appDeleteMatch('${m.id}')" style="background: rgba(239,68,68,0.12); border: 1px solid rgba(239,68,68,0.3); color: var(--coral); cursor: pointer; font-size: 0.75rem; margin-top: 5px; padding: 2px 7px; border-radius: 4px; font-weight: 600;" title="Quản trị: Hoàn tác trận đấu">
@@ -3785,6 +3845,7 @@ async function initCloudSyncAndRealtime() {
           }
 
           const matchObj = {
+            matchId: record.match_id,
             courtNumber: record.court_number || (targetCourtId === 'court_2' ? 'Sân 2' : 'Sân 1'),
             team1: slotT1,
             team2: slotT2,
@@ -3809,6 +3870,7 @@ async function initCloudSyncAndRealtime() {
           const calculatedStatus = totalValid === 4 ? 'ready' : 'idle';
 
           const matchObj = {
+            matchId: record.match_id,
             courtNumber: record.court_number || (targetCourtId === 'court_2' ? 'Sân 2' : 'Sân 1'),
             team1: slotT1,
             team2: slotT2,
@@ -3913,7 +3975,7 @@ async function initCloudSyncAndRealtime() {
           return {
             ...cm,
             activeFrame: cm.activeFrame || lm?.activeFrame || '',
-            activeEloShield: cm.activeEloShield || lm?.activeEloShield || false
+            activeEloShield: cm.activeEloShield ?? lm?.activeEloShield ?? false
           };
         });
         StorageService.saveLocalMembers(merged);
@@ -3943,7 +4005,7 @@ async function initCloudSyncAndRealtime() {
           return {
             ...cm,
             activeFrame: cm.activeFrame || lm?.activeFrame || '',
-            activeEloShield: cm.activeEloShield || lm?.activeEloShield || false
+            activeEloShield: cm.activeEloShield ?? lm?.activeEloShield ?? false
           };
         });
         StorageService.saveLocalMembers(merged);
@@ -4005,25 +4067,33 @@ async function initCloudSyncAndRealtime() {
     }
 
     if (table === 'coin_transactions') {
-      const cloudTx = await supabaseService.fetchCoinTransactions();
+      const [cloudTx, cloudMembers] = await Promise.all([
+        supabaseService.fetchCoinTransactions(), supabaseService.fetchMembers()
+      ]);
       if (cloudTx) {
         StorageService.saveLocalCoinTransactions(cloudTx);
         if (state.currentUser) {
-          const myLatestTx = cloudTx.find(t => t.memberId === state.currentUser.id);
-          if (myLatestTx && myLatestTx.balanceAfter !== undefined) {
+          const cloudUser = cloudMembers?.find(m => m.id === state.currentUser.id);
+          if (cloudUser) {
             const members = StorageService.getMembers();
-            const mem = members.find(m => m.id === state.currentUser.id);
-            if (mem) {
-              mem.coins = myLatestTx.balanceAfter;
+            const index = members.findIndex(m => m.id === state.currentUser.id);
+            if (index !== -1) {
+              members[index] = cloudUser;
               StorageService.saveLocalMembers(members);
             }
-            state.currentUser.coins = myLatestTx.balanceAfter;
-          } else {
-            state.currentUser = StorageService.getCurrentUser();
           }
+          state.currentUser = StorageService.getCurrentUser();
           renderUserAuthHeader();
+          if (document.getElementById('modal-club-shop')?.classList.contains('open')) renderClubShop();
         }
       }
+      return;
+    }
+
+    if (table === 'user_inventory') {
+      const inventory = await supabaseService.fetchInventory();
+      if (inventory) StorageService.saveLocalInventory(inventory);
+      if (document.getElementById('modal-club-shop')?.classList.contains('open')) renderClubShop();
       return;
     }
 
@@ -4918,7 +4988,7 @@ function renderClubShop() {
 
   const userInv = user ? StorageService.getUserInventory(user.id) : [];
   if (invCountBadge) {
-    const totalItems = userInv.reduce((sum, item) => sum + (item.quantity || 1), 0);
+    const totalItems = userInv.reduce((sum, item) => sum + Math.max(0, Number(item.quantity ?? 1) || 0), 0);
     invCountBadge.textContent = totalItems;
   }
 
@@ -5307,14 +5377,19 @@ window.appSwitchShopTab = function(tab) {
   SoundService.playClick();
 };
 
-window.appBuyShopItem = function(itemId) {
+window.appBuyShopItem = async function(itemId) {
+  if (state.buyingItem) return;
   const user = StorageService.getCurrentUser();
   if (!user) {
     window.appOpenLoginModal();
     return;
   }
 
-  const res = StorageService.buyShopItem(user.id, itemId);
+  state.buyingItem = true;
+  let res;
+  try { res = await StorageService.buyShopItem(user.id, itemId); }
+  catch { res = {success:false,message:'Chưa xác nhận được giao dịch. Vui lòng kiểm tra mạng và thử lại.'}; }
+  finally { state.buyingItem = false; }
   if (!res.success) {
     showToast(res.message, 'error');
     return;

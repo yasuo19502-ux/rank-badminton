@@ -3,6 +3,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { encodeMatchCourt, decodeMatchCourt } from './match-record.js';
 
 const CONFIG_KEYS = {
   URL: 'cbb_supabase_url',
@@ -13,6 +14,9 @@ class SupabaseService {
   constructor() {
     this.client = null;
     this.realtimeChannel = null;
+    this.memberWriteQueues = new Map();
+    this.courtWriteQueues = new Map();
+    this.walletVersion = 0;
     this.initClient();
   }
 
@@ -39,6 +43,26 @@ class SupabaseService {
 
   isConfigured() {
     return this.client !== null;
+  }
+
+  async checkWalletVersion() {
+    if (!this.isConfigured()) return 0;
+    const { data, error } = await this.client.rpc('club_wallet_version');
+    this.walletVersion = error ? 0 : Number(data);
+    return this.walletVersion;
+  }
+
+  async walletAction(name, args) {
+    if (this.walletVersion !== 2 && await this.checkWalletVersion() !== 2) {
+      return { success: false, message: 'Hệ thống xu đang được nâng cấp. Vui lòng thử lại sau.' };
+    }
+    try {
+      const { data, error } = await this.client.rpc(name, args);
+      if (error) throw error;
+      return { success: true, data };
+    } catch (error) {
+      return { success: false, definite: error.code === 'P0001' || error.code === '23505', message: error.message || 'Chưa lưu được giao dịch. Vui lòng kiểm tra mạng và thử lại.' };
+    }
   }
 
   initClient() {
@@ -184,57 +208,43 @@ class SupabaseService {
 
   async upsertMember(member, inv = null) {
     if (!this.isConfigured()) return false;
-    try {
-      const payload = this._buildMemberPayload(member, inv);
-      let { error } = await this.client
-        .from('members')
-        .upsert(payload);
+    // Chụp payload ngay khi gọi và giữ thứ tự ghi theo từng thành viên trên thiết bị.
+    const payload = this._buildMemberPayload(member, inv);
+    const client = this.client;
+    const previous = this.memberWriteQueues.get(member.id) || Promise.resolve();
+    const write = previous.catch(() => {}).then(async () => {
+      try {
+        let { error } = await client.from('members').upsert(payload);
 
-      // Nếu database Supabase chưa chạy script thêm cột mới
-      if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role') || error.message?.includes('active_frame') || error.message?.includes('active_elo_shield'))) {
-        delete payload.pin_code;
-        delete payload.coins;
-        delete payload.role;
-        delete payload.active_frame;
-        delete payload.active_elo_shield;
-        const res = await this.client.from('members').upsert(payload);
-        error = res.error;
-      }
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi upsertMember:', err);
-      return false;
-    }
-  }
-
-  async upsertMembers(members, inv = null) {
-    if (!this.isConfigured() || !Array.isArray(members) || members.length === 0) return false;
-    try {
-      const payloads = members.map(m => this._buildMemberPayload(m, inv));
-      let { error } = await this.client
-        .from('members')
-        .upsert(payloads);
-
-      if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role') || error.message?.includes('active_frame') || error.message?.includes('active_elo_shield'))) {
-        payloads.forEach(payload => {
+        // Nếu database cũ chưa có các cột mới, metadata trong phone vẫn được giữ.
+        if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role') || error.message?.includes('active_frame') || error.message?.includes('active_elo_shield'))) {
           delete payload.pin_code;
           delete payload.coins;
           delete payload.role;
           delete payload.active_frame;
           delete payload.active_elo_shield;
-        });
-        const res = await this.client.from('members').upsert(payloads);
-        error = res.error;
-      }
+          const res = await client.from('members').upsert(payload);
+          error = res.error;
+        }
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi batch upsertMembers:', err);
-      return false;
+        if (error) throw error;
+        return true;
+      } catch (err) {
+        console.error('[Supabase] Lỗi upsertMember:', err);
+        return false;
+      }
+    });
+    this.memberWriteQueues.set(member.id, write);
+    try { return await write; }
+    finally {
+      if (this.memberWriteQueues.get(member.id) === write) this.memberWriteQueues.delete(member.id);
     }
+  }
+
+  async upsertMembers(members, inv = null) {
+    if (!this.isConfigured() || !Array.isArray(members) || members.length === 0) return false;
+    const results = await Promise.all(members.map(member => this.upsertMember(member, inv)));
+    return results.every(Boolean);
   }
 
   async deleteMember(id) {
@@ -338,29 +348,16 @@ class SupabaseService {
       if (error) throw error;
 
       return data.map(m => {
-        let courtNumber = m.court_number || '';
-        let refereeId = null;
-        let refereeName = null;
-        if (courtNumber.includes('|ref:')) {
-          const parts = courtNumber.split('|ref:');
-          courtNumber = parts[0];
-          const refParts = (parts[1] || '').split('|');
-          refereeId = refParts[0] || null;
-          refereeName = refParts[1] || null;
-        }
-
         return {
           id: m.id,
           timestamp: Number(m.timestamp),
-          courtNumber: courtNumber || '',
+          ...decodeMatchCourt(m.court_number || ''),
           team1: m.team1,
           team2: m.team2,
           score1: m.score1,
           score2: m.score2,
           eloChange: m.elo_change,
-          isDeuce: m.is_deuce,
-          refereeId,
-          refereeName
+          isDeuce: m.is_deuce
         };
       });
     } catch (err) {
@@ -372,21 +369,15 @@ class SupabaseService {
   async insertMatch(match) {
     if (!this.isConfigured()) return false;
     try {
-      const baseCourt = (match.courtNumber || 'Sân 1').split('|ref:')[0];
-      const refStr = (match.refereeName || match.refereeId)
-        ? `|ref:${match.refereeId || ''}|${match.refereeName || ''}`
-        : '';
-      const courtNumberStr = baseCourt + refStr;
-
       const payload = {
         id: match.id,
         timestamp: match.timestamp,
-        court_number: courtNumberStr,
+        court_number: encodeMatchCourt(match),
         team1: match.team1,
         team2: match.team2,
         score1: match.score1,
         score2: match.score2,
-        elo_change: match.eloChange || 16,
+        elo_change: match.eloChange ?? 16,
         is_deuce: !!match.isDeuce
       };
 
@@ -405,13 +396,13 @@ class SupabaseService {
   async deleteMatch(id) {
     if (!this.isConfigured()) return false;
     try {
-      const { error } = await this.client
+      const { data, error } = await this.client
         .from('matches')
         .delete()
-        .eq('id', id);
+        .eq('id', id).select('id');
 
       if (error) throw error;
-      return true;
+      return Boolean(data?.length);
     } catch (err) {
       console.error('[Supabase] Lỗi deleteMatch:', err);
       return false;
@@ -490,6 +481,7 @@ class SupabaseService {
 
       return {
         id: data.id,
+        matchId: data.match_id,
         courtNumber: data.court_number || 'Sân 1',
         team1Ids: data.team1 || [],
         team2Ids: data.team2 || [],
@@ -506,7 +498,7 @@ class SupabaseService {
     }
   }
 
-  async saveLiveCourt(match, courtId = 'current_court') {
+  async saveLiveCourt(match, courtId = 'current_court', expectedId = null) {
     if (!this.isConfigured()) return false;
     try {
       const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
@@ -569,11 +561,16 @@ class SupabaseService {
         };
       }
 
-      const { error } = await this.client
-        .from('live_court')
-        .upsert(payload);
-
-      if (error) throw error;
+      if (match?.matchId) payload.match_id = match.matchId;
+      const previous = this.courtWriteQueues.get(courtId) || Promise.resolve();
+      const write = previous.catch(()=>{}).then(()=>this.walletAction('club_save_court',{p_payload:payload,p_expected_id:expectedId}));
+      this.courtWriteQueues.set(courtId,write);
+      let result;
+      try { result = await write; }
+      finally { if (this.courtWriteQueues.get(courtId) === write) this.courtWriteQueues.delete(courtId); }
+      if (!result.success) throw new Error(result.message);
+      const data = result.data;
+      if (match && data?.match_id) match.matchId = data.match_id;
       return true;
     } catch (err) {
       console.error('[Supabase] Lỗi saveLiveCourt:', err);
@@ -804,7 +801,7 @@ class SupabaseService {
         memberId: item.member_id,
         itemId: item.item_id,
         itemType: item.item_type,
-        quantity: Number(item.quantity) || 1,
+        quantity: Math.max(0, Number(item.quantity ?? 1) || 0),
         status: item.status || 'available',
         createdAt: item.created_at,
         updatedAt: item.updated_at
@@ -823,7 +820,7 @@ class SupabaseService {
         member_id: item.memberId,
         item_id: item.itemId,
         item_type: item.itemType,
-        quantity: Number(item.quantity) || 1,
+        quantity: Math.max(0, Number(item.quantity ?? 1) || 0),
         status: item.status || 'available',
         updated_at: new Date().toISOString()
       };
@@ -886,6 +883,15 @@ class SupabaseService {
       })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'club_settings' }, (payload) => {
         onChangeCallback('club_settings', payload);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'coin_transactions' }, (payload) => {
+        onChangeCallback('coin_transactions', payload);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'bets' }, (payload) => {
+        onChangeCallback('bets', payload);
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'user_inventory' }, (payload) => {
+        onChangeCallback('user_inventory', payload);
       })
       .subscribe((status) => {
         console.log('[Supabase Realtime] Trạng thái kênh đồng bộ realtime:', status);

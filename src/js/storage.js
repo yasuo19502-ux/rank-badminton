@@ -4,6 +4,7 @@
 
 import { supabaseService } from './supabase.js';
 import { calculateDoublesElo, ZERO_SUM_MATCH_PREFIX } from './elo.js';
+import { getMatchPlayerDelta } from './match-record.js';
 
 const STORAGE_KEYS = {
   MEMBERS: 'cbb_thai_thinh_members_v2',
@@ -274,7 +275,7 @@ export const StorageService = {
         const mergedMembers = cloudMembers.map(cm => {
           const lm = localMap.get(cm.id);
           const activeFrame = cm.activeFrame || lm?.activeFrame || '';
-          const activeEloShield = cm.activeEloShield || lm?.activeEloShield || false;
+          const activeEloShield = cm.activeEloShield ?? lm?.activeEloShield ?? false;
           return {
             ...cm,
             activeFrame,
@@ -296,7 +297,7 @@ export const StorageService = {
       if (cloudSettings) {
         this.saveLocalSettings(cloudSettings);
       }
-      if (cloudCoinTx && cloudCoinTx.length > 0) {
+      if (cloudCoinTx) {
         this.saveLocalCoinTransactions(cloudCoinTx);
       }
       if (cloudBets) {
@@ -341,6 +342,7 @@ export const StorageService = {
 
         if (!hasAnyPlayer || liveCourt.status === 'idle') {
           const empty = {
+            matchId: liveCourt.matchId,
             courtNumber: liveCourt.courtNumber || defaultCourtName,
             team1: [null, null],
             team2: [null, null],
@@ -369,6 +371,7 @@ export const StorageService = {
         }
 
         const reconstructedMatch = {
+          matchId: liveCourt.matchId,
           courtNumber: liveCourt.courtNumber || defaultCourtName,
           team1: slotT1,
           team2: slotT2,
@@ -632,18 +635,19 @@ export const StorageService = {
     } catch (e) {}
   },
 
-  addMatch(matchData) {
+  addMatch(matchData, persist = true) {
     const matches = this.getMatches();
     const newMatch = {
-      id: ZERO_SUM_MATCH_PREFIX + Date.now(),
+      id: ZERO_SUM_MATCH_PREFIX + Date.now() + '_' + crypto.randomUUID(),
       timestamp: Date.now(),
       courtNumber: matchData.courtNumber || 'Sân 1',
       ...matchData
     };
+    if (matches.some(m=>m.id===newMatch.id)) return matches.find(m=>m.id===newMatch.id);
     matches.unshift(newMatch);
     this.saveLocalMatches(matches);
 
-    if (supabaseService.isConfigured()) {
+    if (persist && supabaseService.isConfigured()) {
       supabaseService.insertMatch(newMatch);
     }
     return newMatch;
@@ -658,6 +662,40 @@ export const StorageService = {
     const matchToDelete = matches.find(m => m.id === id);
     if (!matchToDelete) return null;
 
+    const cloudWallet = supabaseService.isConfigured();
+    if (cloudWallet) {
+      if (await supabaseService.checkWalletVersion() !== 2) throw new Error('Hệ thống xu chưa sẵn sàng. Chưa hoàn tác trận.');
+      if (!await supabaseService.deleteMatch(id)) throw new Error('Chưa hoàn tác được trên máy chủ. Vui lòng thử lại.');
+      // The server reverses participant stats, shields and coins in one commit.
+      // Guest profiles live in attendance and keep their existing client path.
+      const guests = this.getGuests();
+      const remaining=matches.filter(m=>m.id!==id).sort((a,b)=>a.timestamp-b.timestamp);
+      for (const guest of guests) {
+        if (![...matchToDelete.team1,...matchToDelete.team2].includes(guest.id)) continue;
+        const won = matchToDelete.team1.includes(guest.id) ? matchToDelete.score1>matchToDelete.score2 : matchToDelete.score2>matchToDelete.score1;
+        guest.elo=Math.max(500,guest.elo-getMatchPlayerDelta(matchToDelete,guest.id));
+        guest.matchesPlayed=Math.max(0,(guest.matchesPlayed||0)-1);
+        guest.wins=Math.max(0,(guest.wins||0)-(won?1:0));
+        guest.losses=Math.max(0,(guest.losses||0)-(won?0:1));
+        guest.streak=0;
+        for (const m of remaining.filter(m=>[...m.team1,...m.team2].includes(guest.id))) {
+          const guestWon=m.team1.includes(guest.id)?m.score1>m.score2:m.score2>m.score1;
+          guest.streak=guestWon?Math.max(0,guest.streak)+1:Math.min(0,guest.streak)-1;
+        }
+      }
+      const attendance=this.getAttendance();
+      this.saveGuests(guests); attendance.guests=guests;
+      if (getLocalDateStr(new Date(Number(matchToDelete.timestamp))) === getLocalDateStr()) {
+        for(const who of [...matchToDelete.team1,...matchToDelete.team2]) {
+          if(attendance.gamesPlayedToday?.[who]) attendance.gamesPlayedToday[who]=Math.max(0,attendance.gamesPlayedToday[who]-1);
+        }
+      }
+      this.saveLocalAttendance(attendance);
+      await supabaseService.saveAttendance(attendance);
+      await this.syncFromCloud();
+      return matchToDelete;
+    }
+
     const members = this.getMembers();
     const memberMap = new Map(members.map(m => [m.id, m]));
     const guests = this.getGuests();
@@ -668,25 +706,12 @@ export const StorageService = {
     const score2 = Number(matchToDelete.score2) || 0;
     const team1Won = score1 > score2;
 
-    let delta1 = 0;
-    let delta2 = 0;
-    if (matchToDelete.deltaTeam1 !== undefined && matchToDelete.deltaTeam2 !== undefined) {
-      delta1 = Number(matchToDelete.deltaTeam1);
-      delta2 = Number(matchToDelete.deltaTeam2);
-    } else {
-      const eloChange = Number(matchToDelete.eloChange) || 16;
-      const usesZeroSum = String(matchToDelete.id || '').startsWith(ZERO_SUM_MATCH_PREFIX);
-      const lossPenalty = usesZeroSum ? eloChange : Math.max(1, Math.round(eloChange * 0.8));
-      delta1 = team1Won ? eloChange : -lossPenalty;
-      delta2 = team1Won ? -lossPenalty : eloChange;
-    }
-
     // Hoàn trả thông số cho Team 1
     const t1Ids = matchToDelete.team1 || [];
     t1Ids.forEach(playerId => {
       const mem = memberMap.get(playerId);
       if (mem) {
-        mem.elo = Math.max(500, (mem.elo || 1000) - delta1);
+        mem.elo = Math.max(500, (mem.elo ?? 1000) - getMatchPlayerDelta(matchToDelete, playerId));
         mem.matchesPlayed = Math.max(0, (mem.matchesPlayed || 1) - 1);
         if (team1Won) {
           mem.wins = Math.max(0, (mem.wins || 1) - 1);
@@ -696,7 +721,7 @@ export const StorageService = {
       } else if (String(playerId).startsWith('guest_')) {
         const guest = guests.find(g => g.id === playerId);
         if (guest) {
-          guest.elo = Math.max(500, (guest.elo || 1000) - delta1);
+          guest.elo = Math.max(500, (guest.elo ?? 1000) - getMatchPlayerDelta(matchToDelete, playerId));
           guest.matchesPlayed = Math.max(0, (guest.matchesPlayed || 1) - 1);
           if (team1Won) {
             guest.wins = Math.max(0, (guest.wins || 1) - 1);
@@ -713,7 +738,7 @@ export const StorageService = {
     t2Ids.forEach(playerId => {
       const mem = memberMap.get(playerId);
       if (mem) {
-        mem.elo = Math.max(500, (mem.elo || 1000) - delta2);
+        mem.elo = Math.max(500, (mem.elo ?? 1000) - getMatchPlayerDelta(matchToDelete, playerId));
         mem.matchesPlayed = Math.max(0, (mem.matchesPlayed || 1) - 1);
         if (!team1Won) {
           mem.wins = Math.max(0, (mem.wins || 1) - 1);
@@ -723,7 +748,7 @@ export const StorageService = {
       } else if (String(playerId).startsWith('guest_')) {
         const guest = guests.find(g => g.id === playerId);
         if (guest) {
-          guest.elo = Math.max(500, (guest.elo || 1000) - delta2);
+          guest.elo = Math.max(500, (guest.elo ?? 1000) - getMatchPlayerDelta(matchToDelete, playerId));
           guest.matchesPlayed = Math.max(0, (guest.matchesPlayed || 1) - 1);
           if (!team1Won) {
             guest.wins = Math.max(0, (guest.wins || 1) - 1);
@@ -746,7 +771,7 @@ export const StorageService = {
     // Tính toán lại streak chuẩn xác từ các trận đấu còn lại
     const allInvolvedIds = [...t1Ids, ...t2Ids];
     allInvolvedIds.forEach(playerId => {
-      const mem = memberMap.get(playerId);
+      const mem = memberMap.get(playerId) || guests.find(g => g.id === playerId);
       if (mem) {
         let streak = 0;
         const playerRemainingMatches = matches
@@ -765,23 +790,31 @@ export const StorageService = {
         mem.streak = streak;
       }
     });
+    if (guestsChanged) this.saveGuests(guests);
 
     // Lưu lại danh sách members vào LocalStorage
     this.saveLocalMembers(members);
 
-    // Chỉ cập nhật các thành viên thực sự liên quan tới trận đấu bị hoàn tác lên Cloud Supabase
-    if (supabaseService.isConfigured()) {
-      const inv = this.getLocalInventory();
-      allInvolvedIds.forEach(id => {
-        if (!id.startsWith('guest_')) {
-          const m = members.find(mem => mem.id === id);
-          if (m) supabaseService.upsertMember(m, inv);
-        }
-      });
+    // Hoàn lại đúng vật phẩm thực sự đã tiêu hao của các trận có dữ liệu kiểm toán.
+    const inventory = this.getLocalInventory();
+    for (const playerId of allInvolvedIds) {
+      const result = matchToDelete.playerResults?.[playerId];
+      if (!result?.shieldUsed || !result.shieldItemId) continue;
+      let item = inventory.find(i => i.id === result.shieldItemId);
+      if (!item) {
+        item = { id: result.shieldItemId, memberId: playerId, itemId: 'elo_shield', itemType: 'perk', quantity: 0, status: 'available' };
+        inventory.push(item);
+      }
+      item.quantity = Math.max(0, Number(item.quantity) || 0) + 1;
+      item.updatedAt = new Date().toISOString();
+      if (supabaseService.isConfigured()) supabaseService.upsertInventoryItem(item);
     }
+    this.saveLocalInventory(inventory);
 
     // Giảm số trận hôm nay trong điểm danh nếu có
-    this.decrementGamePlayedToday(allInvolvedIds);
+    if (getLocalDateStr(new Date(Number(matchToDelete.timestamp))) === getLocalDateStr()) {
+      this.decrementGamePlayedToday(allInvolvedIds);
+    }
 
     // Hoàn tác xu thi đấu (+20 Xu thắng / +5 Xu thua) & xu điểm danh (+50 Xu)
     let matchDateStr = '';
@@ -789,7 +822,7 @@ export const StorageService = {
       try {
         const tsNum = Number(matchToDelete.timestamp);
         if (!isNaN(tsNum) && tsNum > 0) {
-          matchDateStr = new Date(tsNum).toISOString().split('T')[0];
+          matchDateStr = getLocalDateStr(new Date(tsNum));
         } else {
           matchDateStr = String(matchToDelete.timestamp).split('T')[0];
         }
@@ -801,6 +834,7 @@ export const StorageService = {
     const winIds = team1Won ? t1Ids : t2Ids;
     const loseIds = team1Won ? t2Ids : t1Ids;
 
+    if (!cloudWallet) {
     winIds.forEach(pId => {
       if (pId && !String(pId).startsWith('guest_')) {
         this.addCoins(pId, -20, 'match_undo', 'Hoàn tác trận đấu: Thu hồi 20 Xu thắng trận');
@@ -820,7 +854,7 @@ export const StorageService = {
           let mDate = '';
           if (m.timestamp) {
             const tsNum = Number(m.timestamp);
-            mDate = (!isNaN(tsNum) && tsNum > 0) ? new Date(tsNum).toISOString().split('T')[0] : String(m.timestamp).split('T')[0];
+            mDate = (!isNaN(tsNum) && tsNum > 0) ? getLocalDateStr(new Date(tsNum)) : String(m.timestamp).split('T')[0];
           }
           const inT1 = m.team1 && m.team1.includes(pId);
           const inT2 = m.team2 && m.team2.includes(pId);
@@ -828,10 +862,9 @@ export const StorageService = {
         });
 
         if (!hasOtherMatchOnDay) {
-          const txs = this.getCoinTransactions(pId);
-          const hasDailyCheckin = txs.some(t => t.type === 'session_checkin' && t.createdAt?.startsWith(matchDateStr));
-          if (hasDailyCheckin) {
-            this.addCoins(pId, -50, 'session_checkin_undo', `Hoàn tác trận đấu: Thu hồi 50 Xu điểm danh ngày ${matchDateStr}`);
+          const dailyBalance = this.getDailyCheckinBalance(pId, matchDateStr);
+          if (dailyBalance > 0) {
+            this.addCoins(pId, -dailyBalance, 'session_checkin_undo', `Hoàn tác trận đấu: Thu hồi ${dailyBalance} Xu điểm danh ngày ${matchDateStr}`);
           }
         }
       }
@@ -856,11 +889,14 @@ export const StorageService = {
       }
     });
     this.saveLocalBets(allBets);
+    }
 
     // Xóa trên Supabase Cloud & Batch update members
     if (supabaseService.isConfigured()) {
-      await supabaseService.deleteMatch(id);
-      await supabaseService.upsertMembers(members);
+      const changedIds = new Set(allInvolvedIds);
+      const latestMembers = this.getMembers().filter(m => changedIds.has(m.id));
+      await supabaseService.upsertMembers(latestMembers, this.getLocalInventory());
+      await this.refreshWallet();
     }
 
     return matchToDelete;
@@ -1002,6 +1038,7 @@ export const StorageService = {
         guest.losses = (guest.losses || 0) + 1;
         guest.streak = guest.streak < 0 ? guest.streak - 1 : -1;
       }
+      this.saveGuests(attendance.guests);
       this.saveAttendance(attendance);
     }
   },
@@ -1113,9 +1150,16 @@ export const StorageService = {
   },
 
   async saveActiveMatch(match, courtId = 'court_1') {
+    const expectedId = this.getActiveMatch(courtId)?.matchId || null;
+    const ids = value => JSON.stringify([value?.team1, value?.team2].map(team => (team || []).map(p => p?.id || p || '')));
+    if (match && (!match.matchId || ids(match) !== ids(this.getActiveMatch(courtId)))) {
+      match.matchId = 'match_zs_' + crypto.randomUUID();
+    }
     this.saveLocalActiveMatch(match, courtId);
     if (supabaseService.isConfigured()) {
-      return await supabaseService.saveLiveCourt(match, courtId);
+      const saved = await supabaseService.saveLiveCourt(match, courtId, expectedId);
+      if (saved) this.saveLocalActiveMatch(match, courtId);
+      return saved;
     }
     return true;
   },
@@ -1327,19 +1371,20 @@ export const StorageService = {
     txs.unshift(tx);
     this.saveLocalCoinTransactions(txs);
 
-    if (supabaseService.isConfigured()) {
-      supabaseService.insertCoinTransaction(tx);
-    }
+    // Cloud ledger and wallet are written together by database operations only.
     return tx;
   },
 
   addCoins(memberId, amount, type, description) {
+    if (supabaseService.isConfigured()) return { success: false, message: 'Giao dịch xu phải được xác nhận trên máy chủ.' };
     const members = this.getMembers();
     const mem = members.find(m => m.id === memberId);
     if (!mem) return null;
 
+    const requestedAmount = Number(amount);
+    if (!Number.isFinite(requestedAmount) || !Number.isInteger(requestedAmount)) return null;
     const currentCoins = Number(mem.coins !== undefined ? mem.coins : 100);
-    const balanceAfter = Math.max(0, currentCoins + Number(amount));
+    const balanceAfter = Math.max(0, currentCoins + requestedAmount);
     mem.coins = balanceAfter;
     this.saveLocalMembers(members);
     if (supabaseService.isConfigured()) {
@@ -1347,8 +1392,30 @@ export const StorageService = {
       supabaseService.upsertMember(mem, inv);
     }
 
-    const tx = this.recordCoinTx(memberId, amount, balanceAfter, type, description);
+    const tx = this.recordCoinTx(memberId, balanceAfter - currentCoins, balanceAfter, type, description);
     return { success: true, balanceAfter, transaction: tx };
+  },
+
+  getDailyCheckinBalance(memberId, dateStr = getLocalDateStr()) {
+    return this.getCoinTransactions(memberId).reduce((balance, tx) => {
+      if (!['session_checkin', 'session_checkin_undo'].includes(tx.type)) return balance;
+      // Giao dịch thu hồi có thể được thực hiện nhiều ngày sau trận gốc.
+      const rewardDate = tx.description?.match(/ngày (\d{4}-\d{2}-\d{2})/)?.[1]
+        || getLocalDateStr(new Date(tx.createdAt));
+      return rewardDate === dateStr ? balance + Number(tx.amount || 0) : balance;
+    }, 0);
+  },
+
+  async refreshWallet() {
+    const [members,transactions,bets,inventory] = await Promise.all([
+      supabaseService.fetchMembers(),supabaseService.fetchCoinTransactions(),
+      supabaseService.fetchBets(),supabaseService.fetchInventory()
+    ]);
+    if (members) this.saveLocalMembers(members);
+    if (transactions) this.saveLocalCoinTransactions(transactions);
+    if (bets) this.saveLocalBets(bets);
+    if (inventory) this.saveLocalInventory(inventory);
+    return Boolean(members && transactions && bets && inventory);
   },
 
   revertAllCheckinCoins() {
@@ -1426,6 +1493,8 @@ export const StorageService = {
     if (status) {
       bets = bets.filter(b => b.status === status);
     }
+    const matchId = courtId && this.getActiveMatch(courtId)?.matchId;
+    if (status === 'pending' && matchId) bets = bets.filter(b => b.matchId === matchId);
     return bets;
   },
 
@@ -1435,7 +1504,9 @@ export const StorageService = {
     return bets.find(b => b.memberId === memberId) || null;
   },
 
-  placeBet(courtId, memberId, predictedTeam, amount, odds) {
+  placeBet(courtId, memberId, predictedTeam, amount, odds, matchId = null) {
+    if (supabaseService.isConfigured()) return this.placeCloudBet(courtId,memberId,predictedTeam,amount,odds,matchId);
+    if (!['team1','team2'].includes(predictedTeam) || !Number.isFinite(Number(odds)) || Number(odds)<1.2 || Number(odds)>3) return { success:false,message:'Vé cược không hợp lệ!' };
     const numAmount = Number(amount);
     if (![10, 20, 30].includes(numAmount)) {
       return { success: false, message: 'Mức cược không hợp lệ (chỉ chấp nhận 10, 20 hoặc 30 xu)!' };
@@ -1477,7 +1548,7 @@ export const StorageService = {
     const bet = {
       id: 'bet_' + Date.now() + '_' + Math.random().toString(36).substr(2, 5),
       courtId,
-      matchId: '',
+      matchId: matchId || this.getActiveMatch(courtId)?.matchId || '',
       memberId,
       predictedTeam,
       amount: numAmount,
@@ -1498,14 +1569,40 @@ export const StorageService = {
     return { success: true, bet, balanceAfter: deductRes.balanceAfter };
   },
 
+  async placeCloudBet(courtId,memberId,predictedTeam,amount,odds,matchId) {
+    if (!matchId) return { success:false,message:'Trận chưa đồng bộ. Vui lòng tải lại sân trước khi đặt cược.' };
+    const key = `cbb_bet_request_${memberId}_${matchId}`;
+    // Keep the same request ID after an uncertain network response or reload.
+    let request;
+    try { request = JSON.parse(localStorage.getItem(key) || 'null'); } catch {}
+    const values = {team:predictedTeam,amount:Number(amount),odds:Number(odds)};
+    if (!request) {
+      request = {id:'bet_' + crypto.randomUUID(),...values};
+      localStorage.setItem(key,JSON.stringify(request));
+    } else if (request.team!==values.team || request.amount!==values.amount || request.odds!==values.odds) {
+      return {success:false,message:'Có vé đang chờ xác nhận. Vui lòng tải lại để kiểm tra trước khi đổi kèo.'};
+    }
+    const result = await supabaseService.walletAction('club_place_bet',{
+      p_id:request.id,p_court_id:courtId,p_match_id:matchId,p_member_id:memberId,
+      p_team:request.team,p_amount:request.amount,p_odds:request.odds
+    });
+    if (!result.success) {
+      if (result.definite) localStorage.removeItem(key);
+      return result;
+    }
+    await this.refreshWallet();
+    return {success:true,balanceAfter:result.data.balance_after,bet:result.data};
+  },
+
   settleMatchBets(courtId, winningTeam, matchId = '') {
+    if (supabaseService.isConfigured()) return { wonBets:[],lostBets:[] };
     const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
     const allBets = this.getLocalBets();
     const wonBets = [];
     const lostBets = [];
 
     allBets.forEach(bet => {
-      if (bet.courtId === courtId && bet.status === 'pending') {
+      if (bet.courtId === courtId && bet.status === 'pending' && (!bet.matchId || bet.matchId === matchId)) {
         bet.matchId = matchId || bet.matchId || '';
         if (bet.predictedTeam === winningTeam) {
           bet.status = 'won';
@@ -1533,6 +1630,8 @@ export const StorageService = {
   },
 
   refundMatchBets(courtId, reason = 'Trận đấu bị hủy hoặc làm lại') {
+    // On cloud, changing the live lineup atomically refunds its server bets.
+    if (supabaseService.isConfigured()) return [];
     const courtName = courtId === 'court_2' ? 'Sân 2' : 'Sân 1';
     const allBets = this.getLocalBets();
     const refundedBets = [];
@@ -1586,6 +1685,7 @@ export const StorageService = {
   },
 
   buyShopItem(memberId, itemId) {
+    if (supabaseService.isConfigured()) return this.buyCloudItem(memberId,itemId);
     const itemDef = SHOP_ITEMS.find(i => i.id === itemId);
     if (!itemDef) {
       return { success: false, message: 'Vật phẩm không tồn tại!' };
@@ -1629,7 +1729,7 @@ export const StorageService = {
 
     let inventoryItem = null;
     if (existingConsumable) {
-      existingConsumable.quantity = (existingConsumable.quantity || 1) + 1;
+      existingConsumable.quantity = Math.max(0, Number(existingConsumable.quantity ?? 0) || 0) + 1;
       existingConsumable.updatedAt = new Date().toISOString();
       inventoryItem = existingConsumable;
     } else {
@@ -1650,11 +1750,24 @@ export const StorageService = {
 
     if (supabaseService.isConfigured()) {
       supabaseService.upsertInventoryItem(inventoryItem);
-      const members = this.getMembers();
-      supabaseService.upsertMembers(members, allInv);
+      const member = this.getMemberById(memberId);
+      if (member) supabaseService.upsertMember(member, allInv);
     }
 
     return { success: true, item: itemDef, balanceAfter: deductRes.balanceAfter };
+  },
+
+  async buyCloudItem(memberId,itemId) {
+    const item = SHOP_ITEMS.find(i => i.id===itemId);
+    if (!item) return {success:false,message:'Vật phẩm không tồn tại!'};
+    const key = `cbb_purchase_request_${memberId}_${itemId}`;
+    let id = localStorage.getItem(key);
+    if (!id) { id = 'purchase_' + crypto.randomUUID(); localStorage.setItem(key,id); }
+    const result = await supabaseService.walletAction('club_buy_item',{p_id:id,p_member_id:memberId,p_item_id:itemId});
+    if (!result.success) return result;
+    localStorage.removeItem(key);
+    await this.refreshWallet();
+    return {success:true,item,balanceAfter:result.data.balance_after};
   },
 
   equipAvatarFrame(memberId, frameId) {
@@ -1712,8 +1825,9 @@ export const StorageService = {
     return { success: true, activeEloShield: targetState, remainingShields: shieldItem?.quantity || 0 };
   },
 
-  consumeEloShield(memberId) {
-    const members = this.getMembers();
+  consumeEloShield(memberId, memberSnapshot = null, persist = true) {
+    // finishMatch truyền cùng snapshot đang cập nhật để trạng thái tắt không bị ghi đè.
+    const members = memberSnapshot || this.getMembers();
     const mem = members.find(m => m.id === memberId);
     if (!mem || !mem.activeEloShield) return false;
 
@@ -1722,7 +1836,7 @@ export const StorageService = {
     if (!shieldItem) {
       mem.activeEloShield = false;
       this.saveLocalMembers(members);
-      if (supabaseService.isConfigured()) {
+      if (persist && supabaseService.isConfigured()) {
         const inv = this.getLocalInventory();
         supabaseService.upsertMember(mem, inv);
       }
@@ -1738,7 +1852,7 @@ export const StorageService = {
     this.saveLocalMembers(members);
     this.saveLocalInventory(allInv);
 
-    if (supabaseService.isConfigured()) {
+    if (persist && supabaseService.isConfigured()) {
       const inv = this.getLocalInventory();
       supabaseService.upsertMember(mem, inv);
       supabaseService.upsertInventoryItem(shieldItem);
