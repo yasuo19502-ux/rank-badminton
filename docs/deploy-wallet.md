@@ -28,3 +28,30 @@ chống xử lý trùng khi gửi lại yêu cầu.
 
 Phục hồi xu cũ là công việc riêng: cần chốt các vé nghi gắn nhầm và giao dịch
 thủ công trước khi cộng bù. Migration không sửa kết quả/số dư lịch sử đã đối soát.
+
+## Nâng cấp bảo toàn dữ liệu: phiên bản 3
+
+Sau hai migration trên, chạy `20261024_guarded_operations.sql`, rồi triển khai
+frontend cùng phiên bản ngay sau đó. Không chạy lại migration v2 sau v3, vì v2
+chứa các entry point cũ. Yêu cầu Node 20.19+ hoặc 22.12+ cho công cụ build mới.
+
+Migration v3 chụp số lượng và dấu kiểm của cả chín bảng nghiệp vụ bên trong
+transaction. Nếu bất kỳ bản ghi hiện có nào thay đổi, toàn bộ nâng cấp bị hủy.
+Không tính lại Elo, xu, thống kê hoặc lịch sử; không tặng lại khung hiện có.
+Sao lưu riêng tư trước khi nâng cấp và không commit/upload bản sao lưu.
+
+Mọi người đăng nhập lại một lần bằng PIN hiện tại. PIN không còn được gửi xuống
+trình duyệt. Tài khoản chưa có PIN cần quản trị viên thiết lập; quản trị viên
+được nhận diện bằng ID cố định, không dựa vào tên. Hồ sơ chỉ cập nhật trường
+được yêu cầu và từ chối phiên bản cũ. Máy chủ tính Elo, kiểm tra điểm đang lưu,
+quyết toán xu/khiên/khách/điểm danh trong cùng lần lưu. Khiên vẫn giảm 50% điểm
+trừ như quy tắc hiện hành; không đổi quy tắc kinh doanh.
+
+Xuất sao lưu quản trị bao gồm chín bảng, không gồm PIN/phiên đăng nhập. Nhập
+sao lưu vào cloud bị khóa để tránh ghi đè một phần; khôi phục cloud phải được
+đối soát và triển khai riêng. Nút dọn bộ nhớ chỉ xóa cache trên thiết bị.
+
+`npm test` kiểm tra cả PostgreSQL thật chạy trong bộ nhớ và giao diện giả lập.
+Có thể kiểm tra bảo toàn toàn bộ backup riêng tư, không truy cập mạng, bằng:
+`CLUB_PRESERVATION_BACKUP=/absolute/private/backup.json node test_guarded_operations.js`.
+Không thử tạo trận, vé cược hoặc nhận hàng giả trên app thật.

@@ -219,13 +219,22 @@ export const INITIAL_SESSIONS = [];
  */
 export function getLocalDateStr(d = new Date()) {
   const date = typeof d === 'string' ? new Date(d) : (d || new Date());
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, '0');
-  const day = String(date.getDate()).padStart(2, '0');
-  return `${year}-${month}-${day}`;
+  const parts=Object.fromEntries(new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Ho_Chi_Minh',year:'numeric',month:'2-digit',day:'2-digit'}).formatToParts(date).map(p=>[p.type,p.value]));
+  return `${parts.year}-${parts.month}-${parts.day}`;
 }
 
 export const StorageService = {
+  async cloudAction(name,args) {
+    const data=await supabaseService.mutation(name,args);
+    if(!await this.syncFromCloud())throw new Error('Đã gửi thao tác nhưng chưa tải lại được dữ liệu. Vui lòng tải lại để kiểm tra.');
+    return data;
+  },
+  async patchCloudMember(id,patch) {
+    const member=this.getMemberById(id);
+    await supabaseService.patchMember(id,patch,member?.updatedAt);
+    await this.refreshWallet();
+    return {success:true,activeFrame:this.getMemberById(id)?.activeFrame,activeEloShield:this.getMemberById(id)?.activeEloShield};
+  },
   // Đồng bộ đám mây Supabase
   async syncFromCloud() {
     if (!supabaseService.isConfigured()) return false;
@@ -244,7 +253,8 @@ export const StorageService = {
         supabaseService.fetchInventory()
       ]);
 
-      if (cloudMembers && cloudMembers.length > 0) {
+      if (!cloudMembers || !cloudMatches || !cloudSessions || !cloudCoinTx || !cloudBets || !cloudInv) return false;
+      if (cloudMembers) {
         // 1. Đồng bộ Túi đồ (Inventory) từ Cloud
         const currentInv = this.getLocalInventory();
         const invMap = new Map();
@@ -274,7 +284,7 @@ export const StorageService = {
 
         const mergedMembers = cloudMembers.map(cm => {
           const lm = localMap.get(cm.id);
-          const activeFrame = cm.activeFrame || lm?.activeFrame || '';
+          const activeFrame = cm.activeFrame ?? '';
           const activeEloShield = cm.activeEloShield ?? lm?.activeEloShield ?? false;
           return {
             ...cm,
@@ -291,7 +301,7 @@ export const StorageService = {
       if (cloudMatches) {
         this.saveLocalMatches(cloudMatches);
       }
-      if (cloudSessions && cloudSessions.length > 0) {
+      if (cloudSessions) {
         this.saveLocalSessions(cloudSessions);
       }
       if (cloudSettings) {
@@ -340,7 +350,7 @@ export const StorageService = {
         ];
         const hasAnyPlayer = slotT1.some(Boolean) || slotT2.some(Boolean);
 
-        if (!hasAnyPlayer || liveCourt.status === 'idle') {
+        if (!hasAnyPlayer) {
           const empty = {
             matchId: liveCourt.matchId,
             courtNumber: liveCourt.courtNumber || defaultCourtName,
@@ -405,7 +415,7 @@ export const StorageService = {
         // Lọc bỏ triệt để các ID mẫu mem_1 -> mem_16 nếu còn sót trong cache
         const cleaned = parsed.filter(m => !m.id || !m.id.match(/^mem_[0-9]{1,2}$/));
         const normalized = cleaned.map(m => {
-          const isLong = m.id === 'mem_1789569517045' || (m.name && m.name.toLowerCase().includes('đỗ long'));
+          const isLong = m.id === 'mem_1789569517045';
           return {
             ...m,
             coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : 100,
@@ -430,6 +440,7 @@ export const StorageService = {
   },
 
   saveMembers(members) {
+    if(supabaseService.isConfigured())throw new Error('Không được ghi toàn bộ hồ sơ từ bộ nhớ thiết bị.');
     this.saveLocalMembers(members);
     if (supabaseService.isConfigured()) {
       const inv = this.getLocalInventory();
@@ -448,6 +459,12 @@ export const StorageService = {
   },
 
   addMember(memberData) {
+    if(supabaseService.isConfigured())return (async()=>{
+      const data=await supabaseService.createMember(memberData);
+      if(data.token)this.setCurrentUser(data.memberId);
+      await this.syncFromCloud();
+      return this.getMemberById(data.memberId);
+    })();
     const members = this.getMembers();
     const initialCoins = memberData.coins !== undefined ? Number(memberData.coins) : 100;
     const newMember = {
@@ -498,6 +515,11 @@ export const StorageService = {
   },
 
   updateMember(id, updateData) {
+    if(supabaseService.isConfigured())return (async()=>{
+      const member=this.getMemberById(id);const patch={...updateData};
+      if('elo' in patch){if(this.isAdmin()&&member?.matchesPlayed===0&&patch.elo!==member.elo)patch.initialElo=patch.elo;delete patch.elo;}
+      await this.patchCloudMember(id,patch);return this.getMemberById(id);
+    })();
     const members = this.getMembers();
     const index = members.findIndex(m => m.id === id);
     if (index !== -1) {
@@ -514,6 +536,7 @@ export const StorageService = {
   },
 
   deleteMember(id) {
+    if(supabaseService.isConfigured())return (async()=>{const result=await supabaseService.deleteMember(id);await this.syncFromCloud();return result;})();
     let members = this.getMembers();
     members = members.filter(m => m.id !== id);
     this.saveLocalMembers(members);
@@ -556,6 +579,7 @@ export const StorageService = {
   },
 
   addSession(sessionData) {
+    if(supabaseService.isConfigured())return (async()=>{const data=await supabaseService.upsertSession({...sessionData,id:'session_'+crypto.randomUUID()});await this.syncFromCloud();return data;})();
     const sessions = this.getSessions();
     const newSession = {
       id: 'session_' + Date.now(),
@@ -579,6 +603,7 @@ export const StorageService = {
   },
 
   updateSession(id, updateData) {
+    if(supabaseService.isConfigured())return (async()=>{const old=this.getSessions().find(s=>s.id===id);const data=await supabaseService.upsertSession({...old,...updateData,id});await this.syncFromCloud();return data;})();
     const sessions = this.getSessions();
     const index = sessions.findIndex(s => s.id === id);
     if (index !== -1) {
@@ -594,6 +619,7 @@ export const StorageService = {
   },
 
   deleteSession(id) {
+    if(supabaseService.isConfigured())return (async()=>{const data=await supabaseService.deleteSession(id);await this.syncFromCloud();return data;})();
     let sessions = this.getSessions();
     sessions = sessions.filter(s => s.id !== id);
     this.saveLocalSessions(sessions);
@@ -604,6 +630,7 @@ export const StorageService = {
   },
 
   rsvpSession(sessionId, memberId, status = 'attending') {
+    if(supabaseService.isConfigured())return this.cloudAction('club_rsvp',{p_session_id:sessionId,p_member_id:memberId,p_status:status});
     const sessions = this.getSessions();
     const session = sessions.find(s => s.id === sessionId);
     if (session) {
@@ -664,36 +691,9 @@ export const StorageService = {
 
     const cloudWallet = supabaseService.isConfigured();
     if (cloudWallet) {
-      if (await supabaseService.checkWalletVersion() !== 2) throw new Error('Hệ thống xu chưa sẵn sàng. Chưa hoàn tác trận.');
+      if (await supabaseService.checkWalletVersion() !== 3) throw new Error('Hệ thống xu chưa sẵn sàng. Chưa hoàn tác trận.');
       if (!await supabaseService.deleteMatch(id)) throw new Error('Chưa hoàn tác được trên máy chủ. Vui lòng thử lại.');
-      // The server reverses participant stats, shields and coins in one commit.
-      // Guest profiles live in attendance and keep their existing client path.
-      const guests = this.getGuests();
-      const remaining=matches.filter(m=>m.id!==id).sort((a,b)=>a.timestamp-b.timestamp);
-      for (const guest of guests) {
-        if (![...matchToDelete.team1,...matchToDelete.team2].includes(guest.id)) continue;
-        const won = matchToDelete.team1.includes(guest.id) ? matchToDelete.score1>matchToDelete.score2 : matchToDelete.score2>matchToDelete.score1;
-        guest.elo=Math.max(500,guest.elo-getMatchPlayerDelta(matchToDelete,guest.id));
-        guest.matchesPlayed=Math.max(0,(guest.matchesPlayed||0)-1);
-        guest.wins=Math.max(0,(guest.wins||0)-(won?1:0));
-        guest.losses=Math.max(0,(guest.losses||0)-(won?0:1));
-        guest.streak=0;
-        for (const m of remaining.filter(m=>[...m.team1,...m.team2].includes(guest.id))) {
-          const guestWon=m.team1.includes(guest.id)?m.score1>m.score2:m.score2>m.score1;
-          guest.streak=guestWon?Math.max(0,guest.streak)+1:Math.min(0,guest.streak)-1;
-        }
-      }
-      const attendance=this.getAttendance();
-      this.saveGuests(guests); attendance.guests=guests;
-      if (getLocalDateStr(new Date(Number(matchToDelete.timestamp))) === getLocalDateStr()) {
-        for(const who of [...matchToDelete.team1,...matchToDelete.team2]) {
-          if(attendance.gamesPlayedToday?.[who]) attendance.gamesPlayedToday[who]=Math.max(0,attendance.gamesPlayedToday[who]-1);
-        }
-      }
-      this.saveLocalAttendance(attendance);
-      await supabaseService.saveAttendance(attendance);
-      await this.syncFromCloud();
-      return matchToDelete;
+      await this.syncFromCloud();return matchToDelete;
     }
 
     const members = this.getMembers();
@@ -929,7 +929,7 @@ export const StorageService = {
         const todayStr = getLocalDateStr();
         if (parsed.date === todayStr) {
           current = parsed;
-        }
+        } else { this.saveGuests([]); }
       }
     } catch (e) {}
 
@@ -977,6 +977,11 @@ export const StorageService = {
   },
 
   addGuest(guestData) {
+    if(supabaseService.isConfigured())return (async()=>{
+      const guest={id:'guest_'+crypto.randomUUID(),name:guestData.name,gender:guestData.gender||'male',elo:Number(guestData.elo)||1000};
+      await this.cloudAction('club_attendance_action',{p_id:'att_'+crypto.randomUUID(),p_action:'guest_add',p_payload:{guest}});
+      return this.getGuests().find(g=>g.id===guest.id);
+    })();
     const guests = this.getGuests();
     const attendance = this.getAttendance();
     if (!Array.isArray(attendance.presentIds)) attendance.presentIds = [];
@@ -1008,6 +1013,7 @@ export const StorageService = {
   },
 
   removeGuest(guestId) {
+    if(supabaseService.isConfigured())return this.cloudAction('club_attendance_action',{p_id:'att_'+crypto.randomUUID(),p_action:'guest_remove',p_payload:{memberId:guestId}});
     let guests = this.getGuests();
     guests = guests.filter(g => g.id !== guestId);
     this.saveGuests(guests);
@@ -1025,6 +1031,7 @@ export const StorageService = {
   },
 
   updateGuestElo(guestId, delta, won) {
+    if(supabaseService.isConfigured())return; // Included in the server's match transaction.
     const attendance = this.getAttendance();
     if (!attendance.guests) return;
     const guest = attendance.guests.find(g => g.id === guestId);
@@ -1050,6 +1057,7 @@ export const StorageService = {
   },
 
   saveAttendance(attendance) {
+    if(supabaseService.isConfigured())throw new Error('Điểm danh cần được cập nhật bằng từng thao tác đã xác nhận.');
     if (!attendance.guests || !Array.isArray(attendance.guests) || attendance.guests.length === 0) {
       const currentGuests = this.getGuests();
       if (currentGuests.length > 0) {
@@ -1063,6 +1071,7 @@ export const StorageService = {
   },
 
   toggleAttendance(memberId) {
+    if(supabaseService.isConfigured())return this.cloudAction('club_attendance_action',{p_id:'att_'+crypto.randomUUID(),p_action:'present',p_payload:{memberId,present:!this.getAttendance().presentIds.includes(memberId)}});
     const attendance = this.getAttendance();
     const index = attendance.presentIds.indexOf(memberId);
     if (index === -1) {
@@ -1075,6 +1084,7 @@ export const StorageService = {
   },
 
   setAttendanceList(memberIds) {
+    if(supabaseService.isConfigured())return this.cloudAction('club_attendance_action',{p_id:'att_'+crypto.randomUUID(),p_action:'roster',p_payload:{presentIds:[...new Set(memberIds)]}});
     const attendance = this.getAttendance();
     attendance.presentIds = Array.from(new Set(memberIds));
     this.saveAttendance(attendance);
@@ -1082,6 +1092,7 @@ export const StorageService = {
   },
 
   recordGamePlayedToday(playerIds) {
+    if(supabaseService.isConfigured())return this.getAttendance();
     const attendance = this.getAttendance();
     if (!attendance.gamesPlayedToday) attendance.gamesPlayedToday = {};
     playerIds.forEach(id => {
@@ -1092,6 +1103,7 @@ export const StorageService = {
   },
 
   decrementGamePlayedToday(playerIds) {
+    if(supabaseService.isConfigured())return this.getAttendance();
     const attendance = this.getAttendance();
     if (!attendance.gamesPlayedToday) attendance.gamesPlayedToday = {};
     playerIds.forEach(id => {
@@ -1154,11 +1166,14 @@ export const StorageService = {
     const ids = value => JSON.stringify([value?.team1, value?.team2].map(team => (team || []).map(p => p?.id || p || '')));
     if (match && (!match.matchId || ids(match) !== ids(this.getActiveMatch(courtId)))) {
       match.matchId = 'match_zs_' + crypto.randomUUID();
+      match.score1=0;match.score2=0;
     }
     this.saveLocalActiveMatch(match, courtId);
     if (supabaseService.isConfigured()) {
       const saved = await supabaseService.saveLiveCourt(match, courtId, expectedId);
-      if (saved) this.saveLocalActiveMatch(match, courtId);
+      if(saved && this.getActiveMatch(courtId)?.matchId===match?.matchId)this.saveLocalActiveMatch(match,courtId);
+      if(!saved){await this.syncFromCloud();if(typeof window!=='undefined')window.dispatchEvent(new Event('club:write-error'));}
+      if(typeof window!=='undefined')window.dispatchEvent(new CustomEvent('club:court-saved',{detail:{courtId}}));
       return saved;
     }
     return true;
@@ -1186,6 +1201,7 @@ export const StorageService = {
   },
 
   saveClubSettings(settings) {
+    if(supabaseService.isConfigured())return (async()=>{const result=await supabaseService.saveClubSettings(settings);await this.syncFromCloud();return result;})();
     this.saveLocalSettings(settings);
     if (supabaseService.isConfigured()) {
       supabaseService.saveClubSettings(settings);
@@ -1194,54 +1210,37 @@ export const StorageService = {
 
   // Export & Import
   exportAllData() {
-    return JSON.stringify({
-      version: '2.0',
-      exportedAt: new Date().toISOString(),
-      members: this.getMembers(),
-      matches: this.getMatches(),
-      sessions: this.getSessions(),
-      attendance: this.getAttendance()
-    }, null, 2);
+    const cleanMembers=this.getMembers().map(({pinCode,...m})=>m);
+    return JSON.stringify({version:'3.0',exportedAt:new Date().toISOString(),members:cleanMembers,matches:this.getMatches(),sessions:this.getSessions(),attendance:this.getAttendance(),guests:this.getGuests(),inventory:this.getLocalInventory(),bets:this.getLocalBets(),coinTransactions:this.getLocalCoinTransactions(),settings:this.getClubSettings(),courts:{court_1:this.getActiveMatch('court_1'),court_2:this.getActiveMatch('court_2')}},null,2);
   },
-
+  async exportSnapshot() {
+    if(!supabaseService.isConfigured())return this.exportAllData();
+    const data=await supabaseService.mutation('club_export_snapshot',{});
+    return JSON.stringify(data,null,2);
+  },
   importAllData(jsonString) {
+    if(supabaseService.isConfigured())throw new Error('Không tự ghi đè dữ liệu CLB đang chạy. Hãy kiểm tra bản sao lưu và dùng quy trình khôi phục riêng.');
     try {
-      const data = JSON.parse(jsonString);
-      if (data.members && Array.isArray(data.members)) {
-        this.saveMembers(data.members);
-      }
-      if (data.matches && Array.isArray(data.matches)) {
-        this.saveLocalMatches(data.matches);
-      }
-      if (data.sessions && Array.isArray(data.sessions)) {
-        this.saveSessions(data.sessions);
-      }
-      if (data.attendance) {
-        this.saveAttendance(data.attendance);
-      }
+      const data=JSON.parse(jsonString);
+      if(!Array.isArray(data.members)||!Array.isArray(data.matches)||!Array.isArray(data.sessions))return false;
+      const validId=id=>typeof id==='string'&&/^[A-Za-z0-9_-]+$/.test(id);
+      if(data.members.some(m=>!validId(m.id)||!Number.isFinite(Number(m.elo)))||data.matches.some(m=>!validId(m.id)||!Array.isArray(m.team1)||!Array.isArray(m.team2)))return false;
+      this.resetAllData();
+      this.saveLocalMembers(data.members.map(({pinCode,...m})=>m));this.saveLocalMatches(data.matches);this.saveLocalSessions(data.sessions);
+      this.saveGuests(data.guests||data.attendance?.guests||[]);if(data.attendance)this.saveLocalAttendance(data.attendance);
+      this.saveLocalInventory(data.inventory||[]);this.saveLocalBets(data.bets||[]);this.saveLocalCoinTransactions(data.coinTransactions||[]);
+      if(data.settings)this.saveLocalSettings(data.settings);
+      for(const id of ['court_1','court_2'])this.saveLocalActiveMatch(data.courts?.[id]||null,id);
       return true;
-    } catch (e) {
-      console.error('Lỗi import dữ liệu:', e);
-      return false;
-    }
+    }catch(error){return false;}
   },
-
   resetAllData() {
-    localStorage.removeItem(STORAGE_KEYS.MEMBERS);
-    localStorage.removeItem(STORAGE_KEYS.MATCHES);
-    localStorage.removeItem(STORAGE_KEYS.SESSIONS);
-    localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
-    localStorage.removeItem(STORAGE_KEYS.ACTIVE_MATCH);
-    localStorage.removeItem(STORAGE_KEYS.CURRENT_USER_ID);
-    localStorage.removeItem(STORAGE_KEYS.COIN_TRANSACTIONS);
-    this.saveLocalMembers([]);
-    this.saveLocalMatches([]);
-    this.saveLocalSessions([]);
-    this.saveLocalAttendance({
-      date: getLocalDateStr(),
-      presentIds: [],
-      gamesPlayedToday: {}
-    });
+    for(const key of Object.values(STORAGE_KEYS))localStorage.removeItem(key);
+    localStorage.removeItem('cbb_club_session_v3');
+    for(let i=localStorage.length-1;i>=0;i--){const k=localStorage.key(i);if(/^cbb_(bet|purchase|claim)_request_/.test(k))localStorage.removeItem(k);}
+    this.saveLocalMembers([]);this.saveLocalMatches([]);this.saveLocalSessions([]);this.saveGuests([]);this.saveLocalInventory([]);this.saveLocalBets([]);this.saveLocalCoinTransactions([]);
+    this.saveLocalActiveMatch(null,'court_1');this.saveLocalActiveMatch(null,'court_2');
+    this.saveLocalAttendance({date:getLocalDateStr(),presentIds:[],gamesPlayedToday:{},guests:[]});
     return [];
   },
 
@@ -1255,6 +1254,7 @@ export const StorageService = {
   },
 
   getCurrentUser() {
+    if(supabaseService.isConfigured()&&!supabaseService.getSessionToken())return null;
     const userId = this.getCurrentUserId();
     if (!userId) return null;
     return this.getMemberById(userId);
@@ -1278,11 +1278,9 @@ export const StorageService = {
 
     // Chỉ duy nhất Đỗ Long (ID: mem_1789569517045 hoặc tên Long có quyền admin) mới là Admin
     const isLongId = user.id === 'mem_1789569517045';
-    const isLongName = Boolean(user.name && user.name.toLowerCase().includes('đỗ long'));
-    const isLongNick = Boolean(user.nickname && user.nickname.toLowerCase().includes('nhạc trưởng'));
     const hasAdminRole = user.role === 'admin';
 
-    return (isLongId || isLongName || isLongNick) && hasAdminRole;
+    return isLongId && hasAdminRole;
   },
 
   setCurrentUser(memberId) {
@@ -1300,6 +1298,7 @@ export const StorageService = {
   },
 
   verifyPin(memberId, inputPin) {
+    if(supabaseService.isConfigured())return supabaseService.login(memberId,String(inputPin).trim());
     const mem = this.getMemberById(memberId);
     if (!mem) return { success: false, message: 'Không tìm thấy thành viên' };
 
@@ -1318,6 +1317,7 @@ export const StorageService = {
   },
 
   setUserPin(memberId, newPin) {
+    if(supabaseService.isConfigured())return this.patchCloudMember(memberId,{pinCode:String(newPin).trim()});
     const members = this.getMembers();
     const mem = members.find(m => m.id === memberId);
     if (mem) {
@@ -1771,6 +1771,7 @@ export const StorageService = {
   },
 
   equipAvatarFrame(memberId, frameId) {
+    if(supabaseService.isConfigured())return this.patchCloudMember(memberId,{activeFrame:frameId||''});
     const members = this.getMembers();
     const mem = members.find(m => m.id === memberId);
     if (!mem) return { success: false, message: 'Không tìm thấy thành viên' };
@@ -1803,6 +1804,7 @@ export const StorageService = {
   },
 
   toggleEloShield(memberId, enabled = null) {
+    if(supabaseService.isConfigured())return this.patchCloudMember(memberId,{activeEloShield:enabled??!this.getMemberById(memberId)?.activeEloShield});
     const members = this.getMembers();
     const mem = members.find(m => m.id === memberId);
     if (!mem) return { success: false, message: 'Không tìm thấy thành viên' };
@@ -1861,6 +1863,13 @@ export const StorageService = {
   },
 
   claimGrip(memberId) {
+    if(supabaseService.isConfigured())return (async()=>{
+      const key=`cbb_claim_request_${memberId}`;let id=localStorage.getItem(key);
+      if(!id){id='claim_'+crypto.randomUUID();localStorage.setItem(key,id);}
+      const result=await supabaseService.walletAction('club_claim_grip',{p_id:id,p_member_id:memberId});
+      if(!result.success){if(result.definite)localStorage.removeItem(key);throw new Error(result.message);}
+      localStorage.removeItem(key);await this.refreshWallet();return result.data;
+    })();
     const allInv = this.getLocalInventory();
     const gripItem = allInv.find(i => i.memberId === memberId && i.itemId === 'grip' && i.quantity > 0);
     if (!gripItem) {

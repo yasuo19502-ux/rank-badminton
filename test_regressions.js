@@ -29,7 +29,7 @@ const start = app.indexOf('async function finishMatch() {');
 const finishSource = app.slice(start, app.indexOf('\n/**', start));
 const state = { currentCourtId: 'court_1', currentUser: null, courtMatches: { court_1: {} } };
 const context = vm.createContext({
-  state, StorageService: storage, supabaseService: cloud,
+  state, scoreWrites:new Map(),loadInitialState(){},renderHistory(){},renderLeaderboard(){}, StorageService: storage, supabaseService: cloud,
   calculateDoublesElo, getTierByElo, getLocalDateStr,
   showToast() {}, renderCourt() {}, updateCourtTabStatusPills() {}, renderUserAuthHeader() {},
   SoundService: { playFanfare() {}, playLevelUp() {} }, confetti() {}, setTimeout() {}, Date: TestDate
@@ -107,21 +107,14 @@ await test('Lịch sử dùng delta cá nhân; hoàn tác trả điểm và th�
   assert.equal(await storage.undoMatch(match.id),null);
   assert.equal(storage.getUserInventory('c')[0].quantity,1);
 });
-await test('Metadata trận qua API ghi/đọc giữ delta cá nhân và trọng tài', async () => {
-  shield(); const match={...(await play()),refereeId:'ref',refereeName:'Đỗ Long'};
-  let row;
+await test('Cloud chỉ gửi tỷ số; metadata do máy chủ trả về vẫn giải mã đúng', async () => {
+  shield();const match={...(await play()),refereeId:'ref',refereeName:'Đỗ Long'};
+  const row={id:match.id,timestamp:match.timestamp,court_number:encodeMatchCourt(match),team1:match.team1,team2:match.team2,score1:match.score1,score2:match.score2,elo_change:match.eloChange,is_deuce:false};
   cloud.isConfigured=()=>true;
-  cloud.client={from:()=>({insert:async payload=>{row=payload;return {error:null};},select:()=>({order:async()=>({data:[row],error:null})})})};
-  assert.equal(await cloud.insertMatch(match),true);
-  const loaded=(await cloud.fetchMatches())[0];
-  assert.equal(loaded.refereeName,'Đỗ Long');
-  assert.equal(loaded.courtNumber,'Sân 1');
-  assert.deepEqual(loaded.playerResults,JSON.parse(JSON.stringify(match.playerResults)));
-  cloud.isConfigured=()=>false;
-  storage.saveLocalMatches([loaded]);
-  await storage.undoMatch(loaded.id);
-  assert.equal(storage.getMemberById('c').elo,1000);
-  assert.equal(storage.getUserInventory('c')[0].quantity,1);
+  cloud.mutation=async(name,args)=>{assert.equal(name,'club_finish_match');assert.deepEqual(Object.keys(args).sort(),['p_match_id','p_score1','p_score2']);return row;};
+  cloud.fetchAll=async()=>[row];await cloud.insertMatch(match);
+  const loaded=(await cloud.fetchMatches())[0];assert.equal(loaded.refereeName,'Đỗ Long');assert.equal(loaded.courtNumber,'Sân 1');assert.deepEqual(loaded.playerResults,JSON.parse(JSON.stringify(match.playerResults)));
+  cloud.isConfigured=()=>false;storage.saveLocalMatches([loaded]);await storage.undoMatch(loaded.id);assert.equal(storage.getMemberById('c').elo,1000);
 });
 await test('Hoàn tác trận trước giữ phần điểm của trận sau', async () => {
   shield(); const match=await play();
@@ -134,12 +127,9 @@ await test('Mua sau khi hết thẻ: 0 → 1', async () => {
   assert.equal(storage.buyShopItem('c','elo_shield').success,true);
   assert.equal(storage.getUserInventory('c')[0].quantity,1);
 });
-await test('API giữ số lượng 0 trên cả chiều ghi và đọc', async () => {
-  let row;
-  cloud.isConfigured=()=>true;
-  cloud.client={from:()=>({upsert:async payload=>{row=payload;return {error:null};},select:async()=>({data:[row],error:null})})};
-  await cloud.upsertInventoryItem({id:'empty',memberId:'c',itemId:'elo_shield',quantity:0});
-  assert.equal(row.quantity,0);
+await test('Không ghi trực tiếp túi đồ; tải dữ liệu giữ đúng số lượng 0', async () => {
+  cloud.isConfigured=()=>true;cloud.fetchAll=async()=>[{id:'empty',member_id:'c',item_id:'elo_shield',quantity:0}];
+  await assert.rejects(cloud.upsertInventoryItem({id:'empty',quantity:1}),/máy chủ/);
   assert.equal((await cloud.fetchInventory())[0].quantity,0);
 });
 await test('Hoàn tác cloud ghi số dư mới, chỉ cập nhật người liên quan', async () => {
@@ -148,7 +138,7 @@ await test('Hoàn tác cloud ghi số dư mới, chỉ cập nhật người li�
   const server=new Map(storage.getMembers().map(m=>[m.id,structuredClone(m)]));
   const writes=[];
   cloud.isConfigured=()=>true;
-  cloud.checkWalletVersion=async()=>2;
+  cloud.checkWalletVersion=async()=>3;
   cloud.deleteMatch=async()=>{for(const id of ['a','b','c','d'])server.get(id).coins=100;return true;};
   cloud.upsertMembers=async members=>{for(const m of members){writes.push(m.id);server.set(m.id,{...m,coins:server.get(m.id).coins});}return true;};
   cloud.fetchMembers=async()=>[...server.values()];
@@ -184,11 +174,9 @@ await test('Sổ ghi biến động thực tế khi thu hồi bị chặn ở 0;
   assert.equal(storage.addCoins('a',NaN,'invalid','test'),null);
 });
 await test('API và fallback lịch sử giữ delta 0; trận cũ giữ tỷ lệ 80%', async () => {
-  let row;
   cloud.isConfigured=()=>true;
-  cloud.client={from:()=>({insert:async payload=>{row=payload;return {error:null};}})};
-  await cloud.insertMatch({id:'match_zs_zero',timestamp:now,team1:['a','b'],team2:['c','d'],score1:21,score2:19,eloChange:0});
-  assert.equal(row.elo_change,0);
+  cloud.mutation=async()=>({id:'match_zs_zero',elo_change:0,court_number:'Sân 1'});
+  const saved=await cloud.insertMatch({id:'match_zs_zero',score1:21,score2:19});assert.equal(saved.elo_change,0);
   const match={id:'match_zs_zero',team1:['a','b'],team2:['c','d'],score1:21,score2:19,eloChange:0};
   assert.equal(getMatchPlayerDelta(match,'c'),0);
   assert.equal(getMatchPlayerDelta({...match,id:'match_old',eloChange:11},'c'),-9);
@@ -219,29 +207,14 @@ await test('Kết thúc trận dùng Elo hiện tại thay cho snapshot đội h
   await vm.runInContext('finishMatch()',context);
   assert.equal(storage.getMemberById('a').elo,1405);
 });
-await test('Cùng thành viên: request sau chờ request trước và chụp đúng payload', async () => {
-  const requests=[];
-  let release;
-  const gate=new Promise(resolve=>{release=resolve;});
-  cloud.isConfigured=()=>true;
-  cloud.client={from:()=>({upsert:async payload=>{requests.push(payload);if(requests.length===1)await gate;return {error:null};}})};
-  const member=player('a',{coins:120});
-  const first=cloud.upsertMember(member);
-  member.coins=125;
-  const second=cloud.upsertMember(member);
-  await Promise.resolve(); await Promise.resolve();
-  assert.equal(requests.length,1);
-  release(); await Promise.all([first,second]);
-  assert.deepEqual(requests.map(r=>JSON.parse(r.phone).coins),[120,125]);
+await test('Sửa hồ sơ tương thích chỉ gửi trường hồ sơ và phiên bản, không gửi Elo/xu', async () => {
+  const calls=[];cloud.isConfigured=()=>true;cloud.patchMember=async(id,patch,version)=>{calls.push({id,patch,version});return true;};
+  await cloud.upsertMember(player('a',{coins:125,elo:1700,updatedAt:'v1'}));
+  assert.equal(calls[0].version,'v1');assert.equal(calls[0].patch.elo,undefined);assert.equal(calls[0].patch.coins,undefined);assert.equal(calls[0].patch.matchesPlayed,undefined);
 });
-await test('Database cũ thiếu coins giữ dữ liệu xu trong metadata', async () => {
-  const requests=[];
-  cloud.isConfigured=()=>true;
-  cloud.client={from:()=>({upsert:async payload=>{requests.push(structuredClone(payload));return {error:payload.coins!==undefined?{message:'column coins does not exist'}:null};}})};
-  assert.equal(await cloud.upsertMember(player('a',{coins:125})),true);
-  assert.equal(requests.length,2);
-  assert.equal(requests[1].coins,undefined);
-  assert.equal(JSON.parse(requests[1].phone).coins,125);
+await test('Máy chủ cũ chưa nâng cấp bị chặn, không quay lại ghi xu bằng metadata',async()=>{
+  cloud.isConfigured=()=>true;cloud.walletVersion=0;cloud.checkWalletVersion=async()=>2;
+  const result=await cloud.walletAction('club_buy_item',{});assert.equal(result.success,false);
 });
 await test('Realtime đăng ký đủ xu, cược và inventory', async () => {
   const tables=[];
@@ -302,13 +275,13 @@ await test('864 tổ hợp Elo cơ bản cân bằng và tôn trọng sàn', asy
 await test('Cloud chốt trận dùng ID cố định, không tự cộng ví hay lưu lại hồ sơ',async()=>{
   prepare(); state.activeMatch.matchId='match_zs_cloud';
   const remote=storage.getMembers().map((m,i)=>({...m,coins:i<2?170:155,elo:i<2?1011:989}));
-  cloud.isConfigured=()=>true; cloud.checkWalletVersion=async()=>2;
+  cloud.isConfigured=()=>true; cloud.checkWalletVersion=async()=>3;
   let inserted;
   cloud.insertMatch=async m=>{inserted=structuredClone(m);return true;};
   cloud.upsertMember=()=>{throw Error('Không được lưu hồ sơ cũ sau khi server chốt trận');};
   cloud.fetchMembers=async()=>remote;
   cloud.fetchBets=cloud.fetchInventory=cloud.fetchCoinTransactions=async()=>[];
-  cloud.saveAttendance=async()=>true;
+  cloud.fetchMatches=async()=>[{id:'match_zs_cloud'}];cloud.fetchSessions=async()=>[];cloud.fetchClubSettings=cloud.fetchLiveCourt=cloud.fetchAttendance=async()=>null;
   await vm.runInContext('finishMatch()',context);
   assert.equal(inserted.id,'match_zs_cloud');
   assert.equal(storage.getMatches()[0].id,'match_zs_cloud');
@@ -318,7 +291,7 @@ await test('Cloud chốt trận dùng ID cố định, không tự cộng ví ha
 await test('Cloud từ chối lưu trận thì không báo lưu vào lịch sử hoặc ghi hồ sơ',async()=>{
   prepare(); state.activeMatch.matchId='match_zs_failed';
   const before=structuredClone(storage.getMembers());
-  cloud.isConfigured=()=>true; cloud.checkWalletVersion=async()=>2;
+  cloud.isConfigured=()=>true; cloud.checkWalletVersion=async()=>3;
   cloud.insertMatch=async()=>false;
   cloud.upsertMember=()=>{throw Error('Không được ghi hồ sơ khi trận chưa commit');};
   cloud.fetchMembers=async()=>before;

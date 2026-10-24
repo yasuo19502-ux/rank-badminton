@@ -1,4 +1,6 @@
 import confetti from 'canvas-confetti';
+import {installSafeHtml,escapeHtml} from './html.js';
+installSafeHtml();
 import { StorageService, getLocalDateStr, SHOP_ITEMS } from './storage.js';
 import { calculateDoublesElo, calculateBadges, getTierByElo, getNextTier, getPlayerDetailedStats, calculateBettingOdds, TIERS } from './elo.js';
 import { processImageFile, generateDefaultAvatar, getAvatarUrl, renderAvatarHtml } from './avatar.js';
@@ -132,6 +134,18 @@ const state = {
 };
 
 let debouncedSyncLiveScore = () => {};
+const scoreWrites=new Map();
+const actionLocks=new Set();
+function guardedAction(fn,key=fn.name) {
+  return async function(...args){
+    const lock=key?key+':'+(typeof args[0]==='string'?args[0]:''):null;
+    if(lock&&actionLocks.has(lock))return;
+    if(lock)actionLocks.add(lock);
+    try{return await fn.apply(this,args);}catch(error){showToast(error.message||'Chưa lưu được thao tác. Vui lòng thử lại.','error');renderUserAuthHeader();}
+    finally{if(lock)actionLocks.delete(lock);}
+  };
+}
+
 
 // Khởi chạy khi DOM sẵn sàng
 document.addEventListener('DOMContentLoaded', () => {
@@ -172,10 +186,10 @@ function updateThemeButton(theme) {
   const btn = document.getElementById('btn-toggle-theme');
   if (btn) {
     if (theme === 'dark') {
-      btn.innerHTML = '☀️';
+      btn.safeInnerHTML = '☀️';
       btn.title = 'Chuyển sang giao diện Sáng';
     } else {
-      btn.innerHTML = '🌙';
+      btn.safeInnerHTML = '🌙';
       btn.title = 'Chuyển sang giao diện Tối';
     }
   }
@@ -184,7 +198,7 @@ function updateThemeButton(theme) {
 /**
  * Nạp trạng thái ban đầu từ Storage cho 2 Sân (Sân 1 & Sân 2)
  */
-function loadInitialState() {
+function loadInitialState(onlyCourt = null) {
   const initCourt = (courtId, courtName) => {
     const saved = StorageService.getActiveMatch(courtId);
     const hasAny = saved && (
@@ -237,8 +251,8 @@ function loadInitialState() {
     }
   };
 
-  initCourt('court_1', 'Sân 1');
-  initCourt('court_2', 'Sân 2');
+  if(!onlyCourt||onlyCourt==='court_1')initCourt('court_1','Sân 1');
+  if(!onlyCourt||onlyCourt==='court_2')initCourt('court_2','Sân 2');
   updateCourtTabStatusPills();
 }
 
@@ -257,7 +271,7 @@ function updateCourtTabStatusPills() {
 
   if (p1) {
     if (hasP1) {
-      p1.innerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s1_1} - ${s1_2}</strong>`;
+      p1.safeInnerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s1_1} - ${s1_2}</strong>`;
       p1.style.color = 'var(--volt)';
     } else {
       p1.textContent = 'Đang trống';
@@ -267,7 +281,7 @@ function updateCourtTabStatusPills() {
 
   if (p2) {
     if (hasP2) {
-      p2.innerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s2_1} - ${s2_2}</strong>`;
+      p2.safeInnerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s2_1} - ${s2_2}</strong>`;
       p2.style.color = 'var(--cyan)';
     } else {
       p2.textContent = 'Đang trống';
@@ -347,9 +361,9 @@ function setupEventListeners() {
       const copyVal = btn.dataset.copy;
       if (copyVal) {
         navigator.clipboard.writeText(copyVal).then(() => {
-          const orig = btn.innerHTML;
-          btn.innerHTML = '✅';
-          setTimeout(() => { btn.innerHTML = orig; }, 1500);
+          const orig = btn.safeInnerHTML;
+          btn.safeInnerHTML = '✅';
+          setTimeout(() => { btn.safeInnerHTML = orig; }, 1500);
           showToast(`Đã sao chép: ${copyVal}`);
         }).catch(() => {
           showToast(`Sao chép: ${copyVal}`);
@@ -380,7 +394,7 @@ function setupEventListeners() {
   // 4. Nút Đổi Kèo / Hoán đổi
   const btnSwap = document.getElementById('btn-swap-teams');
   if (btnSwap) {
-    btnSwap.addEventListener('click', () => {
+    btnSwap.addEventListener('click', async () => {
       if (state.activeMatch && state.activeMatch.team1 && state.activeMatch.team2) {
         if (state.activeMatch.team1.some(p => !p) || state.activeMatch.team2.some(p => !p)) {
           showToast('Cần chọn đủ 4 VĐV để hoán đổi người giữa 2 đội!', 'info');
@@ -391,7 +405,7 @@ function setupEventListeners() {
         state.activeMatch.team1 = swapped.team1;
         state.activeMatch.team2 = swapped.team2;
         state.activeMatch.diffElo = swapped.diffElo;
-        StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+        await requireCourtSaved(state.activeMatch, state.currentCourtId);
         SoundService.playClick();
         renderCourt();
         updateCourtTabStatusPills();
@@ -401,23 +415,33 @@ function setupEventListeners() {
   }
 
   // 5. Điều chỉnh Tỷ số & Bấm điểm Trong Sân (Realtime)
-  let syncScoreTimeout = null;
-  debouncedSyncLiveScore = () => {
-    if (!state.activeMatch) return;
-    state.activeMatch.score1 = state.score1;
-    state.activeMatch.score2 = state.score2;
-    state.activeMatch.matchStatus = state.matchStatus;
-    state.activeMatch.isSwappedSides = state.isSwappedSides;
-    StorageService.saveLocalActiveMatch(state.activeMatch, state.currentCourtId);
-    updateCourtTabStatusPills();
-
-    if (syncScoreTimeout) clearTimeout(syncScoreTimeout);
-    syncScoreTimeout = setTimeout(() => {
-      StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
-    }, 250);
+  debouncedSyncLiveScore = async (before=null) => {
+    if(!state.activeMatch)return;
+    const courtId=state.currentCourtId,match=state.activeMatch;
+    if(!before){await requireCourtSaved(match,courtId);return;}
+    match.score1=state.score1;match.score2=state.score2;match.matchStatus=state.matchStatus;match.isSwappedSides=state.isSwappedSides;
+    StorageService.saveLocalActiveMatch(match,courtId);updateCourtTabStatusPills();
+    if(!supabaseService.isConfigured()){await requireCourtSaved(match,courtId);return;}
+    const diff1=state.score1-before.score1,diff2=state.score2-before.score2;
+    if(!diff1&&!diff2)return;
+    const delta=(Math.abs(diff1)===1&&!diff2)||(Math.abs(diff2)===1&&!diff1);
+    const action=delta?'delta':'set';
+    const values=delta?{team:diff1?'team1':'team2',delta:diff1||diff2}:{expected1:before.score1,expected2:before.score2,score1:state.score1,score2:state.score2};
+    const requestId='score_'+crypto.randomUUID(),matchId=match.matchId;
+    const previous=scoreWrites.get(courtId)||Promise.resolve();
+    const write=previous.catch(()=>{}).then(()=>supabaseService.score(courtId,matchId,action,values,requestId)).then(record=>{
+      const current=state.courtMatches[courtId];
+      if(current.activeMatch?.matchId!==matchId)return;
+      if(current.serverUpdatedAt&&Date.parse(record.updated_at)<Date.parse(current.serverUpdatedAt))return;
+      current.serverUpdatedAt=record.updated_at;
+      if(scoreWrites.get(courtId)===write){current.score1=record.score1;current.score2=record.score2;current.matchStatus=record.status;current.activeMatch.score1=record.score1;current.activeMatch.score2=record.score2;StorageService.saveLocalActiveMatch(current.activeMatch,courtId);if(state.currentCourtId===courtId)renderCourt();}
+    }).catch(async error=>{showToast(error.message||'Chưa lưu được điểm. Đang tải lại sân.','error');await StorageService.syncFromCloud();loadInitialState();renderCourt();}).finally(()=>{if(scoreWrites.get(courtId)===write)scoreWrites.delete(courtId);});
+    scoreWrites.set(courtId,write);
   };
 
   const recordScoreChange = (newS1, newS2, pulseTeam = null) => {
+    if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+    const before={score1:state.score1,score2:state.score2};
     if (!state.scoreHistory) state.scoreHistory = [];
     state.scoreHistory.push({ score1: state.score1, score2: state.score2 });
     if (state.scoreHistory.length > 20) state.scoreHistory.shift();
@@ -447,7 +471,7 @@ function setupEventListeners() {
     updateScoreboardDisplay();
     renderEloPrediction();
     renderBettingWidget();
-    debouncedSyncLiveScore();
+    debouncedSyncLiveScore(before);
   };
 
   // Nút Dọn Sân
@@ -599,46 +623,46 @@ function setupEventListeners() {
   // 8b. Điểm danh Quick Actions
   const btnReg = document.getElementById('btn-checkin-regulars');
   if (btnReg) {
-    btnReg.addEventListener('click', () => {
+    btnReg.addEventListener('click', guardedAction(async () => {
       const att = StorageService.getAttendance();
       const members = StorageService.getMembers();
       att.presentIds = members.filter(m => m.frequency === 'regular').map(m => m.id);
-      StorageService.saveAttendance(att);
+      await StorageService.setAttendanceList(att.presentIds);
       SoundService.playClick();
       renderAttendance();
       updateSessionStatusBadge();
       renderCourtBench();
-      showToast('Đã chọn 8 thành viên nòng cốt!');
-    });
+      showToast('Đã chọn các thành viên nòng cốt!');
+    }));
   }
 
   const btnAll = document.getElementById('btn-checkin-all');
   if (btnAll) {
-    btnAll.addEventListener('click', () => {
+    btnAll.addEventListener('click', guardedAction(async () => {
       const att = StorageService.getAttendance();
       const members = StorageService.getMembers();
       att.presentIds = members.map(m => m.id);
-      StorageService.saveAttendance(att);
+      await StorageService.setAttendanceList(att.presentIds);
       SoundService.playClick();
       renderAttendance();
       updateSessionStatusBadge();
       renderCourtBench();
       showToast('Đã điểm danh tất cả thành viên!');
-    });
+    }));
   }
 
   const btnNone = document.getElementById('btn-checkin-none');
   if (btnNone) {
-    btnNone.addEventListener('click', () => {
+    btnNone.addEventListener('click', guardedAction(async () => {
       const att = StorageService.getAttendance();
       att.presentIds = [];
-      StorageService.saveAttendance(att);
+      await StorageService.setAttendanceList(att.presentIds);
       SoundService.playClick();
       renderAttendance();
       updateSessionStatusBadge();
       renderCourtBench();
       showToast('Đã bỏ chọn tất cả!');
-    });
+    }));
   }
 
   // 9. Tìm kiếm thành viên
@@ -686,7 +710,7 @@ function setupEventListeners() {
   // Xử lý Form Thêm/Sửa Thành Viên
   const formMember = document.getElementById('form-member');
   if (formMember) {
-    formMember.addEventListener('submit', handleMemberFormSubmit);
+    formMember.addEventListener('submit', guardedAction(handleMemberFormSubmit));
   }
 
   // Xử lý Đăng nhập bằng mã PIN
@@ -765,7 +789,7 @@ function setupEventListeners() {
   // Xử lý Form Thêm Buổi Đánh
   const formSession = document.getElementById('form-session');
   if (formSession) {
-    formSession.addEventListener('submit', handleSessionFormSubmit);
+    formSession.addEventListener('submit', guardedAction(handleSessionFormSubmit));
   }
 
   // Upload Avatar trong Modal
@@ -824,8 +848,8 @@ function setupEventListeners() {
   // Export JSON
   const btnExport = document.getElementById('btn-export-json');
   if (btnExport) {
-    btnExport.addEventListener('click', () => {
-      const json = StorageService.exportAllData();
+    btnExport.addEventListener('click', guardedAction(async () => {
+      const json = await StorageService.exportSnapshot();
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -834,7 +858,7 @@ function setupEventListeners() {
       a.click();
       URL.revokeObjectURL(url);
       showToast('Đã tải xuống file sao lưu!');
-    });
+    }));
   }
 
   // Import JSON
@@ -849,7 +873,7 @@ function setupEventListeners() {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = guardedAction(async (ev) => {
           const success = StorageService.importAllData(ev.target.result);
           if (success) {
             closeAllModals();
@@ -859,7 +883,7 @@ function setupEventListeners() {
           } else {
             showToast('File JSON không hợp lệ!', 'error');
           }
-        };
+        });
         reader.readAsText(file);
       }
     });
@@ -876,9 +900,9 @@ function setupEventListeners() {
         return;
       }
       const ok = await showConfirmModal({
-        title: 'Xóa Toàn Bộ Dữ Liệu?',
-        message: 'Bạn có chắc chắn muốn xóa sạch thành viên, lịch sử trận và điểm danh để làm mới 100% không? Thao tác này không thể hoàn tác!',
-        confirmText: 'Xóa Sạch 100%',
+        title: 'Dọn Bộ Nhớ Trên Thiết Bị?',
+        message: 'Thao tác này đăng xuất và dọn dữ liệu lưu trên thiết bị. Dữ liệu CLB trên máy chủ được giữ nguyên và tải lại khi mở app.',
+        confirmText: 'Dọn Thiết Bị',
         icon: '🗑️',
         isDanger: true
       });
@@ -887,7 +911,7 @@ function setupEventListeners() {
         closeAllModals();
         loadInitialState();
         switchTab(state.currentTab);
-        showToast('Đã làm sạch toàn bộ dữ liệu!');
+        showToast('Đã dọn bộ nhớ thiết bị. Dữ liệu CLB trên máy chủ được giữ nguyên.');
       }
     });
   }
@@ -930,7 +954,7 @@ function setupEventListeners() {
     }
     if (testResult) {
       testResult.style.display = 'none';
-      testResult.innerHTML = '';
+      testResult.safeInnerHTML = '';
     }
 
     document.getElementById('modal-supabase-config')?.classList.add('open');
@@ -946,8 +970,8 @@ function setupEventListeners() {
 
   const btnSettingsExport = document.getElementById('btn-settings-export');
   if (btnSettingsExport) {
-    btnSettingsExport.addEventListener('click', () => {
-      const json = StorageService.exportAllData();
+    btnSettingsExport.addEventListener('click', guardedAction(async () => {
+      const json = await StorageService.exportSnapshot();
       const blob = new Blob([json], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
@@ -956,7 +980,7 @@ function setupEventListeners() {
       a.click();
       URL.revokeObjectURL(url);
       showToast('Đã tải xuống file sao lưu!');
-    });
+    }));
   }
 
   const inputSettingsImport = document.getElementById('input-settings-import-json');
@@ -970,7 +994,7 @@ function setupEventListeners() {
       const file = e.target.files[0];
       if (file) {
         const reader = new FileReader();
-        reader.onload = (ev) => {
+        reader.onload = guardedAction(async (ev) => {
           const success = StorageService.importAllData(ev.target.result);
           if (success) {
             closeAllModals();
@@ -980,7 +1004,7 @@ function setupEventListeners() {
           } else {
             showToast('File JSON không hợp lệ!', 'error');
           }
-        };
+        });
         reader.readAsText(file);
       }
     });
@@ -994,9 +1018,9 @@ function setupEventListeners() {
         return;
       }
       const ok = await showConfirmModal({
-        title: 'Xóa Toàn Bộ Dữ Liệu?',
-        message: 'Bạn có chắc chắn muốn xóa sạch thành viên, lịch sử trận và điểm danh để làm mới 100% không? Thao tác này không thể hoàn tác!',
-        confirmText: 'Xóa Sạch 100%',
+        title: 'Dọn Bộ Nhớ Trên Thiết Bị?',
+        message: 'Thao tác này đăng xuất và dọn dữ liệu lưu trên thiết bị. Dữ liệu CLB trên máy chủ được giữ nguyên và tải lại khi mở app.',
+        confirmText: 'Dọn Thiết Bị',
         icon: '🗑️',
         isDanger: true
       });
@@ -1005,7 +1029,7 @@ function setupEventListeners() {
         closeAllModals();
         loadInitialState();
         switchTab(state.currentTab);
-        showToast('Đã làm sạch toàn bộ dữ liệu!');
+        showToast('Đã dọn bộ nhớ thiết bị. Dữ liệu CLB trên máy chủ được giữ nguyên.');
       }
     });
   }
@@ -1166,6 +1190,8 @@ window.switchTab = switchTab;
  * =========================================================================
  */
 function renderCourt() {
+  const people=new Map([...StorageService.getMembers(),...StorageService.getGuests()].map(p=>[p.id,p]));
+  for(const court of Object.values(state.courtMatches))for(const team of ['team1','team2'])if(court.activeMatch?.[team])court.activeMatch[team]=court.activeMatch[team].map(p=>p?(people.get(p.id)||p):null);
   updateSessionStatusBadge();
 
   const team1Grid = document.getElementById('team1-players-grid');
@@ -1182,7 +1208,7 @@ function renderCourt() {
 
   const courtName = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
   if (venueLabel) {
-    venueLabel.innerHTML = `<span class="court-venue-short">${courtName.toUpperCase()}</span><span class="court-venue-full"> - LƯỚI THÁI THỊNH</span>`;
+    venueLabel.safeInnerHTML = `<span class="court-venue-short">${courtName.toUpperCase()}</span><span class="court-venue-full"> - LƯỚI THÁI THỊNH</span>`;
   }
   if (netBadge) netBadge.textContent = `LƯỚI THÁI THỊNH - ${courtName.toUpperCase()}`;
 
@@ -1222,19 +1248,19 @@ function renderCourt() {
 
   // Render Team 1 (2 slots)
   if (team1Grid) {
-    team1Grid.innerHTML = t1.map((p, idx) => renderCourtPlayerCard(p, 'team1', idx)).join('');
+    team1Grid.safeInnerHTML = t1.map((p, idx) => renderCourtPlayerCard(p, 'team1', idx)).join('');
   }
   const validT1 = t1.filter(Boolean);
   const elo1 = validT1.length > 0 ? Math.round(validT1.reduce((sum, p) => sum + p.elo, 0) / validT1.length) : 0;
-  if (t1AvgLabel) t1AvgLabel.innerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo1}</span>`;
+  if (t1AvgLabel) t1AvgLabel.safeInnerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo1}</span>`;
 
   // Render Team 2 (2 slots)
   if (team2Grid) {
-    team2Grid.innerHTML = t2.map((p, idx) => renderCourtPlayerCard(p, 'team2', idx)).join('');
+    team2Grid.safeInnerHTML = t2.map((p, idx) => renderCourtPlayerCard(p, 'team2', idx)).join('');
   }
   const validT2 = t2.filter(Boolean);
   const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
-  if (t2AvgLabel) t2AvgLabel.innerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo2}</span>`;
+  if (t2AvgLabel) t2AvgLabel.safeInnerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo2}</span>`;
 
   // Quản lý trạng thái thi đấu & badge
   const totalPlayers = validT1.length + validT2.length;
@@ -1329,12 +1355,12 @@ function renderCourtBench() {
     const courtLabel = isCourt1 ? 'S1' : (isCourt2 ? 'S2' : '');
     const isGuestTag = member.isGuest ? ' [Khách]' : '';
     const titleText = isThisCourt
-      ? `${member.name}${isGuestTag} (${member.elo} Elo) — Đang trên sân này (Chạm để gỡ về hàng chờ)`
-      : `${member.name}${isGuestTag} (${member.elo} Elo)${isOnCourt ? ` — Đang ở ${courtLabel}` : ' — Chạm để tự động vào sân'}`;
+      ? `${escapeHtml(member.name)}${isGuestTag} (${member.elo} Elo) — Đang trên sân này (Chạm để gỡ về hàng chờ)`
+      : `${escapeHtml(member.name)}${isGuestTag} (${member.elo} Elo)${isOnCourt ? ` — Đang ở ${courtLabel}` : ' — Chạm để tự động vào sân'}`;
 
     return `
-      <button type="button" 
-        class="bench-avatar-btn ${isOnCourt ? 'is-on-court' : ''} ${member.isGuest ? 'is-guest-bench-btn' : ''}" 
+      <button type="button"
+        class="bench-avatar-btn ${isOnCourt ? 'is-on-court' : ''} ${member.isGuest ? 'is-guest-bench-btn' : ''}"
         onclick="window.appBenchSelectPlayer('${member.id}')"
         title="${titleText}"
       >
@@ -1345,15 +1371,15 @@ function renderCourtBench() {
   };
 
   if (males.length === 0) {
-    maleContainer.innerHTML = '<span class="bench-empty-hint">Chưa có nam điểm danh</span>';
+    maleContainer.safeInnerHTML = '<span class="bench-empty-hint">Chưa có nam điểm danh</span>';
   } else {
-    maleContainer.innerHTML = males.map(renderBenchAvatarBtn).join('');
+    maleContainer.safeInnerHTML = males.map(renderBenchAvatarBtn).join('');
   }
 
   if (females.length === 0) {
-    femaleContainer.innerHTML = '<span class="bench-empty-hint">Chưa có nữ điểm danh</span>';
+    femaleContainer.safeInnerHTML = '<span class="bench-empty-hint">Chưa có nữ điểm danh</span>';
   } else {
-    femaleContainer.innerHTML = females.map(renderBenchAvatarBtn).join('');
+    femaleContainer.safeInnerHTML = females.map(renderBenchAvatarBtn).join('');
   }
 }
 
@@ -1362,7 +1388,7 @@ function renderCourtBench() {
  * - Nếu người đó đã ở trên sân hiện tại: Chạm vào sẽ gỡ ra về hàng chờ!
  * - Nếu chưa trên sân: Tự động nhảy vào ô trống đầu tiên (Sân trái -> Sân phải)
  */
-window.appBenchSelectPlayer = function(memberId) {
+window.appBenchSelectPlayer = async function(memberId) {
   if (!state.activeMatch) {
     state.activeMatch = { team1: [null, null], team2: [null, null] };
   }
@@ -1429,7 +1455,7 @@ window.appBenchSelectPlayer = function(memberId) {
   const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
   state.activeMatch.diffElo = Math.abs(elo1 - elo2);
 
-  StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+  await requireCourtSaved(state.activeMatch, state.currentCourtId);
 
   SoundService.playClick();
   renderCourt();
@@ -1439,7 +1465,7 @@ window.appBenchSelectPlayer = function(memberId) {
 /**
  * Gỡ một VĐV khỏi vị trí trên sân và đưa trở lại hàng chờ (để trống slot đó)
  */
-window.appUnassignSlot = function(teamKey, slotIndex) {
+window.appUnassignSlot = async function(teamKey, slotIndex) {
   if (!state.activeMatch || !state.activeMatch[teamKey]) return;
   const removed = state.activeMatch[teamKey][slotIndex];
   if (!removed) return;
@@ -1452,11 +1478,10 @@ window.appUnassignSlot = function(teamKey, slotIndex) {
   const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
   state.activeMatch.diffElo = Math.abs(elo1 - elo2);
 
-  StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+  await requireCourtSaved(state.activeMatch, state.currentCourtId);
 
   SoundService.playClick();
   renderCourt();
-  debouncedSyncLiveScore();
 };
 
 function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
@@ -1479,7 +1504,7 @@ function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
 
   return `
     <div class="court-player-card court-slot-occupied" onclick="window.appOpenSwapPlayerModal('${teamKey}', ${slotIndex})" title="Chạm để đổi VĐV khác">
-      <div class="player-avatar-wrap" onclick="event.stopPropagation(); window.appUnassignSlot('${teamKey}', ${slotIndex})" title="Chạm vào avatar để gỡ ${player.name} về hàng chờ">
+      <div class="player-avatar-wrap" onclick="event.stopPropagation(); window.appUnassignSlot('${teamKey}', ${slotIndex})" title="Chạm vào avatar để gỡ ${escapeHtml(player.name)} về hàng chờ">
         ${renderAvatarHtml(player, { size: 'sm' })}
         <span class="gender-badge-dot ${isMale ? 'gender-male' : 'gender-female'}">
           ${isMale ? '♂' : '♀'}
@@ -1487,13 +1512,13 @@ function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
       </div>
       <div class="player-info">
         <div class="player-name">
-          <span class="player-name-text">${player.name}</span>
+          <span class="player-name-text">${escapeHtml(player.name)}</span>
           ${player.activeEloShield ? '<span title="Khiên bảo vệ Elo đang BẬT (Giảm 50% điểm trừ nếu thua)" style="font-size: 0.82rem; flex-shrink: 0;">🛡️</span>' : ''}
         </div>
         <div class="player-meta-row">
           <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
             <span class="tier-icon">${tier.icon}</span>
-            <span class="tier-name-text">${tier.name}</span>
+            <span class="tier-name-text">${escapeHtml(tier.name)}</span>
           </span>
           <span class="elo-pill">${player.elo}</span>
         </div>
@@ -1514,18 +1539,18 @@ function renderEloPrediction() {
   const t2 = (state.activeMatch?.team2 || []).map(refreshPlayer);
 
   if (!state.activeMatch || t1.length < 2 || t2.length < 2 || t1.some(p => !p) || t2.some(p => !p)) {
-    previewBox.innerHTML = '<span>Dự đoán Elo sẽ xuất hiện khi có đủ 4 VĐV</span>';
+    previewBox.safeInnerHTML = '<span>Dự đoán Elo sẽ xuất hiện khi có đủ 4 VĐV</span>';
     return;
   }
 
   if (state.score1 === state.score2) {
-    previewBox.innerHTML = '<span>Tỷ số đang hòa. Cần có 1 đội thắng để phân định Elo</span>';
+    previewBox.safeInnerHTML = '<span>Tỷ số đang hòa. Cần có 1 đội thắng để phân định Elo</span>';
     return;
   }
 
   const result = calculateDoublesElo(t1, t2, state.score1, state.score2);
 
-  previewBox.innerHTML = `
+  previewBox.safeInnerHTML = `
     <div class="elo-preview-item">
       <span>Đội 1:</span>
       <span class="${result.deltaTeam1 > 0 ? 'elo-delta-pos' : 'elo-delta-neg'}">
@@ -1554,7 +1579,7 @@ function renderBettingWidget() {
   if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2 ||
       state.activeMatch.team1.length < 2 || state.activeMatch.team2.length < 2 ||
       state.activeMatch.team1.some(p => !p) || state.activeMatch.team2.some(p => !p)) {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div style="display: flex; align-items: center; justify-content: space-between; color: var(--text-muted); font-size: 0.82rem; padding: 4px 0;">
         <span style="display: flex; align-items: center; gap: 6px;">
           <span>🎯</span> Kèo cược vui bằng Xu sẽ mở khi có đủ 4 VĐV trên sân
@@ -1645,7 +1670,7 @@ function renderBettingWidget() {
         <span style="display: flex; align-items: center; gap: 8px;">
           <span>🪙</span> <span>Đăng nhập mã PIN để tham gia cược vui nhận Xu!</span>
         </span>
-        <button class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem;" onclick="window.appOpenAuthModal()">
+        <button class="btn-primary" style="padding: 6px 14px; font-size: 0.8rem;" onclick="window.appOpenLoginModal()">
           Đăng Nhập
         </button>
       </div>
@@ -1755,7 +1780,7 @@ function renderBettingWidget() {
     `;
   }
 
-  container.innerHTML = `${headerHtml}${crowdMeterHtml}${bodyHtml}`;
+  container.safeInnerHTML = `${headerHtml}${crowdMeterHtml}${bodyHtml}`;
 }
 
 window.appSelectBetTeam = function(teamKey) {
@@ -1838,18 +1863,18 @@ window.appOpenCourtBetsModal = function() {
   const headerBox = document.getElementById('modal-court-bets-match-header');
   if (headerBox) {
     if (t1.length > 0 && t2.length > 0) {
-      headerBox.innerHTML = `
+      headerBox.safeInnerHTML = `
         <div style="font-size: 0.78rem; color: var(--cyan); font-weight: 800; text-transform: uppercase;">
           🏸 ${courtName} • TỶ SỐ HIỆN TẠI: ${state.score1} - ${state.score2}
         </div>
         <div style="font-size: 0.95rem; font-weight: 800; color: var(--text-primary); margin-top: 4px;">
-          <span style="color: #38bdf8;">${t1.map(p => p.name).join(' & ')}</span>
+          <span style="color: #38bdf8;">${escapeHtml(t1.map(p => p.name).join(' & '))}</span>
           <span style="color: var(--text-muted); font-size: 0.8rem; margin: 0 8px;">VS</span>
-          <span style="color: #f43f5e;">${t2.map(p => p.name).join(' & ')}</span>
+          <span style="color: #f43f5e;">${escapeHtml(t2.map(p => p.name).join(' & '))}</span>
         </div>
       `;
     } else {
-      headerBox.innerHTML = `<div style="color: var(--text-muted);">Chưa có trận đấu trên sân</div>`;
+      headerBox.safeInnerHTML = `<div style="color: var(--text-muted);">Chưa có trận đấu trên sân</div>`;
     }
   }
 
@@ -1862,8 +1887,8 @@ window.appOpenCourtBetsModal = function() {
 
   const t1Title = document.getElementById('bets-modal-t1-title');
   const t2Title = document.getElementById('bets-modal-t2-title');
-  if (t1Title) t1Title.innerHTML = `Đội 1 (${oddsData.oddsTeam1}x) • ${t1Bets.length} vé`;
-  if (t2Title) t2Title.innerHTML = `Đội 2 (${oddsData.oddsTeam2}x) • ${t2Bets.length} vé`;
+  if (t1Title) t1Title.safeInnerHTML = `Đội 1 (${oddsData.oddsTeam1}x) • ${t1Bets.length} vé`;
+  if (t2Title) t2Title.safeInnerHTML = `Đội 2 (${oddsData.oddsTeam2}x) • ${t2Bets.length} vé`;
 
   const renderBetList = (bets) => {
     if (bets.length === 0) {
@@ -1889,8 +1914,8 @@ window.appOpenCourtBetsModal = function() {
 
   const t1List = document.getElementById('bets-modal-t1-list');
   const t2List = document.getElementById('bets-modal-t2-list');
-  if (t1List) t1List.innerHTML = renderBetList(t1Bets);
-  if (t2List) t2List.innerHTML = renderBetList(t2Bets);
+  if (t1List) t1List.safeInnerHTML = renderBetList(t1Bets);
+  if (t2List) t2List.safeInnerHTML = renderBetList(t2Bets);
 
   modal.classList.add('open');
 };
@@ -1898,175 +1923,51 @@ window.appOpenCourtBetsModal = function() {
 /**
  * Tạo trận mới cho sân hiện tại với hiệu ứng xốc đĩa quay số
  */
-function generateNewMatch(withAnimation = true) {
-  const attendance = StorageService.getAttendance();
-  const members = StorageService.getMembers();
-  const guests = StorageService.getGuests();
-  const allCandidates = [...members, ...guests];
-  const presentMembers = allCandidates.filter(m => attendance.presentIds.includes(m.id));
-
-  if (presentMembers.length < 4) {
-    showToast(`Cần ít nhất 4 người có mặt tại sân để ghép trận! Hiện mới có ${presentMembers.length} người.`, 'error');
-    return;
-  }
-
-  // Loại trừ những người đang đánh ở sân còn lại (Court 1 hoặc Court 2)
-  const otherCourtId = state.currentCourtId === 'court_1' ? 'court_2' : 'court_1';
-  const otherMatch = state.courtMatches[otherCourtId].activeMatch;
-  const excludeIds = [];
-  if (otherMatch && otherMatch.team1 && otherMatch.team2) {
-    otherMatch.team1.forEach(p => p && excludeIds.push(p.id));
-    otherMatch.team2.forEach(p => p && excludeIds.push(p.id));
-  }
-
-  const availablePresent = presentMembers.filter(m => !excludeIds.includes(m.id));
-
-  if (availablePresent.length < 4) {
-    const currentCourtName = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
-    const otherCourtName = state.currentCourtId === 'court_2' ? 'Sân 1' : 'Sân 2';
-    showToast(`Không đủ người để xếp trận cho ${currentCourtName} (${otherCourtName} đang có 4 người đánh, chỉ còn ${availablePresent.length} người rảnh)`, 'error');
-    return;
-  }
-
-  const courtName = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
-  const spinModal = document.getElementById('modal-spinner');
-  const subtitle = document.getElementById('spinner-subtitle');
-
-  if (withAnimation && spinModal) {
-    if (subtitle) {
-      if (state.matchmakerMode === 'mixed') {
-        subtitle.textContent = `Đang ghép cặp Đôi Nam Nữ cho ${courtName}...`;
-      } else if (state.matchmakerMode === 'random') {
-        subtitle.textContent = `Đang xốc đĩa bốc thăm ngẫu nhiên cho ${courtName}...`;
-      } else {
-        subtitle.textContent = `Đang tính toán chênh lệch Elo nhỏ nhất cho ${courtName}...`;
-      }
-    }
-
-    spinModal.classList.add('open');
-    SoundService.playWhistle();
-
-    setTimeout(() => {
-      try {
-        StorageService.refundMatchBets(state.currentCourtId, 'Tạo trận mới');
-        const match = MatchmakerService.createMatch(
-          presentMembers,
-          attendance.gamesPlayedToday,
-          state.matchmakerMode,
-          excludeIds
-        );
-        match.courtNumber = courtName;
-        state.activeMatch = match;
-        state.score1 = 0;
-        state.score2 = 0;
-        StorageService.saveActiveMatch(match, state.currentCourtId);
-        renderCourt();
-        updateScoreboardDisplay();
-        renderEloPrediction();
-        updateCourtTabStatusPills();
-        spinModal.classList.remove('open');
-        showToast(`Đã xếp trận mới lên ${courtName}!`);
-      } catch (err) {
-        spinModal.classList.remove('open');
-        showToast(err.message, 'error');
-      }
-    }, 600);
-  } else {
-    try {
-      StorageService.refundMatchBets(state.currentCourtId, 'Tạo trận mới');
-      const match = MatchmakerService.createMatch(
-        presentMembers,
-        attendance.gamesPlayedToday,
-        state.matchmakerMode,
-        excludeIds
-      );
-      match.courtNumber = courtName;
-      state.activeMatch = match;
-      state.score1 = 0;
-      state.score2 = 0;
-      StorageService.saveActiveMatch(match, state.currentCourtId);
-      renderCourt();
-      updateScoreboardDisplay();
-      renderEloPrediction();
-      updateCourtTabStatusPills();
-      showToast(`Đã xếp trận mới lên ${courtName}!`);
-    } catch (err) {
-      showToast(err.message, 'error');
-    }
-  }
+async function generateNewMatch(withAnimation = true) {
+  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+  const courtId=state.currentCourtId,courtName=courtId==='court_2'?'Sân 2':'Sân 1',mode=state.matchmakerMode;
+  if(state.generatingCourt)return;state.generatingCourt=true;
+  const spinner=document.getElementById('modal-spinner');
+  try{
+    const attendance=StorageService.getAttendance();
+    const candidates=[...StorageService.getMembers(),...StorageService.getGuests()].filter(p=>attendance.presentIds.includes(p.id));
+    const other=state.courtMatches[courtId==='court_1'?'court_2':'court_1'].activeMatch;
+    const excluded=[...(other?.team1||[]),...(other?.team2||[])].filter(Boolean).map(p=>p.id);
+    const match=MatchmakerService.createMatch(candidates,attendance.gamesPlayedToday,mode,excluded);
+    match.courtNumber=courtName;match.score1=0;match.score2=0;
+    if(withAnimation){spinner?.classList.add('open');SoundService.playWhistle();await new Promise(resolve=>setTimeout(resolve,600));}
+    StorageService.refundMatchBets(courtId,'Tạo trận mới');
+    await requireCourtSaved(match,courtId);loadInitialState(courtId);renderCourt();updateCourtTabStatusPills();showToast(`Đã xếp trận lên ${courtName}.`);
+  }catch(error){showToast(error.message,'error');}finally{state.generatingCourt=false;spinner?.classList.remove('open');}
 }
 
-/**
- * Ghép đồng thời 2 trận cho cả 2 sân (Cần tối thiểu 8 người có mặt)
- */
-function spinBothCourts() {
-  const attendance = StorageService.getAttendance();
-  const members = StorageService.getMembers();
-  const guests = StorageService.getGuests();
-  const allCandidates = [...members, ...guests];
-  const presentMembers = allCandidates.filter(m => attendance.presentIds.includes(m.id));
-
-  if (presentMembers.length < 8) {
-    showToast(`Cần tối thiểu 8 người có mặt để ghép cùng lúc 2 sân! (Hiện có ${presentMembers.length} người)`, 'error');
-    return;
-  }
-
-  const spinModal = document.getElementById('modal-spinner');
-  const subtitle = document.getElementById('spinner-subtitle');
-  if (subtitle) subtitle.textContent = 'Đang bốc 8 người chia đều cho Sân 1 và Sân 2...';
-  if (spinModal) spinModal.classList.add('open');
-  SoundService.playWhistle();
-
-  setTimeout(() => {
-    try {
-      StorageService.refundMatchBets('court_1', 'Ghép lại đồng thời cả 2 sân');
-      StorageService.refundMatchBets('court_2', 'Ghép lại đồng thời cả 2 sân');
-
-      // 1. Ghép Sân 1
-      const match1 = MatchmakerService.createMatch(
-        presentMembers,
-        attendance.gamesPlayedToday,
-        state.courtMatches.court_1.mode || 'balanced',
-        []
-      );
-      match1.courtNumber = 'Sân 1';
-      state.courtMatches.court_1.activeMatch = match1;
-      state.courtMatches.court_1.score1 = 0;
-      state.courtMatches.court_1.score2 = 0;
-      StorageService.saveActiveMatch(match1, 'court_1');
-
-      // 2. Ghép Sân 2 từ những người còn lại
-      const excludeCourt1 = [...match1.team1.map(p => p.id), ...match1.team2.map(p => p.id)];
-      const match2 = MatchmakerService.createMatch(
-        presentMembers,
-        attendance.gamesPlayedToday,
-        state.courtMatches.court_2.mode || 'balanced',
-        excludeCourt1
-      );
-      match2.courtNumber = 'Sân 2';
-      state.courtMatches.court_2.activeMatch = match2;
-      state.courtMatches.court_2.score1 = 0;
-      state.courtMatches.court_2.score2 = 0;
-      StorageService.saveActiveMatch(match2, 'court_2');
-
-      if (spinModal) spinModal.classList.remove('open');
-      SoundService.playFanfare();
-      renderCourt();
-      updateScoreboardDisplay();
-      renderEloPrediction();
-      updateCourtTabStatusPills();
-      showToast('🎉 Đã ghép xong cả 2 sân cho 8 người!');
-    } catch (err) {
-      if (spinModal) spinModal.classList.remove('open');
-      showToast(err.message, 'error');
-    }
-  }, 700);
+async function spinBothCourts() {
+  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+  if(state.spinningCourts)return;state.spinningCourts=true;
+  const spinner=document.getElementById('modal-spinner');
+  try{
+    const attendance=StorageService.getAttendance(),all=[...StorageService.getMembers(),...StorageService.getGuests()].filter(p=>attendance.presentIds.includes(p.id));
+    if(all.length<8)throw new Error('Cần ít nhất tám người có mặt để xếp cả hai sân.');
+    const one=MatchmakerService.createMatch(all,attendance.gamesPlayedToday,state.courtMatches.court_1.mode||'balanced',[]);
+    const exclude=[...one.team1,...one.team2].map(p=>p.id);
+    const two=MatchmakerService.createMatch(all,attendance.gamesPlayedToday,state.courtMatches.court_2.mode||'balanced',exclude);
+    one.courtNumber='Sân 1';two.courtNumber='Sân 2';spinner?.classList.add('open');
+    if(supabaseService.isConfigured()){
+      const expected=Object.fromEntries(['court_1','court_2'].map(id=>[id,StorageService.getActiveMatch(id)?.matchId||null]));
+      const payloads=[one,two].map((m,i)=>({id:i?'court_2':'court_1',match_id:'match_zs_'+crypto.randomUUID(),team1:m.team1.map(p=>p.id),team2:m.team2.map(p=>p.id),score1:0,score2:0,status:'ready',matchmaker_mode:m.mode||'balanced',diff_elo:m.diffElo||0}));
+      await StorageService.cloudAction('club_save_courts',{p_id:'courts_'+crypto.randomUUID(),p_payloads:payloads,p_expected:expected});
+    }else{StorageService.refundMatchBets('court_1');StorageService.refundMatchBets('court_2');await requireCourtSaved(one,'court_1');await requireCourtSaved(two,'court_2');}
+    loadInitialState();renderCourt();updateCourtTabStatusPills();showToast('Đã xếp thành công cả hai sân.');
+  }catch(error){showToast(error.message,'error');}finally{state.spinningCourts=false;spinner?.classList.remove('open');}
 }
 
 /**
  * Xác nhận kết quả trận đấu & Cập nhật điểm Elo
  */
 async function finishMatch() {
+  const requestedCourt=state.currentCourtId,requestedMatch=state.activeMatch?.matchId;
+  await Promise.allSettled([...scoreWrites.values()]);
+  if(state.currentCourtId!==requestedCourt||state.activeMatch?.matchId!==requestedMatch){showToast('Sân hoặc trận đã thay đổi. Vui lòng kiểm tra lại trước khi chốt.','info');return;}
   if (state.finishingMatch) return;
   if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2 ||
       state.activeMatch.team1.some(p => !p) || state.activeMatch.team2.some(p => !p)) {
@@ -2111,13 +2012,19 @@ async function finishMatch() {
   const cloudWallet = supabaseService.isConfigured();
   state.finishingMatch = true;
   try {
-  if (cloudWallet && await supabaseService.checkWalletVersion() !== 2) {
+  if (cloudWallet && await supabaseService.checkWalletVersion() !== 3) {
     showToast('Hệ thống xu chưa sẵn sàng. Chưa lưu kết quả, vui lòng thử lại sau.', 'error');
     return;
   }
   if (cloudWallet && !active.matchId) {
     showToast('Trận chưa đồng bộ. Vui lòng tải lại sân trước khi lưu kết quả.', 'error');
     return;
+  }
+  if(cloudWallet){
+    if(!await supabaseService.insertMatch({id:active.matchId,score1:s1,score2:s2}))throw new Error('Chưa lưu được kết quả.');
+    if(!await StorageService.syncFromCloud())throw new Error('Kết quả đã gửi. Vui lòng tải lại để xác nhận.');
+    loadInitialState();state.currentUser=StorageService.getCurrentUser();renderUserAuthHeader();renderCourt();updateCourtTabStatusPills();renderHistory();renderLeaderboard();
+    showToast(`Đã lưu kết quả ${s1} - ${s2}.`);return;
   }
   const members = StorageService.getMembers();
   const inventoryBefore = StorageService.getLocalInventory();
@@ -2319,7 +2226,7 @@ async function finishMatch() {
   state.courtMatches[finishedCourtId].matchStatus = 'idle';
   state.courtMatches[finishedCourtId].scoreHistory = [];
   if (cloudWallet) StorageService.saveLocalActiveMatch(emptyMatch, finishedCourtId);
-  else StorageService.saveActiveMatch(emptyMatch, finishedCourtId);
+  else await requireCourtSaved(emptyMatch, finishedCourtId);
   }
   renderCourt();
   updateCourtTabStatusPills();
@@ -2399,7 +2306,7 @@ function renderLeaderboard() {
   });
 
   if (sortedMembers.length === 0) {
-    if (podiumContainer) podiumContainer.innerHTML = '';
+    if (podiumContainer) podiumContainer.safeInnerHTML = '';
     if (listContainer) {
       let emptyTitle = 'CLB Thái Thịnh chưa có thành viên';
       let emptyDesc = 'Dữ liệu thành viên đang để trống để bạn tự nhập danh sách thật của CLB. Bấm nút bên dưới để thêm thành viên đầu tiên!';
@@ -2411,7 +2318,7 @@ function renderLeaderboard() {
         emptyDesc = 'Hãy thêm thành viên Nữ vào CLB để xuất hiện trên bảng xếp hạng này.';
       }
 
-      listContainer.innerHTML = `
+      listContainer.safeInnerHTML = `
         <div class="empty-state-box" style="margin-top: 10px;">
           <div style="font-size: 3rem; margin-bottom: 12px;">🏸</div>
           <h3 class="empty-state-title">${emptyTitle}</h3>
@@ -2428,7 +2335,7 @@ function renderLeaderboard() {
   // Bục vinh danh (Top 3) chỉ dành riêng cho thành viên ĐÃ THI ĐẤU (matchesPlayed > 0)
   const activeMembersForPodium = sortedMembers.filter(m => (m.matchesPlayed || 0) > 0);
   if (podiumContainer && activeMembersForPodium.length < 3) {
-    podiumContainer.innerHTML = '';
+    podiumContainer.safeInnerHTML = '';
   }
 
   // Render Podium Top 3 (Hạng 2 bên trái, Hạng 1 ở giữa, Hạng 3 bên phải)
@@ -2455,8 +2362,8 @@ function renderLeaderboard() {
           <div style="display: flex; justify-content: center; margin-bottom: 6px;">
             ${renderAvatarHtml(p, { size: isFirst ? 'xl' : 'lg' })}
           </div>
-          <div class="podium-name">${p.name}</div>
-          ${isCoinSort 
+          <div class="podium-name">${escapeHtml(p.name)}</div>
+          ${isCoinSort
             ? `
               <div class="podium-coin-amount">🪙 ${coins} Xu</div>
               ${richBadgeHtml}
@@ -2467,7 +2374,7 @@ function renderLeaderboard() {
             : `
               <div class="podium-elo">${p.elo} Elo</div>
               <div style="font-size: 0.72rem; color: ${tier.color}; font-weight: 700; margin-top: 2px;">
-                ${tier.icon} ${tier.name}
+                ${tier.icon} ${escapeHtml(tier.name)}
               </div>
               <div style="font-size: 0.75rem; color: var(--text-dim); margin-top: 4px;">
                 ${p.wins}T - ${p.losses}B (${p.matchesPlayed > 0 ? Math.round((p.wins/p.matchesPlayed)*100) : 0}%)
@@ -2477,7 +2384,7 @@ function renderLeaderboard() {
       `;
     };
 
-    podiumContainer.innerHTML = `
+    podiumContainer.safeInnerHTML = `
       ${renderPodiumItem(second, '2', 'badge-silver')}
       ${renderPodiumItem(first, '1', 'badge-gold', true)}
       ${renderPodiumItem(third, '3', 'badge-bronze')}
@@ -2486,7 +2393,7 @@ function renderLeaderboard() {
 
   // Render Danh sách bảng xếp hạng
   if (listContainer) {
-    listContainer.innerHTML = sortedMembers.map((p, index) => {
+    listContainer.safeInnerHTML = sortedMembers.map((p, index) => {
       const rank = index + 1;
       const hasPlayed = (p.matchesPlayed || 0) > 0;
       const tier = getTierByElo(p.elo);
@@ -2502,19 +2409,19 @@ function renderLeaderboard() {
           </div>
           <div class="lb-member-details">
             <div class="lb-name-row">
-              <span class="lb-name">${p.name}</span>
-              ${p.nickname ? `<span style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">(${p.nickname})</span>` : ''}
-              ${hasPlayed 
+              <span class="lb-name">${escapeHtml(p.name)}</span>
+              ${p.nickname ? `<span style="font-size: 0.75rem; color: var(--text-dim); font-weight: 600;">(${escapeHtml(p.nickname)})</span>` : ''}
+              ${hasPlayed
                 ? `
                   <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
-                    ${tier.icon} ${tier.name}
+                    ${tier.icon} ${escapeHtml(tier.name)}
                   </span>
-                ` 
+                `
                 : `<span class="unranked-badge">Chưa đấu trận nào</span>`}
               ${p.activeEloShield ? '<span title="Khiên bảo vệ Elo đang BẬT" style="font-size: 0.85rem;">🛡️</span>' : ''}
             </div>
             <div class="lb-stats-sub">
-              ${hasPlayed 
+              ${hasPlayed
                 ? `
                   <span>Đã đấu: <strong>${p.matchesPlayed}</strong></span>
                   <span>Thắng: <strong style="color: #4ade80;">${p.wins}</strong></span>
@@ -2527,7 +2434,7 @@ function renderLeaderboard() {
                 `}
             </div>
           </div>
-          ${isCoinSort 
+          ${isCoinSort
             ? `
               <div class="lb-elo-box">
                 <div class="lb-coin-display">🪙 ${coins} Xu</div>
@@ -2537,7 +2444,7 @@ function renderLeaderboard() {
             : `
               <div class="lb-elo-box">
                 <div class="lb-elo-num">${p.elo}</div>
-                <div class="lb-tier-label">${hasPlayed ? (nextTierInfo.tier ? `Cần +${nextTierInfo.pointsNeeded} lên ${nextTierInfo.tier.name}` : 'Tối thượng') : 'Ước tính ban đầu'}</div>
+                <div class="lb-tier-label">${hasPlayed ? (nextTierInfo.tier ? `Cần +${nextTierInfo.pointsNeeded} lên ${escapeHtml(nextTierInfo.tier.name)}` : 'Tối thượng') : 'Ước tính ban đầu'}</div>
               </div>
             `}
         </div>
@@ -2552,6 +2459,7 @@ function renderLeaderboard() {
  * =========================================================================
  */
 function renderAttendance() {
+  for(const id of ['btn-checkin-regulars','btn-checkin-all','btn-checkin-none']){const button=document.getElementById(id);if(button)button.hidden=supabaseService.isConfigured()&&!StorageService.isAdmin();}
   const members = StorageService.getMembers();
   const attendance = StorageService.getAttendance();
   const guests = StorageService.getGuests();
@@ -2560,7 +2468,7 @@ function renderAttendance() {
   if (!grid) return;
 
   if (members.length === 0 && guests.length === 0) {
-    grid.innerHTML = `
+    grid.safeInnerHTML = `
       <div class="empty-state-box" style="grid-column: 1/-1;">
         <div style="font-size: 2.5rem; margin-bottom: 10px;">📋</div>
         <h4 class="empty-state-title">Chưa có thành viên để điểm danh</h4>
@@ -2588,7 +2496,7 @@ function renderAttendance() {
           </div>
           <div class="att-info">
             <div class="att-name">
-              ${g.name}
+              ${escapeHtml(g.name)}
               <span class="badge-guest">Khách ${g.gender === 'male' ? '♂' : '♀'}</span>
             </div>
             <div class="att-meta">
@@ -2620,7 +2528,7 @@ function renderAttendance() {
             ${renderAvatarHtml(m, { size: 'sm' })}
           </div>
           <div class="att-info">
-            <div class="att-name">${m.name}</div>
+            <div class="att-name">${escapeHtml(m.name)}</div>
             <div class="att-meta">
               ${m.frequency === 'regular' ? '⚡ Nòng cốt' : '🍃 Thỉnh thoảng'} • Hôm nay: ${gamesCount} trận
             </div>
@@ -2633,7 +2541,7 @@ function renderAttendance() {
     `;
   }).join('');
 
-  grid.innerHTML = guestsHtml + membersHtml;
+  grid.safeInnerHTML = guestsHtml + membersHtml;
 }
 
 // Global hook để mở Modal Thêm Khách
@@ -2651,7 +2559,7 @@ window.appOpenAddGuestModal = function() {
 };
 
 // Global hook để submit form Thêm Khách
-window.appSubmitAddGuest = function(e) {
+window.appSubmitAddGuest = async function(e) {
   if (e) e.preventDefault();
   const nameInput = document.getElementById('field-guest-name');
   const genderInput = document.getElementById('field-guest-gender');
@@ -2665,7 +2573,7 @@ window.appSubmitAddGuest = function(e) {
     return;
   }
 
-  const newGuest = StorageService.addGuest({ name, gender, elo });
+  const newGuest = await StorageService.addGuest({ name, gender, elo });
   document.getElementById('modal-add-guest')?.classList.remove('open');
   SoundService.playClick();
   renderAttendance();
@@ -2688,7 +2596,7 @@ window.appRemoveGuest = async function(guestId) {
   if (!ok) return;
 
   // Nếu khách đang trên Sân 1 hoặc Sân 2, gỡ ra khỏi sân trước
-  ['court_1', 'court_2'].forEach(cId => {
+  for(const cId of ['court_1','court_2']) {
     const match = state.courtMatches?.[cId]?.activeMatch;
     if (match) {
       let changed = false;
@@ -2701,12 +2609,12 @@ window.appRemoveGuest = async function(guestId) {
         if (match.team2[1]?.id === guestId) { match.team2[1] = null; changed = true; }
       }
       if (changed) {
-        StorageService.saveActiveMatch(match, cId);
+        if(!await requireCourtSaved(match,cId))throw new Error('Chưa gỡ được khách khỏi sân.');
       }
     }
-  });
+  }
 
-  StorageService.removeGuest(guestId);
+  await StorageService.removeGuest(guestId);
   SoundService.playClick();
   renderAttendance();
   updateSessionStatusBadge();
@@ -2716,11 +2624,11 @@ window.appRemoveGuest = async function(guestId) {
 };
 
 // Global hook để gọi từ HTML onclick
-window.appToggleAttendance = function(memberId) {
+window.appToggleAttendance = async function(memberId) {
   const attendanceBefore = StorageService.getAttendance();
   const wasPresent = attendanceBefore.presentIds?.includes(memberId);
 
-  StorageService.toggleAttendance(memberId);
+  await StorageService.toggleAttendance(memberId);
   SoundService.playClick();
   renderAttendance();
   updateSessionStatusBadge();
@@ -2754,13 +2662,13 @@ function renderBadges() {
   if (!container) return;
 
   if (badges.length === 0) {
-    container.innerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
+    container.safeInnerHTML = `<div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
       Chưa có đủ dữ liệu trận đấu để trao danh hiệu vinh danh. Hãy chơi thêm vài set đấu nhé!
     </div>`;
     return;
   }
 
-  container.innerHTML = badges.map(b => {
+  container.safeInnerHTML = badges.map(b => {
     const avatarUrl = getAvatarUrl(b.player);
     return `
       <div class="badge-honor-card">
@@ -2768,15 +2676,15 @@ function renderBadges() {
         <div class="badge-header">
           <span class="badge-large-icon">${b.icon}</span>
           <div class="badge-title-wrap">
-            <h3 style="color: ${b.color};">${b.title}</h3>
+            <h3 style="color: ${b.color};">${escapeHtml(b.title)}</h3>
             <div class="badge-desc">${b.detail}</div>
           </div>
         </div>
         <div class="badge-player-holder">
-          <img class="badge-player-avatar" src="${avatarUrl}" alt="${b.player.name}" onerror="this.src='${generateDefaultAvatar(b.player.name, b.player.gender)}'">
+          <img class="badge-player-avatar" src="${avatarUrl}" alt="${escapeHtml(b.player.name)}" data-fallback="${generateDefaultAvatar(b.player.name, b.player.gender)}">
           <div>
-            <div class="badge-player-name">${b.player.name}</div>
-            <div class="badge-player-detail">${b.player.nickname || 'Chiến binh CLB'} • ${b.player.elo} Elo</div>
+            <div class="badge-player-name">${escapeHtml(b.player.name)}</div>
+            <div class="badge-player-detail">${escapeHtml(b.player.nickname || 'Chiến binh CLB')} • ${b.player.elo} Elo</div>
           </div>
         </div>
       </div>
@@ -2795,7 +2703,7 @@ function renderMembers() {
   if (!container) return;
 
   if (members.length === 0) {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div class="empty-state-card" style="grid-column: 1 / -1;">
         <div style="font-size: 3.2rem; margin-bottom: 12px;">👥</div>
         <h3 class="empty-state-title">Chưa có thành viên nào trong danh sách</h3>
@@ -2812,14 +2720,14 @@ function renderMembers() {
 
   let filtered = members;
   if (state.searchQuery) {
-    filtered = members.filter(m => 
+    filtered = members.filter(m =>
       m.name.toLowerCase().includes(state.searchQuery) ||
       (m.nickname && m.nickname.toLowerCase().includes(state.searchQuery))
     );
   }
 
   if (filtered.length === 0) {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div style="grid-column: 1 / -1; text-align: center; padding: 40px; color: var(--text-muted);">
         🔍 Không tìm thấy thành viên nào khớp với "<strong>${state.searchQuery}</strong>"
       </div>
@@ -2827,7 +2735,7 @@ function renderMembers() {
     return;
   }
 
-  container.innerHTML = filtered.map(m => {
+  container.safeInnerHTML = filtered.map(m => {
     const tier = getTierByElo(m.elo);
     const avatarUrl = getAvatarUrl(m);
     const winRate = m.matchesPlayed > 0 ? Math.round((m.wins / m.matchesPlayed) * 100) : 0;
@@ -2871,12 +2779,12 @@ function renderMembers() {
           </div>
           <div style="min-width: 0; flex: 1;">
             <div style="font-weight: 800; font-size: 1rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-              ${m.name} ${isMe ? '<span style="font-size: 0.7rem; color: var(--cyan); background: rgba(6,182,212,0.12); padding: 1px 6px; border-radius: 4px; margin-left: 4px;">Tôi</span>' : ''}
+              ${escapeHtml(m.name)} ${isMe ? '<span style="font-size: 0.7rem; color: var(--cyan); background: rgba(6,182,212,0.12); padding: 1px 6px; border-radius: 4px; margin-left: 4px;">Tôi</span>' : ''}
             </div>
-            <div style="font-size: 0.78rem; color: var(--text-muted);">${m.nickname || 'Chưa có biệt danh'}</div>
+            <div style="font-size: 0.78rem; color: var(--text-muted);">${escapeHtml(m.nickname || 'Chưa có biệt danh')}</div>
             <div style="margin-top: 6px;">
               <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
-                ${tier.icon} ${tier.name}
+                ${tier.icon} ${escapeHtml(tier.name)}
               </span>
             </div>
           </div>
@@ -2912,14 +2820,14 @@ window.appGenerateMatch = function() {
 };
 
 // Global hook để Bắt Đầu Trận Đấu & Kích hoạt bảng điểm trong sân
-window.appStartMatch = function() {
+window.appStartMatch = async function() {
   if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2) {
     showToast('Chưa có đội hình trên sân để bắt đầu!', 'error');
     return;
   }
   state.matchStatus = 'in_progress';
   state.activeMatch.matchStatus = 'in_progress';
-  StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+  await requireCourtSaved(state.activeMatch, state.currentCourtId);
   SoundService.playWhistle();
   renderCourt();
   updateCourtTabStatusPills();
@@ -2966,7 +2874,7 @@ window.appClearCourt = async function() {
   state.courtMatches[state.currentCourtId].matchStatus = 'idle';
   state.courtMatches[state.currentCourtId].isSwappedSides = false;
   state.courtMatches[state.currentCourtId].scoreHistory = [];
-  await StorageService.saveActiveMatch(emptyMatch, state.currentCourtId);
+  await requireCourtSaved(emptyMatch, state.currentCourtId);
   SoundService.playClick();
   renderCourt();
   updateCourtTabStatusPills();
@@ -2983,7 +2891,7 @@ window.appSwapCourtSides = function() {
   state.isSwappedSides = !state.isSwappedSides;
   if (state.activeMatch) {
     state.activeMatch.isSwappedSides = state.isSwappedSides;
-    StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+    StorageService.saveLocalActiveMatch(state.activeMatch, state.currentCourtId);
   }
   SoundService.playClick();
   renderCourt();
@@ -2992,6 +2900,8 @@ window.appSwapCourtSides = function() {
 
 // Global hook để Hoàn Tác Điểm Vừa Bấm (Undo)
 window.appUndoScore = function() {
+  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+  const before={score1:state.score1,score2:state.score2};
   const hist = state.scoreHistory;
   if (!hist || hist.length === 0) {
     showToast('Chưa có thao tác điểm nào để hoàn tác!', 'info');
@@ -3004,12 +2914,14 @@ window.appUndoScore = function() {
   updateScoreboardDisplay();
   renderEloPrediction();
   renderBettingWidget();
-  debouncedSyncLiveScore();
+  debouncedSyncLiveScore(before);
   showToast(`↩️ Đã hoàn tác về tỷ số: ${state.score1} - ${state.score2}`);
 };
 
 // Global hook để Nhập Tỷ Số Bằng Bàn Phím Trực Tiếp
 window.appPromptManualScore = function(isTeam1) {
+  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+  const before={score1:state.score1,score2:state.score2};
   const currentVal = isTeam1 ? state.score1 : state.score2;
   const teamLabel = isTeam1 ? 'Đội 1' : 'Đội 2';
   const input = prompt(`Nhập tỷ số trực tiếp cho ${teamLabel} (từ 0 đến 30):`, currentVal);
@@ -3034,7 +2946,7 @@ window.appPromptManualScore = function(isTeam1) {
   updateScoreboardDisplay();
   renderEloPrediction();
   renderBettingWidget();
-  debouncedSyncLiveScore();
+  debouncedSyncLiveScore(before);
   showToast(`Đã đổi điểm ${teamLabel}: ${val}`);
 };
 
@@ -3070,7 +2982,7 @@ window.appDeleteMember = async function(memberId) {
     isDanger: true
   });
   if (ok) {
-    StorageService.deleteMember(memberId);
+    await StorageService.deleteMember(memberId);
     showToast(`Đã xóa ${mem.name}`);
     renderMembers();
     renderLeaderboard();
@@ -3119,7 +3031,7 @@ function openMemberModal(memberId = null) {
       if (nickInput) nickInput.value = mem.nickname || '';
       if (genderSelect) genderSelect.value = mem.gender || 'male';
       if (freqSelect) freqSelect.value = mem.frequency || 'regular';
-      if (pinInput) pinInput.value = mem.pinCode || '';
+      if (pinInput) pinInput.value = '';
       if (previewImg) previewImg.src = getAvatarUrl(mem);
 
       // QUY TẮC ELO:
@@ -3128,7 +3040,7 @@ function openMemberModal(memberId = null) {
       const matchesPlayed = Number(mem.matchesPlayed) || 0;
       if (eloInput) {
         eloInput.value = mem.elo || 1000;
-        if (matchesPlayed > 0) {
+        if (matchesPlayed > 0 || !StorageService.isAdmin()) {
           eloInput.disabled = true;
           if (eloLockedMsg) eloLockedMsg.style.display = 'block';
           if (lockedMatchesCount) lockedMatchesCount.textContent = matchesPlayed;
@@ -3168,7 +3080,7 @@ function openMemberModal(memberId = null) {
   if (modal) modal.classList.add('open');
 }
 
-function handleMemberFormSubmit(e) {
+async function handleMemberFormSubmit(e) {
   e.preventDefault();
   const name = document.getElementById('field-member-name').value.trim();
   const nickname = document.getElementById('field-member-nickname').value.trim();
@@ -3199,20 +3111,21 @@ function handleMemberFormSubmit(e) {
     if (state.tempAvatarBase64) {
       updateData.avatar = state.tempAvatarBase64;
     }
-    StorageService.updateMember(state.editingMemberId, updateData);
+    await StorageService.updateMember(state.editingMemberId, updateData);
     if (state.currentUser && state.currentUser.id === state.editingMemberId) {
       state.currentUser = StorageService.getCurrentUser();
       renderUserAuthHeader();
     }
     showToast(`Đã cập nhật thông tin ${name}`);
   } else {
-    const newMember = StorageService.addMember({
+    if(!/^\d{4}$/.test(pinCode))throw new Error('Vui lòng đặt PIN gồm đúng 4 chữ số cho thành viên mới.');
+    const newMember = await StorageService.addMember({
       name,
       nickname,
       gender,
       frequency,
       elo,
-      pinCode: pinCode || '1234',
+      pinCode,
       avatar: state.tempAvatarBase64 || ''
     });
 
@@ -3225,7 +3138,7 @@ function handleMemberFormSubmit(e) {
 
     // Tự động thêm vào điểm danh hôm nay NẾU CÓ LỊCH SÂN HỢP LỆ
     if (StorageService.hasScheduledSessionToday()) {
-      StorageService.toggleAttendance(newMember.id);
+      await StorageService.toggleAttendance(newMember.id);
     }
     showToast(`Đã thêm thành viên: ${name} (+100 Xu tân thủ)`);
   }
@@ -3252,7 +3165,7 @@ function renderHistory() {
   if (!container) return;
 
   if (matches.length === 0) {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div class="empty-state-card" style="text-align: center; padding: 48px 20px; background: rgba(255,255,255,0.02); border: 1px dashed rgba(255,255,255,0.1); border-radius: 16px; margin: 16px 0;">
         <div style="font-size: 3rem; margin-bottom: 12px; filter: drop-shadow(0 4px 12px rgba(0,0,0,0.2));">📜</div>
         <h3 style="margin: 0 0 6px; font-size: 1.1rem; color: var(--text-main);">Chưa Có Trận Đấu Nào</h3>
@@ -3330,7 +3243,7 @@ function renderHistory() {
     </div>
   ` : '';
 
-  container.innerHTML = cardsHtml + loadMoreHtml;
+  container.safeInnerHTML = cardsHtml + loadMoreHtml;
 }
 
 window.appLoadMoreHistory = function() {
@@ -3393,8 +3306,8 @@ window.appOpenSwapPlayerModal = function(teamKey, slotIndex) {
   const targetLabel = document.getElementById('swap-target-label');
   if (targetLabel) {
     const teamName = teamKey === 'team1' ? '🔵 Đội 1' : '🟠 Đội 2';
-    targetLabel.innerHTML = currentPlayer 
-      ? `${teamName} (Vị trí ${slotIndex + 1}) — Hiện tại: <strong>${currentPlayer.name}</strong> (${currentPlayer.elo} Elo)`
+    targetLabel.safeInnerHTML = currentPlayer
+      ? `${teamName} (Vị trí ${slotIndex + 1}) — Hiện tại: <strong>${escapeHtml(currentPlayer.name)}</strong> (${currentPlayer.elo} Elo)`
       : `${teamName} (Vị trí ${slotIndex + 1}) — <strong>Chọn VĐV vào vị trí trống</strong>`;
   }
 
@@ -3412,13 +3325,13 @@ window.appOpenSwapPlayerModal = function(teamKey, slotIndex) {
   if (modal) modal.classList.add('open');
 };
 
-window.appRemovePlayerFromSlot = function() {
+window.appRemovePlayerFromSlot = async function() {
   if (!state.activeMatch || !state.swapTarget) return;
   const { teamKey, slotIndex } = state.swapTarget;
   if (state.activeMatch[teamKey]) {
     const removedPlayer = state.activeMatch[teamKey][slotIndex];
     state.activeMatch[teamKey][slotIndex] = null;
-    StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+    await requireCourtSaved(state.activeMatch, state.currentCourtId);
     document.getElementById('modal-swap-court-player')?.classList.remove('open');
     state.swapTarget = null;
     SoundService.playClick();
@@ -3448,8 +3361,8 @@ function renderSwapPlayerList(query = '') {
   const q = query.trim().toLowerCase();
   let filtered = allCandidates;
   if (q) {
-    filtered = allCandidates.filter(m => 
-      m.name.toLowerCase().includes(q) || 
+    filtered = allCandidates.filter(m =>
+      m.name.toLowerCase().includes(q) ||
       (m.nickname && m.nickname.toLowerCase().includes(q))
     );
   }
@@ -3475,11 +3388,11 @@ function renderSwapPlayerList(query = '') {
   });
 
   if (filtered.length === 0) {
-    container.innerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 20px;">Không tìm thấy thành viên hoặc khách nào phù hợp</div>`;
+    container.safeInnerHTML = `<div style="text-align: center; color: var(--text-dim); padding: 20px;">Không tìm thấy thành viên hoặc khách nào phù hợp</div>`;
     return;
   }
 
-  container.innerHTML = filtered.map(m => {
+  container.safeInnerHTML = filtered.map(m => {
     const isCurrent = state.swapTarget.currentMemberId && m.id === state.swapTarget.currentMemberId;
     const isOnCourt = onCourtIds.includes(m.id);
     const isPresent = presentIds.includes(m.id);
@@ -3500,15 +3413,15 @@ function renderSwapPlayerList(query = '') {
       badgeHtml = `<span class="swap-action-badge swap-badge-in">➕ Vào sân</span>`;
     }
 
-    const presentTag = isPresent 
-      ? `<span style="color: #10b981; font-weight: 700;">● Có mặt (${games} trận)</span>` 
+    const presentTag = isPresent
+      ? `<span style="color: #10b981; font-weight: 700;">● Có mặt (${games} trận)</span>`
       : `<span style="color: var(--text-dim);">Chưa điểm danh</span>`;
 
     return `
       <div class="${itemClass}" onclick="window.appApplySwapPlayer('${m.id}')">
-        <img class="swap-player-avatar" src="${avatarUrl}" alt="${m.name}" onerror="this.src='${generateDefaultAvatar(m.name, m.gender)}'">
+        <img class="swap-player-avatar" src="${avatarUrl}" alt="${escapeHtml(m.name)}" data-fallback="${generateDefaultAvatar(m.name, m.gender)}">
         <div class="swap-player-info">
-          <div class="swap-player-name">${m.name} ${m.nickname ? `(${m.nickname})` : ''} ${m.isGuest ? '<span class="badge-guest">Khách</span>' : ''}</div>
+          <div class="swap-player-name">${escapeHtml(m.name)} ${m.nickname ? `(${escapeHtml(m.nickname)})` : ''} ${m.isGuest ? '<span class="badge-guest">Khách</span>' : ''}</div>
           <div class="swap-player-meta">
             <span style="color: ${tier.color}; font-weight: 700;">${tier.icon} ${m.elo} Elo</span>
             <span>•</span>
@@ -3521,7 +3434,7 @@ function renderSwapPlayerList(query = '') {
   }).join('');
 }
 
-window.appApplySwapPlayer = function(newMemberId) {
+window.appApplySwapPlayer = async function(newMemberId) {
   if (!state.activeMatch || !state.swapTarget) return;
   const { teamKey, slotIndex, currentMemberId } = state.swapTarget;
 
@@ -3566,7 +3479,7 @@ window.appApplySwapPlayer = function(newMemberId) {
   const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
   state.activeMatch.diffElo = Math.abs(elo1 - elo2);
 
-  StorageService.saveActiveMatch(state.activeMatch, state.currentCourtId);
+  await requireCourtSaved(state.activeMatch, state.currentCourtId);
 
   document.getElementById('modal-swap-court-player')?.classList.remove('open');
   state.swapTarget = null;
@@ -3625,7 +3538,7 @@ function showToast(message, type = 'success', duration = null) {
   }
 
   // 2. Dọn sạch container ngay lập tức - Không cho phép dồn toa / xếp chồng
-  container.innerHTML = '';
+  container.safeInnerHTML = '';
 
   // 3. Tạo phần tử Toast mới
   const toast = document.createElement('div');
@@ -3636,13 +3549,13 @@ function showToast(message, type = 'success', duration = null) {
   const hasLeadingEmoji = /^(\p{Extended_Pictographic}|\u26A1|\u2600|\u2728|\u2705|\u23F0|\u26A0)/u.test(trimmed);
 
   if (hasLeadingEmoji) {
-    toast.innerHTML = `<span class="toast-msg">${trimmed}</span>`;
+    toast.safeInnerHTML = `<span class="toast-msg">${escapeHtml(trimmed)}</span>`;
   } else {
     let icon = '⚡';
     if (type === 'error') icon = '⚠️';
     else if (type === 'info') icon = 'ℹ️';
     else if (type === 'success') icon = '✨';
-    toast.innerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${trimmed}</span>`;
+    toast.safeInnerHTML = `<span class="toast-icon">${icon}</span><span class="toast-msg">${escapeHtml(trimmed)}</span>`;
   }
 
   // 4. Cho phép chạm/click để đóng ngay lập tức
@@ -3804,6 +3717,8 @@ async function initCloudSyncAndRealtime() {
       const record = payload.new;
       if (record && (record.id === 'court_1' || record.id === 'court_2' || record.id === 'current_court')) {
         const targetCourtId = record.id === 'court_2' ? 'court_2' : 'court_1';
+        if(state.courtMatches[targetCourtId].serverUpdatedAt&&Date.parse(record.updated_at)<Date.parse(state.courtMatches[targetCourtId].serverUpdatedAt))return;
+        state.courtMatches[targetCourtId].serverUpdatedAt=record.updated_at;
         let allPeople = [...StorageService.getMembers(), ...StorageService.getGuests()];
         let personMap = new Map(allPeople.map(p => [p.id, p]));
 
@@ -3922,6 +3837,7 @@ async function initCloudSyncAndRealtime() {
 
     if (table === 'attendance') {
       const record = payload.new;
+      if(record?.date&&record.date!==getLocalDateStr())return;
       if (record && Array.isArray(record.present_ids)) {
         // Cập nhật tức thì trực tiếp từ WebSocket payload, không phụ thuộc vào REST API
         const rawGames = record.games_played_today || {};
@@ -3974,7 +3890,7 @@ async function initCloudSyncAndRealtime() {
           const lm = localMap.get(cm.id);
           return {
             ...cm,
-            activeFrame: cm.activeFrame || lm?.activeFrame || '',
+            activeFrame: cm.activeFrame ?? '',
             activeEloShield: cm.activeEloShield ?? lm?.activeEloShield ?? false
           };
         });
@@ -4004,7 +3920,7 @@ async function initCloudSyncAndRealtime() {
           const lm = localMap.get(cm.id);
           return {
             ...cm,
-            activeFrame: cm.activeFrame || lm?.activeFrame || '',
+            activeFrame: cm.activeFrame ?? '',
             activeEloShield: cm.activeEloShield ?? lm?.activeEloShield ?? false
           };
         });
@@ -4112,6 +4028,7 @@ async function initCloudSyncAndRealtime() {
         supabaseService.ensureRealtimeSubscription();
       }
       StorageService.syncFromCloud().then(() => {
+        loadInitialState();
         updateCourtTabStatusPills();
         renderCourt();
         updateScoreboardDisplay();
@@ -4215,7 +4132,7 @@ function renderCalendarMonth(sessions, memberMap) {
   }
 
   // Render lưới ô
-  daysGrid.innerHTML = cells.map(cell => {
+  daysGrid.safeInnerHTML = cells.map(cell => {
     const daySessions = sessionsByDate.get(cell.dateStr) || [];
     const hasSession = daySessions.length > 0;
     const isToday = cell.dateStr === todayStr;
@@ -4226,7 +4143,7 @@ function renderCalendarMonth(sessions, memberMap) {
       const first = daySessions[0];
       const timeStr = first.startTime ? first.startTime : 'Có lịch';
       chipHtml = `
-        <div class="cal-session-pill" title="${first.title || 'Buổi đánh cầu'}">
+        <div class="cal-session-pill" title="${escapeHtml(first.title || 'Buổi đánh cầu')}">
           <span>🏸</span> ${timeStr}
         </div>
       `;
@@ -4275,7 +4192,7 @@ function renderCalendarSelectedDayPanel(container, sessionsByDate, memberMap) {
   const todayStr = getLocalDateStr();
   const isToday = selDate === todayStr;
 
-  container.innerHTML = `
+  container.safeInnerHTML = `
     <div class="cal-panel-header">
       <div class="cal-panel-title">
         <span>🏸</span> Chi Tiết: ${dateFormatted}
@@ -4311,7 +4228,7 @@ function renderSessionList(sessions, memberMap) {
   if (!container) return;
 
   if (sessions.length === 0) {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
         Chưa có lịch buổi đánh nào. Bấm <strong>"+ Đặt Lịch Mới"</strong> để lên lịch!
       </div>
@@ -4319,7 +4236,7 @@ function renderSessionList(sessions, memberMap) {
     return;
   }
 
-  container.innerHTML = sessions.map(s => renderSingleSessionCard(s, memberMap)).join('');
+  container.safeInnerHTML = sessions.map(s => renderSingleSessionCard(s, memberMap)).join('');
 }
 
 /**
@@ -4337,7 +4254,7 @@ function renderSingleSessionCard(s, memberMap) {
   const femaleCount = attendingMembers.filter(m => m.gender === 'female').length;
 
   const hasMap = Boolean(s.venueAddress || s.venueName);
-  const mapQuery = encodeURIComponent(`${s.venueName || ''} ${s.venueAddress || ''}`.trim());
+  const mapQuery = encodeURIComponent(`${escapeHtml(s.venueName || '')} ${escapeHtml(s.venueAddress || '')}`.trim());
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
   const timeDisplay = s.startTime && s.endTime ? `${s.startTime} - ${s.endTime}` : (s.startTime || s.endTime || '');
 
@@ -4349,7 +4266,7 @@ function renderSingleSessionCard(s, memberMap) {
           <div class="session-month-text">${monthText}</div>
         </div>
         <div class="session-main-info">
-          <div class="session-title">${s.title || 'Buổi Đánh Cầu'}</div>
+          <div class="session-title">${escapeHtml(s.title || 'Buổi Đánh Cầu')}</div>
           ${timeDisplay ? `
           <div class="session-time-row">
             <span>⏰</span> ${timeDisplay}
@@ -4366,16 +4283,16 @@ function renderSingleSessionCard(s, memberMap) {
         ${(s.venueName || s.courtNumbers) ? `
         <div class="venue-name-row">
           <div class="venue-name">
-            <span>📍</span> ${s.venueName || 'Sân cầu lông'}
+            <span>📍</span> ${escapeHtml(s.venueName || 'Sân cầu lông')}
           </div>
-          ${s.courtNumbers ? `<span class="venue-courts-tag">${s.courtNumbers}</span>` : ''}
+          ${s.courtNumbers ? `<span class="venue-courts-tag">${escapeHtml(s.courtNumbers)}</span>` : ''}
         </div>` : ''}
         ${s.venueAddress ? `
         <div class="venue-address-row">
-          <span>${s.venueAddress}</span>
+          <span>${escapeHtml(s.venueAddress)}</span>
           ${hasMap ? `<a href="${mapUrl}" target="_blank" rel="noopener noreferrer" class="venue-map-link">[Bản đồ ↗]</a>` : ''}
         </div>` : ''}
-        ${s.feeNote ? `<div style="font-size: 0.75rem; color: var(--volt); margin-top: 4px;">💰 ${s.feeNote}</div>` : ''}
+        ${s.feeNote ? `<div style="font-size: 0.75rem; color: var(--volt); margin-top: 4px;">💰 ${escapeHtml(s.feeNote)}</div>` : ''}
       </div>` : ''}
 
       <div class="session-attendees-strip">
@@ -4385,7 +4302,7 @@ function renderSingleSessionCard(s, memberMap) {
         </div>
         <div class="attendees-avatars-pile">
           ${attendingMembers.slice(0, 14).map(m => `
-            <img class="pile-avatar" src="${getAvatarUrl(m)}" title="${m.name} (${m.gender === 'male' ? 'Nam' : 'Nữ'})" alt="${m.name}" onclick="window.appViewPlayerProfile('${m.id}')" style="cursor: pointer;">
+            <img class="pile-avatar" src="${getAvatarUrl(m)}" title="${escapeHtml(m.name)} (${m.gender === 'male' ? 'Nam' : 'Nữ'})" alt="${escapeHtml(m.name)}" onclick="window.appViewPlayerProfile('${m.id}')" style="cursor: pointer;">
           `).join('')}
           ${attendingMembers.length > 14 ? `<span style="font-size: 0.75rem; color: var(--text-muted); padding: 4px;">+${attendingMembers.length - 14}</span>` : ''}
         </div>
@@ -4404,6 +4321,7 @@ function renderSingleSessionCard(s, memberMap) {
 }
 
 function openSessionModal(sessionId = null, defaultDate = null) {
+  if(supabaseService.isConfigured()&&!StorageService.isAdmin()){showToast('Chỉ quản trị viên được thay đổi lịch sân.','error');return;}
   state.editingSessionId = sessionId;
   const modal = document.getElementById('modal-session-form');
   const title = document.getElementById('session-modal-title');
@@ -4460,7 +4378,7 @@ window.appOpenAddSessionForDate = function(dateStr) {
   openSessionModal(null, dateStr);
 };
 
-function handleSessionFormSubmit(e) {
+async function handleSessionFormSubmit(e) {
   e.preventDefault();
   const title = document.getElementById('field-session-title').value.trim();
   const date = document.getElementById('field-session-date').value;
@@ -4479,12 +4397,12 @@ function handleSessionFormSubmit(e) {
   const sessionTitle = title || `Buổi Đánh Ngày ${date}`;
 
   if (state.editingSessionId) {
-    StorageService.updateSession(state.editingSessionId, {
+    await StorageService.updateSession(state.editingSessionId, {
       title: sessionTitle, date, startTime, endTime, venueName, venueAddress, courtNumbers, feeNote
     });
     showToast('Đã cập nhật lịch buổi đánh!');
   } else {
-    StorageService.addSession({
+    await StorageService.addSession({
       title: sessionTitle, date, startTime, endTime, venueName, venueAddress, courtNumbers, feeNote
     });
     showToast('Đã tạo lịch buổi đánh mới!');
@@ -4495,6 +4413,7 @@ function handleSessionFormSubmit(e) {
 }
 
 window.appQuickRSVP = function(sessionId) {
+  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
   const session = StorageService.getSessions().find(s => s.id === sessionId);
   if (!session) return;
 
@@ -4511,32 +4430,32 @@ window.appQuickRSVP = function(sessionId) {
   const list = document.getElementById('quick-rsvp-members-list');
 
   const rsvps = session.rsvps || {};
-  const members = StorageService.getMembers();
+  const members=StorageService.getMembers().filter(m=>StorageService.isAdmin()||m.id===StorageService.getCurrentUser()?.id);
 
   // Nút 1-chạm nếu người dùng hiện tại đã đăng nhập
   if (state.currentUser && selfBox && btnSelf) {
     selfBox.style.display = 'block';
     const isAttending = rsvps[state.currentUser.id] === 'attending';
-    btnSelf.innerHTML = isAttending
-      ? `<span>✅</span> <span>Bạn (${state.currentUser.name}) Đã Đăng Ký (Bấm để huỷ)</span>`
-      : `<span>✋</span> <span>Tôi (${state.currentUser.name}) Tham Gia Buổi Này!</span>`;
+    btnSelf.safeInnerHTML = isAttending
+      ? `<span>✅</span> <span>Bạn (${escapeHtml(state.currentUser.name)}) Đã Đăng Ký (Bấm để huỷ)</span>`
+      : `<span>✋</span> <span>Tôi (${escapeHtml(state.currentUser.name)}) Tham Gia Buổi Này!</span>`;
     btnSelf.className = isAttending ? 'btn btn-secondary' : 'btn btn-primary';
     btnSelf.style.width = '100%';
-    btnSelf.onclick = () => {
+    btnSelf.onclick = guardedAction(async () => {
       const newStatus = isAttending ? 'declined' : 'attending';
-      StorageService.rsvpSession(sessionId, state.currentUser.id, newStatus);
+      await StorageService.rsvpSession(sessionId, state.currentUser.id, newStatus);
       SoundService.playClick();
       modal.classList.remove('open');
       showToast(newStatus === 'attending' ? `✅ Bạn đã đăng ký tham gia!` : `Đã huỷ đăng ký buổi đánh`);
       renderSessions();
-    };
+    });
   } else if (selfBox) {
     selfBox.style.display = 'none';
   }
 
   // Danh sách thành viên chọn nhanh
   if (list) {
-    list.innerHTML = members.map(m => {
+    list.safeInnerHTML = members.map(m => {
       const isAtt = rsvps[m.id] === 'attending';
       return `
         <div style="display: flex; align-items: center; justify-content: space-between; padding: 8px 12px; background: var(--bg-card); border: 1px solid var(--border-subtle); border-radius: 10px; cursor: pointer; transition: all 0.15s ease;"
@@ -4544,7 +4463,7 @@ window.appQuickRSVP = function(sessionId) {
           <div style="display: flex; align-items: center; gap: 10px;">
             ${renderAvatarHtml(m, { size: 'sm' })}
             <div>
-              <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${m.name}</div>
+              <div style="font-weight: 600; font-size: 0.88rem; color: var(--text-primary);">${escapeHtml(m.name)}</div>
               <div style="font-size: 0.74rem; color: var(--text-dim);">${m.elo} Elo • ${m.frequency === 'regular' ? '⚡ Nòng cốt' : '🍃 Giao lưu'}</div>
             </div>
           </div>
@@ -4559,9 +4478,9 @@ window.appQuickRSVP = function(sessionId) {
   modal.classList.add('open');
 };
 
-window.appToggleMemberRSVP = function(sessionId, memberId, status) {
+window.appToggleMemberRSVP = async function(sessionId, memberId, status) {
   const modal = document.getElementById('modal-quick-rsvp');
-  StorageService.rsvpSession(sessionId, memberId, status);
+  await StorageService.rsvpSession(sessionId, memberId, status);
   SoundService.playClick();
   if (modal) modal.classList.remove('open');
   const mem = StorageService.getMemberById(memberId);
@@ -4569,7 +4488,7 @@ window.appToggleMemberRSVP = function(sessionId, memberId, status) {
   renderSessions();
 };
 
-window.appStartSession = function(sessionId) {
+window.appStartSession = async function(sessionId) {
   const sessions = StorageService.getSessions();
   const session = sessions.find(s => s.id === sessionId);
   if (!session) return;
@@ -4582,7 +4501,8 @@ window.appStartSession = function(sessionId) {
     return;
   }
 
-  StorageService.setAttendanceList(attendingIds);
+  if(session.date!==getLocalDateStr())throw new Error('Chỉ bắt đầu được buổi đánh hôm nay.');
+  await StorageService.setAttendanceList(attendingIds);
   SoundService.playWhistle();
   showToast(`🏸 Đã bắt đầu buổi đánh! ${attendingIds.length} thành viên đã sẵn sàng trên sân.`);
   switchTab('court');
@@ -4598,7 +4518,7 @@ window.appDeleteSession = async function(sessionId) {
     isDanger: true
   });
   if (ok) {
-    StorageService.deleteSession(sessionId);
+    await StorageService.deleteSession(sessionId);
     showToast('Đã xóa buổi đánh');
     renderSessions();
   }
@@ -4625,7 +4545,7 @@ window.appViewPlayerProfile = function(memberId) {
   const avatarUrl = getAvatarUrl(m);
   const isMale = m.gender === 'male';
 
-  body.innerHTML = `
+  body.safeInnerHTML = `
     <div class="profile-pro-wrap">
       <div class="profile-hero-card">
         <div class="profile-avatar-large-wrap">
@@ -4635,12 +4555,12 @@ window.appViewPlayerProfile = function(memberId) {
           </span>
         </div>
         <div class="profile-hero-details">
-          <div class="profile-hero-name">${m.name}</div>
-          <div class="profile-hero-nick">${m.nickname || 'Chiến binh CLB Thái Thịnh'}</div>
+          <div class="profile-hero-name">${escapeHtml(m.name)}</div>
+          <div class="profile-hero-nick">${escapeHtml(m.nickname || 'Chiến binh CLB Thái Thịnh')}</div>
           <div class="profile-hero-badges">
             ${StorageService.isAdmin(m) ? '<span class="tier-pill" style="background: rgba(239,68,68,0.18); color: #f87171; border: 1px solid rgba(239,68,68,0.4); font-weight: 700;">👑 Quản Trị Viên</span>' : ''}
             <span class="tier-pill tier-${tier.id}" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
-              ${tier.icon} ${tier.name}
+              ${tier.icon} ${escapeHtml(tier.name)}
             </span>
             <span class="profile-freq-pill">
               ${m.frequency === 'regular' ? '⚡ Nòng cốt' : '🍃 Thỉnh thoảng'}
@@ -4654,7 +4574,7 @@ window.appViewPlayerProfile = function(memberId) {
         <div class="progress-header">
           <span class="progress-rank-text">Hạng <strong>#${stats.rank}</strong> • <span class="progress-elo-val">${m.elo} Elo</span></span>
           <span class="progress-next-tier">
-            ${nextTier.tier ? `Cần +${nextTier.pointsNeeded} Elo lên ${nextTier.tier.name}` : '👑 Bậc Tối Thượng'}
+            ${nextTier.tier ? `Cần +${nextTier.pointsNeeded} Elo lên ${escapeHtml(nextTier.tier.name)}` : '👑 Bậc Tối Thượng'}
           </span>
         </div>
         <div class="progress-bar-track">
@@ -4697,7 +4617,7 @@ window.appViewPlayerProfile = function(memberId) {
             </div>
             <div class="bp-info">
               <div class="bp-tag">💘 BẠN DIỄN ĂN Ý NHẤT</div>
-              <div class="bp-name">${stats.bestPartner.player.name}</div>
+              <div class="bp-name">${escapeHtml(stats.bestPartner.player.name)}</div>
             </div>
           </div>
           <div class="bp-stats">
@@ -4722,10 +4642,10 @@ window.appViewPlayerProfile = function(memberId) {
                   </span>
                   <div>
                     <div style="font-weight: 700;">
-                      Đánh cùng: <strong>${pm.partner ? pm.partner.name : 'Đồng đội'}</strong>
+                      Đánh cùng: <strong>${escapeHtml(pm.partner ? pm.partner.name : 'Đồng đội')}</strong>
                     </div>
                     <div style="font-size: 0.72rem; color: var(--text-dim);">
-                      vs ${pm.opponents.map(o => o.name).join(' & ')} • ${pm.courtNumber}
+                      vs ${escapeHtml(pm.opponents.map(o => o.name).join(' & '))} • ${pm.courtNumber}
                     </div>
                   </div>
                 </div>
@@ -4765,15 +4685,15 @@ function renderUserAuthHeader() {
   if (currentUser) {
     const coins = currentUser.coins !== undefined ? currentUser.coins : 100;
     const isCurrentUserAdmin = StorageService.isAdmin(currentUser);
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div id="header-user-widget" class="header-user-pill" onclick="window.appOpenUserWallet()" title="Xem ví xu & hồ sơ cá nhân">
         ${renderAvatarHtml(currentUser, { size: 'xs', className: 'header-user-avatar' })}
-        <span class="header-user-name">${currentUser.name}${isCurrentUserAdmin ? ' <span style="font-size: 0.68rem; background: rgba(239,68,68,0.2); color: #f87171; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 2px;">👑 Admin</span>' : ''}</span>
+        <span class="header-user-name">${escapeHtml(currentUser.name)}${isCurrentUserAdmin ? ' <span style="font-size: 0.68rem; background: rgba(239,68,68,0.2); color: #f87171; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 2px;">👑 Admin</span>' : ''}</span>
         <span class="header-coin-badge">🪙 <span id="header-user-coins">${coins}</span></span>
       </div>
     `;
   } else {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <button class="btn-header-login" onclick="window.appOpenLoginModal()" title="Đăng nhập để nhận xu & quản lý hồ sơ">
         <span>🔑</span> <span class="login-text-full">Đăng Nhập</span><span class="login-text-short">ĐN</span>
       </button>
@@ -4794,9 +4714,9 @@ window.appOpenLoginModal = function() {
     return;
   }
 
-  select.innerHTML = members.map(m => `
+  select.safeInnerHTML = members.map(m => `
     <option value="${m.id}" ${state.currentUser?.id === m.id ? 'selected' : ''}>
-      ${m.name} ${m.nickname ? `(${m.nickname})` : ''} • Elo ${m.elo} ${m.pinCode ? '🔒' : '🆕 (Chưa đặt PIN)'}
+      ${escapeHtml(m.name)} ${m.nickname ? `(${escapeHtml(m.nickname)})` : ''} • Elo ${m.elo} ${(m.hasPin||m.pinCode) ? '🔒' : '🆕 (Chưa đặt PIN)'}
     </option>
   `).join('');
 
@@ -4805,8 +4725,8 @@ window.appOpenLoginModal = function() {
     const mem = StorageService.getMemberById(memId);
     const hint = document.getElementById('auth-pin-hint');
     const tag = document.getElementById('auth-pin-status-tag');
-    if (mem && !mem.pinCode) {
-      if (hint) hint.innerHTML = '✨ <strong>Tài khoản mới:</strong> Hãy nhập 4 số bất kỳ để đặt mã PIN đăng nhập lần đầu.';
+    if (mem && !(mem.hasPin||mem.pinCode)) {
+      if (hint) hint.textContent = 'Nhờ quản trị viên thiết lập PIN trước khi đăng nhập tài khoản này.';
       if (tag) { tag.textContent = 'Chưa đặt PIN'; tag.style.color = 'var(--volt)'; }
     } else {
       if (hint) hint.textContent = 'Nhập mã PIN 4 số của bạn để mở khóa tài khoản.';
@@ -4825,7 +4745,7 @@ window.appOpenLoginModal = function() {
   modal.classList.add('open');
 };
 
-window.appSubmitAuthPin = function() {
+window.appSubmitAuthPin = async function() {
   const select = document.getElementById('select-auth-member');
   const inputPin = document.getElementById('input-auth-pin');
   if (!select || !inputPin) return;
@@ -4839,7 +4759,7 @@ window.appSubmitAuthPin = function() {
     return;
   }
 
-  const result = StorageService.verifyPin(memberId, pin);
+  const result = await StorageService.verifyPin(memberId, pin);
   if (!result.success) {
     showToast(result.message || 'Mã PIN không đúng!', 'error');
     inputPin.value = '';
@@ -4884,27 +4804,27 @@ window.appOpenUserWallet = function() {
   const txList = document.getElementById('wallet-tx-list');
 
   if (avatarContainer) {
-    avatarContainer.innerHTML = renderAvatarHtml(user, { size: 'lg' });
+    avatarContainer.safeInnerHTML = renderAvatarHtml(user, { size: 'lg' });
   } else if (avatarImg) {
     avatarImg.src = getAvatarUrl(user);
   }
   if (name) name.textContent = user.name;
   if (tier) {
     const t = getTierByElo(user.elo);
-    tier.innerHTML = `${t.icon} ${t.name} (Elo ${user.elo})`;
+    tier.safeInnerHTML = `${t.icon} ${escapeHtml(t.name)} (Elo ${user.elo})`;
   }
   if (coins) coins.textContent = user.coins !== undefined ? user.coins : 100;
 
   if (txList) {
     const txs = StorageService.getCoinTransactions(user.id);
     if (txs.length === 0) {
-      txList.innerHTML = `
+      txList.safeInnerHTML = `
         <div style="text-align: center; padding: 24px 16px; color: var(--text-muted); font-size: 0.85rem;">
           Chưa có giao dịch xu nào được ghi nhận.
         </div>
       `;
     } else {
-      txList.innerHTML = txs.map(tx => {
+      txList.safeInnerHTML = txs.map(tx => {
         const isPos = tx.amount > 0;
         const dateStr = new Date(tx.createdAt || Date.now()).toLocaleDateString('vi-VN', {
           day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit'
@@ -4912,7 +4832,7 @@ window.appOpenUserWallet = function() {
         return `
           <div class="wallet-tx-item">
             <div style="min-width: 0; flex: 1; padding-right: 8px;">
-              <div class="wallet-tx-desc">${tx.description || 'Giao dịch xu'}</div>
+              <div class="wallet-tx-desc">${escapeHtml(tx.description || 'Giao dịch xu')}</div>
               <div class="wallet-tx-date">${dateStr} • Số dư sau: ${tx.balanceAfter} Xu</div>
             </div>
             <div class="${isPos ? 'tx-amount-pos' : 'tx-amount-neg'}">
@@ -4947,7 +4867,8 @@ window.appOpenAdminSettings = function() {
   document.getElementById('modal-club-settings')?.classList.add('open');
 };
 
-window.appLogout = function() {
+window.appLogout = async function() {
+  if(supabaseService.isConfigured())await supabaseService.logout();
   StorageService.clearCurrentUser();
   state.currentUser = null;
   closeAllModals();
@@ -4994,7 +4915,7 @@ function renderClubShop() {
 
   // 1. RENDER SHOP ITEMS (Flat Grid, Không chia kệ)
   if (itemsContainer) {
-    itemsContainer.innerHTML = SHOP_ITEMS.map(item => {
+    itemsContainer.safeInnerHTML = SHOP_ITEMS.map(item => {
       const isLegendary = item.rarity === 'legendary';
       let badgeClass = 'badge-real';
       if (item.category === 'perk') badgeClass = 'badge-perk';
@@ -5048,11 +4969,11 @@ function renderClubShop() {
                   <span class="shop-item-badge ${badgeClass}">${item.tierBadge || item.badge}</span>
                   ${item.hasAnimation ? '<span class="shop-anim-tag">⚡ XOAY 360°</span>' : ''}
                 </div>
-                <div class="shop-item-title">${item.name}</div>
+                <div class="shop-item-title">${escapeHtml(item.name)}</div>
                 ${consumableCount > 0 ? `<div style="font-size: 0.74rem; color: #10b981; font-weight: 700; margin-top: 2px;">(Đang có: ${consumableCount})</div>` : ''}
               </div>
             </div>
-            <div class="shop-item-desc">${item.description}</div>
+            <div class="shop-item-desc">${escapeHtml(item.description)}</div>
           </div>
           <div class="shop-item-bottom">
             <div class="shop-item-price" style="${isLegendary ? 'color: #fde047; font-size: 1.05rem; text-shadow: 0 0 10px rgba(250,204,21,0.5);' : ''}">
@@ -5071,7 +4992,7 @@ function renderClubShop() {
     const shieldCount = shieldItem?.quantity || 0;
     const isShieldActive = !!(user && user.activeEloShield);
 
-    shieldBox.innerHTML = `
+    shieldBox.safeInnerHTML = `
       <div class="perk-banner-header">
         <div class="perk-banner-title">
           <span>🛡️</span> Thẻ Khiên Bảo Vệ Elo (Đang có: <strong>${shieldCount}</strong> thẻ)
@@ -5081,7 +5002,7 @@ function renderClubShop() {
         </button>
       </div>
       <div class="perk-banner-desc">
-        ${isShieldActive 
+        ${isShieldActive
           ? `<strong style="color: #10b981;">Khiên đang BẬT:</strong> Nếu thua trận tiếp theo, bạn chỉ bị trừ 50% số điểm Elo! Nếu thắng, bạn nhận đủ 100% Elo và không bị trừ thẻ.`
           : `Khiên đang TẮT. Bật khiên trước khi đánh trận để kích hoạt quyền lợi giảm 50% trừ điểm Elo khi thua.`}
       </div>
@@ -5110,7 +5031,7 @@ function renderClubShop() {
         </div>
         <div class="inventory-card-bottom">
           <span style="font-size: 0.74rem; color: var(--text-dim);">Cơ bản</span>
-          ${isDefaultActive 
+          ${isDefaultActive
             ? `<span style="font-size: 0.78rem; font-weight: 700; color: #10b981;">✓ Đang Dùng</span>`
             : `<button class="btn-inventory-action btn-inventory-unequip" onclick="window.appEquipFrame('')">Dùng Mặc Định</button>`}
         </div>
@@ -5159,14 +5080,14 @@ function renderClubShop() {
               ${renderAvatarHtml(dummyMember, { size: 'md' })}
             </div>
             <div class="inventory-card-info">
-              <div class="inventory-card-name">${shopDef.name}</div>
+              <div class="inventory-card-name">${escapeHtml(shopDef.name)}</div>
               <div class="inventory-card-status">${isActive ? '🟢 Đang sử dụng' : 'Trong túi đồ'}</div>
               ${shopDef.hasAnimation ? '<div style="font-size: 0.7rem; color: #facc15; font-weight: 700;">⚡ Hiệu ứng xoay 360°</div>' : ''}
             </div>
           </div>
           <div class="inventory-card-bottom">
             <span style="font-size: 0.74rem; color: var(--text-dim);">${shopDef.tierBadge || shopDef.badge}</span>
-            ${isActive 
+            ${isActive
               ? `<button class="btn-inventory-action btn-inventory-unequip" onclick="window.appEquipFrame('')">Tháo Khung</button>`
               : `<button class="btn-inventory-action btn-inventory-equip" onclick="window.appEquipFrame('${shopDef.id}')">Đeo Khung</button>`}
           </div>
@@ -5174,7 +5095,7 @@ function renderClubShop() {
       `;
     });
 
-    invItemsContainer.innerHTML = cardsHtml;
+    invItemsContainer.safeInnerHTML = cardsHtml;
   }
 
   // 3. RENDER COIN HISTORY
@@ -5220,15 +5141,15 @@ function renderCoinHistory(filter = null) {
   if (!container) return;
 
   if (displayTxs.length === 0) {
-    container.innerHTML = `
+    container.safeInnerHTML = `
       <div class="empty-history-box">
         <div style="font-size: 2.2rem; margin-bottom: 6px;">📜</div>
         <div style="font-weight: 700; color: var(--text-secondary);">Chưa có giao dịch nào</div>
         <div style="font-size: 0.8rem; color: var(--text-dim); margin-top: 2px;">
-          ${currentCoinHistoryFilter === 'all' 
-            ? 'Hãy tích cực điểm danh và thi đấu để tích lũy xu!' 
-            : currentCoinHistoryFilter === 'in' 
-              ? 'Chưa có giao dịch thu vào nào.' 
+          ${currentCoinHistoryFilter === 'all'
+            ? 'Hãy tích cực điểm danh và thi đấu để tích lũy xu!'
+            : currentCoinHistoryFilter === 'in'
+              ? 'Chưa có giao dịch thu vào nào.'
               : 'Chưa có giao dịch chi tiêu nào.'}
         </div>
       </div>
@@ -5249,7 +5170,7 @@ function renderCoinHistory(filter = null) {
     system: { icon: '🪙', label: 'Hệ thống', color: '#8b5cf6' }
   };
 
-  container.innerHTML = displayTxs.map(tx => {
+  container.safeInnerHTML = displayTxs.map(tx => {
     const isPos = tx.amount > 0;
     const typeMeta = typeIcons[tx.type] || { icon: '🪙', label: 'Giao dịch', color: '#8b5cf6' };
     const dateObj = new Date(tx.createdAt || Date.now());
@@ -5263,7 +5184,7 @@ function renderCoinHistory(filter = null) {
         </div>
         <div class="coin-history-body">
           <div class="coin-history-title-row">
-            <span class="coin-history-desc">${tx.description || 'Giao dịch xu'}</span>
+            <span class="coin-history-desc">${escapeHtml(tx.description || 'Giao dịch xu')}</span>
             <span class="coin-history-badge" style="color: ${typeMeta.color}; border-color: ${typeMeta.color}44;">
               ${typeMeta.label}
             </span>
@@ -5414,11 +5335,11 @@ window.appBuyShopItem = async function(itemId) {
   }
 };
 
-window.appEquipFrame = function(frameId) {
+window.appEquipFrame = async function(frameId) {
   const user = StorageService.getCurrentUser();
   if (!user) return;
 
-  const res = StorageService.equipAvatarFrame(user.id, frameId);
+  const res = await StorageService.equipAvatarFrame(user.id, frameId);
   if (!res.success) {
     showToast(res.message, 'error');
     return;
@@ -5436,11 +5357,11 @@ window.appEquipFrame = function(frameId) {
   renderCourt();
 };
 
-window.appToggleEloShield = function() {
+window.appToggleEloShield = async function() {
   const user = StorageService.getCurrentUser();
   if (!user) return;
 
-  const res = StorageService.toggleEloShield(user.id);
+  const res = await StorageService.toggleEloShield(user.id);
   if (!res.success) {
     showToast(res.message, 'error');
     return;
@@ -5467,7 +5388,7 @@ window.appClaimGrip = async function() {
   });
   if (!confirmClaim) return;
 
-  const res = StorageService.claimGrip(user.id);
+  const res = await StorageService.claimGrip(user.id);
   if (!res.success) {
     showToast(res.message, 'error');
     return;
@@ -5479,3 +5400,13 @@ window.appClaimGrip = async function() {
   renderClubShop();
 };
 
+
+// Every asynchronous UI mutation reports a server failure instead of success.
+for(const name of ['appSubmitAddGuest','appRemoveGuest','appToggleAttendance','appDeleteMember','appDeleteSession','appToggleMemberRSVP','appStartSession','appEquipFrame','appToggleEloShield','appClaimGrip','appSubmitAuthPin','appLogout','appBenchSelectPlayer','appUnassignSlot','appStartMatch','appApplySwapPlayer','appRemovePlayerFromSlot','appClearCourt']){window[name]=guardedAction(window[name],name);}
+window.addEventListener('club:auth-required',()=>{state.currentUser=null;renderUserAuthHeader();window.appOpenLoginModal();});
+window.addEventListener('club:write-error',()=>showToast('Chưa lưu được thay đổi sân. Đã tải lại dữ liệu máy chủ.','error'));
+window.addEventListener('club:court-saved',event=>{loadInitialState(event.detail.courtId);renderCourt();});
+
+async function requireCourtSaved(match,courtId){if(!await StorageService.saveActiveMatch(match,courtId))throw new Error('Chưa lưu được sân. Vui lòng kiểm tra lại dữ liệu đã tải.');return true;}
+
+window.addEventListener('unhandledrejection',event=>{console.error('[App] Thao tác chưa hoàn tất:',event.reason?.message);showToast(event.reason?.message||'Thao tác chưa hoàn tất. Vui lòng tải lại để kiểm tra.','error');event.preventDefault();});

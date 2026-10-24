@@ -4,18 +4,21 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node test_logic.js && node test_phase3.js && TZ=Asia/Ho_Chi_Minh node test_regressions.js && node test_wallet_db.js",
+    "test": "node test_logic.js && node test_phase3.js && TZ=Asia/Ho_Chi_Minh node test_regressions.js && node test_wallet_db.js && node test_guarded_operations.js && node test_guarded_client.js && node test_ui_smoke.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
   },
   "devDependencies": {
     "@electric-sql/pglite": "^0.5.11",
-    "vite": "^5.4.2",
+    "esbuild": "^0.28.2",
+    "jsdom": "^29.1.1",
+    "vite": "^8.3.5",
     "ws": "^8.21.3"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.109.0",
-    "canvas-confetti": "^1.9.3"
+    "canvas-confetti": "^1.9.3",
+    "dompurify": "^3.4.17"
   }
 }

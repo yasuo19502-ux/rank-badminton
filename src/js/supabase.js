@@ -45,6 +45,67 @@ class SupabaseService {
     return this.client !== null;
   }
 
+  getSessionToken() { return localStorage.getItem('cbb_club_session_v3') || ''; }
+  saveSession(data) {
+    if (data?.token) localStorage.setItem('cbb_club_session_v3',data.token);
+  }
+  async login(memberId,pin) {
+    const {data,error}=await this.client.rpc('club_login',{p_member_id:memberId,p_pin:pin});
+    if(error) return {success:false,message:'Chưa xác minh được đăng nhập. Vui lòng thử lại.'};
+    if(data.success) this.saveSession(data);
+    return data;
+  }
+  async logout() {
+    try { await this.client?.rpc('club_logout'); } finally { localStorage.removeItem('cbb_club_session_v3'); }
+  }
+  async fetchAll(table,sort='id',ascending=true) {
+    const rows=[];
+    for(let offset=0;;offset+=200){
+      let q=this.client.from(table).select('*').order(sort,{ascending});
+      if(sort!=='id') q=q.order('id',{ascending:true});
+      const {data,error}=await q.range(offset,offset+199);
+      if(error)throw error;
+      rows.push(...data);if(data.length<200)return rows;
+    }
+  }
+  async mutation(name,args) {
+    const r=await this.walletAction(name,args);
+    if(!r.success)throw new Error(r.message);
+    return r.data;
+  }
+  async patchMember(id,patch,expected) {
+    await this.mutation('club_patch_member',{p_member_id:id,p_patch:patch,p_expected_updated_at:expected||null});
+    return true;
+  }
+  async createMember(payload) {
+    const fingerprint=Array.from(new Uint8Array(await crypto.subtle.digest('SHA-256',new TextEncoder().encode(JSON.stringify(payload))))).map(n=>n.toString(16).padStart(2,'0')).join('');
+    const key='cbb_registration_request';
+    let pending;try{pending=JSON.parse(localStorage.getItem(key)||'null');}catch{}
+    if(pending?.fingerprint!==fingerprint)pending={fingerprint,id:'register_'+crypto.randomUUID()};
+    localStorage.setItem(key,JSON.stringify(pending));
+    const {data,error}=await this.client.rpc('club_create_member',{p_payload:{...payload,requestId:pending.id}});
+    if(error){if(['P0001','23505','28000','42501','22023'].includes(error.code))localStorage.removeItem(key);throw new Error(error.message);}
+    if(!data?.success||!data.memberId)throw new Error('Chưa xác nhận được đăng ký. Vui lòng thử lại.');
+    localStorage.removeItem(key);this.saveSession(data);return data;
+  }
+  async score(id,matchId,action,values,requestId) {
+    const previous=this.courtWriteQueues.get(id)||Promise.resolve();
+    const write=previous.catch(()=>{}).then(async()=>{
+      const args={p_id:requestId,p_court_id:id,p_match_id:matchId,p_action:action,p_values:values};
+      let result=await this.walletAction('club_score',args);
+      if(!result.success&&!result.definite)result=await this.walletAction('club_score',args);
+      if(!result.success)throw new Error(result.message);return result.data;
+    });
+    this.courtWriteQueues.set(id,write);
+    try{return await write;}finally{if(this.courtWriteQueues.get(id)===write)this.courtWriteQueues.delete(id);}
+  }
+  async attendanceAction(action,payload) {
+    return this.mutation('club_attendance_action',{p_id:'att_'+crypto.randomUUID(),p_action:action,p_payload:payload});
+  }
+  async rsvp(sessionId,memberId,status) {
+    return this.mutation('club_rsvp',{p_session_id:sessionId,p_member_id:memberId,p_status:status});
+  }
+
   async checkWalletVersion() {
     if (!this.isConfigured()) return 0;
     const { data, error } = await this.client.rpc('club_wallet_version');
@@ -53,20 +114,12 @@ class SupabaseService {
   }
 
   async giftOctober20Frames() {
-    if (!this.client) return { success: false };
-    try {
-      const { data, error } = await this.client.rpc('club_gift_october20');
-      if (error) throw error;
-      return { success: true, count: Number(data) || 0 };
-    } catch (error) {
-      // Never fall back to writing profiles from local cache.
-      console.warn('[20-10] Chưa đồng bộ được quà khung:', error.message);
-      return { success: false };
-    }
+    // Existing gifts/choices are preserved. Opening the application is read-only.
+    return {success:true,count:0};
   }
 
   async walletAction(name, args) {
-    if (this.walletVersion !== 2 && await this.checkWalletVersion() !== 2) {
+    if (this.walletVersion !== 3 && await this.checkWalletVersion() !== 3) {
       return { success: false, message: 'Hệ thống xu đang được nâng cấp. Vui lòng thử lại sau.' };
     }
     try {
@@ -74,7 +127,12 @@ class SupabaseService {
       if (error) throw error;
       return { success: true, data };
     } catch (error) {
-      return { success: false, definite: error.code === 'P0001' || error.code === '23505', message: error.message || 'Chưa lưu được giao dịch. Vui lòng kiểm tra mạng và thử lại.' };
+      if(error.code==='28000'){
+        localStorage.removeItem('cbb_club_session_v3');
+        localStorage.removeItem('cbb_thai_thinh_current_user_id_v1');
+        if(typeof window!=='undefined')window.dispatchEvent(new Event('club:auth-required'));
+      }
+      return { success: false, definite: ['P0001','23505','28000','42501'].includes(error.code), message: error.message || 'Chưa lưu được giao dịch. Vui lòng kiểm tra mạng và thử lại.' };
     }
   }
 
@@ -83,7 +141,12 @@ class SupabaseService {
     if (config && config.url && config.key) {
       try {
         this.client = createClient(config.url, config.key, {
-          auth: { persistSession: false }
+          auth: { persistSession: false },
+          global:{fetch:(url,init={})=>{
+            const headers=new Headers(init.headers);
+            const token=this.getSessionToken();if(token)headers.set('x-club-session',token);
+            return fetch(url,{...init,headers});
+          }}
         });
         console.log(`[Supabase] Đã khởi tạo kết nối Cloud (${config.source}): ${config.url}`);
         return true;
@@ -113,7 +176,7 @@ class SupabaseService {
       const testClient = createClient(url.trim(), key.trim(), {
         auth: { persistSession: false }
       });
-      const { data, error } = await testClient.from('members').select('id').limit(1);
+      const { data, error } = await testClient.rpc('club_members_public');
       if (error) throw error;
       return { success: true };
     } catch (err) {
@@ -125,10 +188,7 @@ class SupabaseService {
   async fetchMembers() {
     if (!this.isConfigured()) return null;
     try {
-      const { data, error } = await this.client
-        .from('members')
-        .select('*')
-        .order('elo', { ascending: false });
+      const { data, error } = await this.client.rpc('club_members_public');
 
       if (error) throw error;
 
@@ -153,10 +213,12 @@ class SupabaseService {
           streak: m.streak || 0,
           avatar: m.avatar || '',
           joinedDate: m.joined_date || '',
-          pinCode: m.pin_code || meta.pinCode || '',
+          pinCode: '',
+          hasPin:!!m.has_pin,
+          updatedAt:m.updated_at,
           coins: m.coins !== undefined && m.coins !== null ? Number(m.coins) : (meta.coins !== undefined ? Number(meta.coins) : 100),
-          role: (m.id === 'mem_1789569517045' || (m.name && m.name.toLowerCase().includes('đỗ long'))) ? 'admin' : 'member',
-          activeFrame: m.active_frame || meta.activeFrame || '',
+          role: m.id === 'mem_1789569517045' ? 'admin' : 'member',
+          activeFrame: m.active_frame ?? meta.activeFrame ?? '',
           activeEloShield: m.active_elo_shield !== undefined ? !!m.active_elo_shield : !!meta.activeEloShield,
           _metaInventory: Array.isArray(meta.inventory) ? meta.inventory : []
         };
@@ -219,73 +281,20 @@ class SupabaseService {
     };
   }
 
-  async upsertMember(member, inv = null) {
-    if (!this.isConfigured()) return false;
-    // Chụp payload ngay khi gọi và giữ thứ tự ghi theo từng thành viên trên thiết bị.
-    const payload = this._buildMemberPayload(member, inv);
-    const client = this.client;
-    const previous = this.memberWriteQueues.get(member.id) || Promise.resolve();
-    const write = previous.catch(() => {}).then(async () => {
-      try {
-        let { error } = await client.from('members').upsert(payload);
-
-        // Nếu database cũ chưa có các cột mới, metadata trong phone vẫn được giữ.
-        if (error && (error.message?.includes('pin_code') || error.message?.includes('coins') || error.message?.includes('role') || error.message?.includes('active_frame') || error.message?.includes('active_elo_shield'))) {
-          delete payload.pin_code;
-          delete payload.coins;
-          delete payload.role;
-          delete payload.active_frame;
-          delete payload.active_elo_shield;
-          const res = await client.from('members').upsert(payload);
-          error = res.error;
-        }
-
-        if (error) throw error;
-        return true;
-      } catch (err) {
-        console.error('[Supabase] Lỗi upsertMember:', err);
-        return false;
-      }
-    });
-    this.memberWriteQueues.set(member.id, write);
-    try { return await write; }
-    finally {
-      if (this.memberWriteQueues.get(member.id) === write) this.memberWriteQueues.delete(member.id);
-    }
+  async upsertMember(member) {
+    // Compatibility for explicit profile edits only; never upload statistics.
+    const patch=Object.fromEntries(['name','nickname','gender','frequency','avatar'].filter(k=>member[k]!==undefined).map(k=>[k,member[k]]));
+    return this.patchMember(member.id,patch,member.updatedAt);
   }
 
-  async upsertMembers(members, inv = null) {
-    if (!this.isConfigured() || !Array.isArray(members) || members.length === 0) return false;
-    const results = await Promise.all(members.map(member => this.upsertMember(member, inv)));
-    return results.every(Boolean);
-  }
+  async upsertMembers() { throw new Error('Không được ghi toàn bộ hồ sơ từ bộ nhớ cũ.'); }
 
-  async deleteMember(id) {
-    if (!this.isConfigured()) return false;
-    try {
-      const { error } = await this.client
-        .from('members')
-        .delete()
-        .eq('id', id);
+  async deleteMember(id) { return this.mutation('club_delete_member',{p_member_id:id}); }
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi deleteMember:', err);
-      return false;
-    }
-  }
-
-  // --- API LỊCH BUỔI ĐÁNH & SÂN ĐẤU (SESSIONS) ---
   async fetchSessions() {
     if (!this.isConfigured()) return null;
     try {
-      const { data, error } = await this.client
-        .from('sessions')
-        .select('*')
-        .order('date', { ascending: false });
-
-      if (error) throw error;
+      const data=await this.fetchAll('sessions','date',false);
 
       return data.map(s => ({
         id: s.id,
@@ -297,7 +306,8 @@ class SupabaseService {
         venueAddress: s.venue_address || '',
         courtNumbers: s.court_numbers || '',
         feeNote: s.fee_note || '',
-        rsvps: s.rsvps || {}
+        rsvps: s.rsvps || {},
+        updatedAt:s.updated_at
       }));
     } catch (err) {
       console.error('[Supabase] Lỗi fetchSessions:', err);
@@ -306,59 +316,16 @@ class SupabaseService {
   }
 
   async upsertSession(session) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {
-        id: session.id,
-        title: session.title || '',
-        date: session.date,
-        start_time: session.startTime || '',
-        end_time: session.endTime || '',
-        venue_name: session.venueName || '',
-        venue_address: session.venueAddress || '',
-        court_numbers: session.courtNumbers || '',
-        fee_note: session.feeNote || '',
-        rsvps: session.rsvps || {}
-      };
-
-      const { error } = await this.client
-        .from('sessions')
-        .upsert(payload);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi upsertSession:', err);
-      return false;
-    }
+    const payload={id:session.id,title:session.title||'',date:session.date,start_time:session.startTime||'',end_time:session.endTime||'',venue_name:session.venueName||'',venue_address:session.venueAddress||'',court_numbers:session.courtNumbers||'',fee_note:session.feeNote||''};
+    return this.mutation('club_save_session',{p_payload:payload,p_expected_updated_at:session.updatedAt||null});
   }
 
-  async deleteSession(sessionId) {
-    if (!this.isConfigured()) return false;
-    try {
-      const { error } = await this.client
-        .from('sessions')
-        .delete()
-        .eq('id', sessionId);
+  async deleteSession(id) { return this.mutation('club_delete_session',{p_session_id:id}); }
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi deleteSession:', err);
-      return false;
-    }
-  }
-
-  // --- API LỊCH SỬ TRẬN ĐẤU (MATCHES) ---
   async fetchMatches() {
     if (!this.isConfigured()) return null;
     try {
-      const { data, error } = await this.client
-        .from('matches')
-        .select('*')
-        .order('timestamp', { ascending: false });
-
-      if (error) throw error;
+      const data=await this.fetchAll('matches','timestamp',false);
 
       return data.map(m => {
         return {
@@ -380,49 +347,13 @@ class SupabaseService {
   }
 
   async insertMatch(match) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {
-        id: match.id,
-        timestamp: match.timestamp,
-        court_number: encodeMatchCourt(match),
-        team1: match.team1,
-        team2: match.team2,
-        score1: match.score1,
-        score2: match.score2,
-        elo_change: match.eloChange ?? 16,
-        is_deuce: !!match.isDeuce
-      };
-
-      const { error } = await this.client
-        .from('matches')
-        .insert(payload);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi insertMatch:', err);
-      return false;
-    }
+    const data=await this.mutation('club_finish_match',{p_match_id:match.id,p_score1:match.score1,p_score2:match.score2});
+    if(!data?.id||data.id!==match.id)throw new Error('Chưa xác nhận được kết quả trận. Vui lòng tải lại để kiểm tra.');
+    return {...data,...decodeMatchCourt(data.court_number||'')};
   }
 
-  async deleteMatch(id) {
-    if (!this.isConfigured()) return false;
-    try {
-      const { data, error } = await this.client
-        .from('matches')
-        .delete()
-        .eq('id', id).select('id');
+  async deleteMatch(id) { return this.mutation('club_undo_match',{p_match_id:id}); }
 
-      if (error) throw error;
-      return Boolean(data?.length);
-    } catch (err) {
-      console.error('[Supabase] Lỗi deleteMatch:', err);
-      return false;
-    }
-  }
-
-  // --- API ĐIỂM DANH (ATTENDANCE) ---
   async fetchAttendance(dateStr) {
     if (!this.isConfigured()) return null;
     try {
@@ -452,34 +383,8 @@ class SupabaseService {
     }
   }
 
-  async saveAttendance(attendance) {
-    if (!this.isConfigured()) return false;
-    try {
-      const rawGames = { ...(attendance.gamesPlayedToday || {}) };
-      if (Array.isArray(attendance.guests)) {
-        rawGames._guest_profiles = attendance.guests;
-      }
+  async saveAttendance() { throw new Error('Điểm danh phải cập nhật theo từng thao tác đã xác nhận.'); }
 
-      const payload = {
-        date: attendance.date,
-        present_ids: attendance.presentIds || [],
-        games_played_today: rawGames,
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await this.client
-        .from('attendance')
-        .upsert(payload);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi saveAttendance:', err);
-      return false;
-    }
-  }
-
-  // --- API TRẬN ĐẤU ĐANG DIỄN RA TRÊN SÂN (LIVE_COURT) ---
   async fetchLiveCourt(courtId = 'current_court') {
     if (!this.isConfigured()) return null;
     try {
@@ -583,7 +488,10 @@ class SupabaseService {
       finally { if (this.courtWriteQueues.get(courtId) === write) this.courtWriteQueues.delete(courtId); }
       if (!result.success) throw new Error(result.message);
       const data = result.data;
-      if (match && data?.match_id) match.matchId = data.match_id;
+      if (match && data?.match_id) {
+        match.matchId=data.match_id;match.score1=data.score1;match.score2=data.score2;
+        match.status=data.status;match.matchStatus=data.status;
+      }
       return true;
     } catch (err) {
       console.error('[Supabase] Lỗi saveLiveCourt:', err);
@@ -620,45 +528,13 @@ class SupabaseService {
   }
 
   async saveClubSettings(settings) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {
-        id: 'thai_thinh',
-        club_name: settings.clubName || 'CLB Cầu Lông Thái Thịnh',
-        announcement: settings.announcement || '',
-        default_venue: settings.defaultVenue || '',
-        default_address: settings.defaultAddress || '',
-        k_factor: Number(settings.kFactor) || 32,
-        updated_at: new Date().toISOString()
-      };
-
-      const { error } = await this.client
-        .from('club_settings')
-        .upsert(payload);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi saveClubSettings:', err);
-      return false;
-    }
+    return this.mutation('club_save_settings',{p_payload:{club_name:settings.clubName,announcement:settings.announcement,default_venue:settings.defaultVenue,default_address:settings.defaultAddress,k_factor:settings.kFactor}});
   }
 
-  // --- API GIAO DỊCH XU (COIN_TRANSACTIONS - GIAI ĐOẠN 1) ---
   async fetchCoinTransactions(memberId = null) {
     if (!this.isConfigured()) return null;
     try {
-      let query = this.client
-        .from('coin_transactions')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (memberId) {
-        query = query.eq('member_id', memberId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data=(await this.fetchAll('coin_transactions','created_at',false)).filter(tx=>!memberId||tx.member_id===memberId);
 
       return data.map(tx => ({
         id: tx.id,
@@ -674,59 +550,14 @@ class SupabaseService {
     }
   }
 
-  async insertCoinTransaction(tx) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {
-        id: tx.id,
-        member_id: tx.memberId,
-        amount: tx.amount,
-        balance_after: tx.balanceAfter,
-        type: tx.type,
-        description: tx.description || '',
-        created_at: tx.createdAt || new Date().toISOString()
-      };
+  async insertCoinTransaction() { return false; }
 
-      const { error } = await this.client
-        .from('coin_transactions')
-        .insert(payload);
+  async deleteCoinTransactionsByType() { return false; }
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  async deleteCoinTransactionsByType(type) {
-    if (!this.isConfigured()) return false;
-    try {
-      const { error } = await this.client
-        .from('coin_transactions')
-        .delete()
-        .eq('type', type);
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      return false;
-    }
-  }
-
-  // --- API DỰ ĐOÁN & CƯỢC VUI (BETS - GIAI ĐOẠN 2) ---
   async fetchBets(courtId = null) {
     if (!this.isConfigured()) return null;
     try {
-      let query = this.client
-        .from('bets')
-        .select('*')
-        .order('created_at', { ascending: false });
-
-      if (courtId) {
-        query = query.eq('court_id', courtId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data=(await this.fetchAll('bets','created_at',false)).filter(b=>!courtId||b.court_id===courtId);
 
       return data.map(b => ({
         id: b.id,
@@ -746,68 +577,14 @@ class SupabaseService {
     }
   }
 
-  async insertBet(bet) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {
-        id: bet.id,
-        court_id: bet.courtId,
-        match_id: bet.matchId || null,
-        member_id: bet.memberId,
-        predicted_team: bet.predictedTeam,
-        amount: Number(bet.amount),
-        odds: Number(bet.odds),
-        potential_payout: Number(bet.potentialPayout),
-        status: bet.status || 'pending',
-        created_at: bet.createdAt || new Date().toISOString()
-      };
+  async insertBet() { return false; }
 
-      const { error } = await this.client
-        .from('bets')
-        .insert(payload);
+  async updateBet() { return false; }
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi insertBet:', err);
-      return false;
-    }
-  }
-
-  async updateBet(betId, updates) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {};
-      if (updates.status !== undefined) payload.status = updates.status;
-      if (updates.matchId !== undefined) payload.match_id = updates.matchId;
-
-      const { error } = await this.client
-        .from('bets')
-        .update(payload)
-        .eq('id', betId);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi updateBet:', err);
-      return false;
-    }
-  }
-
-  // --- API TÚI ĐỒ & VẬT PHẨM (USER_INVENTORY - GIAI ĐOẠN 3) ---
   async fetchInventory(memberId = null) {
     if (!this.isConfigured()) return null;
     try {
-      let query = this.client
-        .from('user_inventory')
-        .select('*');
-
-      if (memberId) {
-        query = query.eq('member_id', memberId);
-      }
-
-      const { data, error } = await query;
-      if (error) throw error;
+      const data=(await this.fetchAll('user_inventory')).filter(i=>!memberId||i.member_id===memberId);
 
       return data.map(item => ({
         id: item.id,
@@ -825,51 +602,19 @@ class SupabaseService {
     }
   }
 
-  async upsertInventoryItem(item) {
-    if (!this.isConfigured()) return false;
-    try {
-      const payload = {
-        id: item.id,
-        member_id: item.memberId,
-        item_id: item.itemId,
-        item_type: item.itemType,
-        quantity: Math.max(0, Number(item.quantity ?? 1) || 0),
-        status: item.status || 'available',
-        updated_at: new Date().toISOString()
-      };
+  async upsertInventoryItem() { throw new Error('Vật phẩm phải được cập nhật bằng thao tác máy chủ.'); }
 
-      const { error } = await this.client
-        .from('user_inventory')
-        .upsert(payload);
+  async deleteInventoryItem() { return false; }
 
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi upsertInventoryItem:', err);
-      return false;
-    }
-  }
-
-  async deleteInventoryItem(id) {
-    if (!this.isConfigured()) return false;
-    try {
-      const { error } = await this.client
-        .from('user_inventory')
-        .delete()
-        .eq('id', id);
-
-      if (error) throw error;
-      return true;
-    } catch (err) {
-      console.error('[Supabase] Lỗi deleteInventoryItem:', err);
-      return false;
-    }
-  }
-
-  // --- REALTIME SUBSCRIPTIONS (TỰ ĐỘNG ĐỒNG BỘ CÁC BẢNG DỮ LIỆU) ---
   subscribeToChanges(onChangeCallback) {
     if (!this.isConfigured()) return;
     this.lastOnChangeCallback = onChangeCallback;
+    // Public member RPC omits credentials. Member rows are deliberately not
+    // broadcast because legacy phone metadata contains private PINs.
+    if(typeof document!=='undefined'){
+      clearInterval(this.profilePoll);
+      this.profilePoll=setInterval(()=>{if(document.visibilityState==='visible')onChangeCallback('members',{});},15000);
+    }
 
     if (this.realtimeChannel) {
       try {
@@ -879,9 +624,6 @@ class SupabaseService {
 
     this.realtimeChannel = this.client
       .channel('thai-thinh-realtime-channel')
-      .on('postgres_changes', { event: '*', schema: 'public', table: 'members' }, (payload) => {
-        onChangeCallback('members', payload);
-      })
       .on('postgres_changes', { event: '*', schema: 'public', table: 'sessions' }, (payload) => {
         onChangeCallback('sessions', payload);
       })
