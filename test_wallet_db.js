@@ -181,5 +181,17 @@ await test('Client không được tự sửa sổ hoặc trạng thái cược'
   assert.equal(await scalar("select has_function_privilege('anon','public.club_apply_coin(text,integer,text,text,text,text,text,boolean)','EXECUTE')"),false);
   assert.equal(await scalar("select has_function_privilege('anon','public.club_place_bet(text,text,text,text,text,integer,numeric)','EXECUTE')"),true);
 });
+await reset();
+await test('Quà 20-10 lặp lại không ghi đè Elo, xu, khiên hoặc khung đã chọn',async()=>{
+  await db.exec("alter table members add column gender text default 'male'; update members set gender='female',elo=1137,wins=8,phone='{\"activeFrame\":\"frame_gold\",\"activeEloShield\":true,\"pinCode\":\"5678\"}' where id='a'");
+  await db.exec(fs.readFileSync(new URL('./supabase/migrations/20261024_safe_frame_gifts.sql',import.meta.url),'utf8'));
+  await db.exec("select club_gift_october20();select club_gift_october20()");
+  assert.deepEqual((await db.query("select elo,wins,coins from members where id='a'")).rows[0],{elo:1137,wins:8,coins:100});
+  const meta=JSON.parse(await scalar("select phone from members where id='a'"));
+  assert.equal(meta.activeFrame,'frame_gold');assert.equal(meta.activeEloShield,true);assert.equal(meta.pinCode,'5678');
+  assert.equal(meta.inventory.filter(i=>i.itemId==='frame_ribbon_2010').length,1);
+  assert.equal(await scalar("select count(*)::int from user_inventory where member_id='a' and item_id='frame_ribbon_2010'"),1);
+  assert.equal(await scalar('select count(*)::int from coin_transactions'),0);
+});
 console.log(`${passed} wallet database tests passed.`);
 } finally { await db.close(); }

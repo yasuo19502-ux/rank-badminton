@@ -1883,6 +1883,11 @@ export const StorageService = {
    * và kích hoạt đeo khung avatar nếu chưa có khung riêng biệt
    */
   giftOctober20Frames() {
+    // Cloud gifts must never upload a cached member profile: opening an old tab
+    // could otherwise roll back Elo, statistics and shield state.
+    if (supabaseService.isConfigured()) {
+      return supabaseService.giftOctober20Frames();
+    }
     try {
       const members = this.getMembers();
       let inv = this.getLocalInventory();
@@ -1922,13 +1927,6 @@ export const StorageService = {
       }
       if (membersChanged) {
         this.saveLocalMembers(members);
-      }
-
-      // Đồng bộ Cloud Supabase
-      if (supabaseService.isConfigured() && (invChanged || membersChanged)) {
-        updatedFemales.forEach(f => {
-          supabaseService.upsertMember(f, inv);
-        });
       }
 
       return { success: true, count: updatedFemales.length };

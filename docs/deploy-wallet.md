@@ -6,6 +6,8 @@ nó giữ số dư hiện tại, không cộng bù hoặc tính lại lịch s�
 
 1. Sao lưu số dư, Elo, trận, vé cược, giao dịch và inventory hiện tại vào nơi riêng tư.
 2. Chạy migration trong SQL Editor của đúng dự án `sfdtqtdjxnkkgjimnliz`.
+   Sau đó chạy `supabase/migrations/20261024_safe_frame_gifts.sql` để việc tặng
+   khung tự động chỉ cập nhật mỹ phẩm, không ghi hồ sơ/Elo cũ từ trình duyệt.
    Không chạy lại toàn bộ `supabase_schema.sql` cũ.
 3. Kiểm tra `select public.club_wallet_version();` trả `2`; số dư và Elo
    của các thành viên không thay đổi sau migration.

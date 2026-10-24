@@ -52,6 +52,19 @@ class SupabaseService {
     return this.walletVersion;
   }
 
+  async giftOctober20Frames() {
+    if (!this.client) return { success: false };
+    try {
+      const { data, error } = await this.client.rpc('club_gift_october20');
+      if (error) throw error;
+      return { success: true, count: Number(data) || 0 };
+    } catch (error) {
+      // Never fall back to writing profiles from local cache.
+      console.warn('[20-10] Chưa đồng bộ được quà khung:', error.message);
+      return { success: false };
+    }
+  }
+
   async walletAction(name, args) {
     if (this.walletVersion !== 2 && await this.checkWalletVersion() !== 2) {
       return { success: false, message: 'Hệ thống xu đang được nâng cấp. Vui lòng thử lại sau.' };
