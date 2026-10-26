@@ -85,6 +85,25 @@
           </div>
         </div>
 
+        <div class="bench-panel">
+          <div class="panel-heading"><div><h3>Người có mặt</h3><p>Chạm để xếp vào <span id="bench-current-court">Sân 1</span> · Vuốt ngang xem thêm.</p></div><button class="btn-secondary" onclick="window.appSwitchTab('attendance')">Điểm danh →</button></div>
+          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
+          <div id="court-bench-container" class="court-bench-container">
+            <div class="bench-gender-row male-row">
+              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
+              <div id="bench-male-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+            <div class="bench-gender-row female-row">
+              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
+              <div id="bench-female-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </div>
+        </div>
+
         <!-- BỘ CHỌN 2 SÂN SONG SONG: SÂN 1 & SÂN 2 -->
         <div class="court-parallel-selector-bar">
           <div class="court-tabs-group">
@@ -230,25 +249,6 @@
           <button type="button" id="btn-finish-match" class="btn-primary btn-save-match-record">
             <span>🏆</span> LƯU KẾT QUẢ TRẬN
           </button>
-        </div>
-
-        <div class="bench-panel">
-          <div class="panel-heading"><div><h3>Người có mặt</h3><p>Chạm vào thành viên để xếp vào sân đang chọn.</p></div><button class="btn-secondary" onclick="window.appSwitchTab('attendance')">Điểm danh →</button></div>
-          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
-          <div id="court-bench-container" class="court-bench-container">
-            <div class="bench-gender-row male-row">
-              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
-              <div id="bench-male-avatars" class="bench-avatars-scroll">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-            <div class="bench-gender-row female-row">
-              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
-              <div id="bench-female-avatars" class="bench-avatars-scroll">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- KHU VỰC ĐIỀU KHIỂN GHÉP CẶP & DỰ ĐOÁN TÁCH BIỆT -->

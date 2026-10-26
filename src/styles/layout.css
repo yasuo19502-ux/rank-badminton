@@ -55,6 +55,25 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible, summary:fo
 .panel-heading p { font-size:.78rem; color:var(--text-dim); margin:3px 0 0; }
 .panel-heading .btn-secondary { min-height:40px; font-size:.76rem; padding:8px 12px; white-space:nowrap; }
 .bench-panel .court-bench-container { border:0; border-radius:0; background:transparent; box-shadow:none; padding:0; min-height:0; }
+/* Keep the attendance bench readable and touch-friendly above the courts. */
+.bench-panel .panel-heading { margin-bottom:8px; }
+.bench-panel .panel-heading > div { min-width:0; }
+.bench-panel .panel-heading p { line-height:1.5; }
+.bench-panel .bench-avatars-scroll { gap:6px; padding:7px 3px 5px; }
+.bench-panel .bench-avatar-btn { flex-direction:column; gap:5px; width:68px; min-height:76px; padding:3px 2px; border-radius:9px; color:var(--text-main); touch-action:manipulation; }
+.bench-panel .bench-avatar-btn:hover { transform:none; background:var(--layout-soft); }
+.bench-panel .bench-avatar-btn.is-on-court { opacity:.75; filter:none; cursor:pointer; }
+.bench-player-avatar { display:flex; position:relative; align-items:center; justify-content:center; }
+.bench-panel .bench-avatar-btn .avatar-container { width:36px !important; height:36px !important; min-width:36px !important; min-height:36px !important; }
+.bench-panel .bench-avatar-btn .avatar-img { width:36px !important; height:36px !important; }
+.bench-player-name { display:flex; align-items:flex-start; justify-content:center; width:100%; min-height:28px; white-space:normal; overflow-wrap:anywhere; font-size:.68rem; font-weight:600; line-height:1.3; }
+.bench-panel .bench-on-court-tag { font-size:9px; line-height:14px; }
+@media (max-width:480px) {
+  .bench-panel .bench-gender-row { gap:4px; }
+  .bench-panel .bench-avatars-scroll { gap:3px; }
+  .bench-panel .bench-avatar-btn { width:58px; }
+  .bench-panel .panel-heading { gap:8px; align-items:flex-start; }
+}
 .court-lower-grid { gap:18px; }
 .match-controls-card, .live-betting-card.standalone { box-shadow:none; border-radius:16px; }
 .mode-btn { min-height:48px; }

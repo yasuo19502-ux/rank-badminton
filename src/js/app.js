@@ -1300,6 +1300,9 @@ function renderCourtBench() {
   const femaleContainer = document.getElementById('bench-female-avatars');
   if (!maleContainer || !femaleContainer) return;
 
+  const courtHint = document.getElementById('bench-current-court');
+  if (courtHint) courtHint.textContent = state.currentCourtId === 'court_2' ? 'Sân 2' : 'Sân 1';
+
   const attendance = StorageService.getAttendance();
   const presentIds = attendance.presentIds || [];
   const allMembers = StorageService.getMembers();
@@ -1342,10 +1345,13 @@ function renderCourtBench() {
       <button type="button"
         class="bench-avatar-btn ${isOnCourt ? 'is-on-court' : ''} ${member.isGuest ? 'is-guest-bench-btn' : ''}"
         onclick="window.appBenchSelectPlayer('${member.id}')"
-        title="${titleText}"
+        title="${titleText}" aria-label="${titleText}"
       >
-        ${renderAvatarHtml(member, { size: 'sm' })}
-        ${isOnCourt ? `<span class="bench-on-court-tag ${isCourt2 ? 'court-2' : ''}">${courtLabel}</span>` : ''}
+        <span class="bench-player-avatar">
+          ${renderAvatarHtml(member, { size: 'sm' })}
+          ${isOnCourt ? `<span class="bench-on-court-tag ${isCourt2 ? 'court-2' : ''}">${courtLabel}</span>` : ''}
+        </span>
+        <span class="bench-player-name">${escapeHtml(member.name)}</span>
       </button>
     `;
   };
