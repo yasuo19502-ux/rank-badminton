@@ -2,7 +2,7 @@
 <html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>CLB Cầu Lông Thái Thịnh - Bảng Xếp Hạng & Ghép Sân</title>
   <meta name="description" content="Ứng dụng xếp hạng Elo đánh đôi, ghép cặp tự động thông minh và quản lý buổi đánh cho CLB Cầu Lông Thái Thịnh">
   <link rel="icon" href="/icons/icon.svg">
@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Cầu Lông TT">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/src/styles/main.css">
+  <link rel="stylesheet" href="/src/styles/layout.css">
 </head>
 <body>
   <div class="app-container">
@@ -32,25 +33,11 @@
       </div>
 
       <!-- Desktop Navigation -->
-      <nav class="desktop-nav">
-        <button class="nav-tab-btn active" data-tab="court">
-          <span>🏸</span> Sân Đấu
-        </button>
-        <button class="nav-tab-btn" data-tab="sessions">
-          <span>📅</span> Lịch Sân
-        </button>
-        <button class="nav-tab-btn" data-tab="leaderboard">
-          <span>🏆</span> Xếp Hạng
-        </button>
-        <button class="nav-tab-btn" data-tab="attendance">
-          <span>📋</span> Điểm Danh
-        </button>
-        <button class="nav-tab-btn" data-tab="members">
-          <span>👥</span> Thành Viên
-        </button>
-        <button class="nav-tab-btn" data-tab="history">
-          <span>📜</span> Lịch Sử
-        </button>
+      <nav class="desktop-nav" aria-label="Điều hướng chính">
+        <button class="nav-tab-btn active" data-tab="court"><span aria-hidden="true">🏸</span> Hôm nay</button>
+        <button class="nav-tab-btn" data-tab="sessions"><span aria-hidden="true">📅</span> Lịch sân</button>
+        <button class="nav-tab-btn" data-tab="leaderboard"><span aria-hidden="true">🏆</span> Xếp hạng</button>
+        <button class="nav-tab-btn" data-tab="me"><span aria-hidden="true">👤</span> Cá nhân</button>
       </nav>
 
       <!-- Header Quick Actions -->
@@ -82,44 +69,15 @@
     <!-- MAIN VIEWS -->
     <main id="main-content">
       
-      <!-- ================= BANNER CHÚC MỪNG 20-10 (TUẦN LỄ PHỤ NỮ VIỆT NAM 20/10 - 27/10) ================= -->
-      <div id="banner-celebrate-2010" class="banner-celebrate-2010" style="display: none;">
-        <div class="banner-2010-backdrop"></div>
-        <div class="banner-2010-content">
-          <div class="banner-2010-ribbon-icon">
-            <img src="/images/frame_ribbon_2010.webp" alt="Nơ 20-10" class="banner-ribbon-img">
-          </div>
-          <div class="banner-2010-text-col">
-            <div class="banner-2010-badge-row">
-              <span class="badge-2010-pill">🌸 20-10 PHỤ NỮ VIỆT NAM</span>
-              <span class="badge-2010-club">🏸 CLB Cầu Lông Thái Thịnh</span>
-            </div>
-            <h2 class="banner-2010-title">Chúc Mừng Ngày Phụ Nữ Việt Nam 20-10! 💐</h2>
-            <p class="banner-2010-desc">
-              CLB Thái Thịnh mến chúc toàn thể các bóng hồng luôn tươi trẻ, rạng rỡ, ngập tràn hạnh phúc và smash cháy sân trong mọi trận đấu! 💖
-            </p>
-            <div class="banner-2010-gift-notice">
-              🎁 <strong>Món quà độc quyền:</strong> CLB đã gửi tặng riêng mỗi bạn nữ <strong>Khung Avatar Nơ Hồng Kỷ Niệm 20-10</strong> vĩnh viễn trong Túi Đồ!
-            </div>
-          </div>
-          <div class="banner-2010-actions">
-            <button type="button" class="btn-banner-2010-gift" onclick="window.appOpenShopModal('inventory')">
-              👗 Mở Túi Đồ Của Tôi
-            </button>
-            <button type="button" class="btn-banner-2010-close" onclick="window.appDismissBanner2010()" title="Đóng banner tạm thời">
-              ✕
-            </button>
-          </div>
-        </div>
-      </div>
+      <nav id="workspace-nav" class="workspace-nav" aria-label="Trong buổi đánh"></nav>
 
       <!-- ================= 1. TAB: SÂN ĐẤU (COURT & MATCHMAKER) ================= -->
       <section id="tab-court" class="tab-view active">
         <!-- Banner thông tin buổi đánh -->
         <div class="section-banner">
           <div class="banner-info">
-            <h2><span>🏸</span> Sân Đấu & Xếp Trận 1 Chạm</h2>
-            <p>Ghép cặp tự động cân kèo Elo, ưu tiên người nghỉ lâu và ghi điểm trực tiếp</p>
+            <h2><span>🏸</span> Hôm nay ở sân</h2>
+            <p>Theo dõi hai sân, xếp đội và ghi điểm trong buổi đánh.</p>
           </div>
           <div class="session-status-pill">
             <span class="status-dot"></span>
@@ -146,21 +104,6 @@
             </button>
           </div>
 
-          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
-          <div id="court-bench-container" class="court-bench-container">
-            <div class="bench-gender-row male-row">
-              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
-              <div id="bench-male-avatars" class="bench-avatars-scroll">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-            <div class="bench-gender-row female-row">
-              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
-              <div id="bench-female-avatars" class="bench-avatars-scroll">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- THANH CÔNG CỤ TRỌNG TÀI & SÂN ĐẤU -->
@@ -280,17 +223,36 @@
 
           <!-- Nút Lưu Kết Quả Trận Đấu -->
           <button type="button" id="btn-finish-match" class="btn-primary btn-save-match-record">
-            <span>🏆</span> XÁC NHẬN KẾT QUẢ & CẬP NHẬT RANK
+            <span>🏆</span> LƯU KẾT QUẢ TRẬN
           </button>
+        </div>
+
+        <div class="bench-panel">
+          <div class="panel-heading"><div><h3>Người có mặt</h3><p>Chạm vào thành viên để xếp vào sân đang chọn.</p></div><button class="btn-secondary" onclick="window.appSwitchTab('attendance')">Điểm danh →</button></div>
+          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
+          <div id="court-bench-container" class="court-bench-container">
+            <div class="bench-gender-row male-row">
+              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
+              <div id="bench-male-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+            <div class="bench-gender-row female-row">
+              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
+              <div id="bench-female-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+          </div>
         </div>
 
         <!-- KHU VỰC ĐIỀU KHIỂN GHÉP CẶP & DỰ ĐOÁN TÁCH BIỆT -->
         <div class="court-lower-grid">
-          <!-- Cột Trái: Chế Độ Xếp Cặp & Vị Trí Sân -->
+          <!-- Cột Trái: Xếp đội hình & Vị Trí Sân -->
           <div class="match-controls-card">
             <div class="controls-card-header">
               <h3 class="controls-card-title">
-                <span>⚙️</span> Chế Độ Xếp Cặp
+                <span>⚙️</span> Xếp đội hình
               </h3>
               <div class="court-pos-wrap">
                 <span class="court-pos-label">Vị trí:</span>
@@ -322,10 +284,10 @@
             <!-- Nút Tạo Trận / Đổi Người -->
             <div class="action-btn-row">
               <button id="btn-generate-match" class="btn-primary">
-                <span>⚡</span> Quay Trận Mới
+                <span>⚡</span> Xếp trận mới
               </button>
               <button id="btn-swap-teams" class="btn-secondary" title="Đổi chéo người chơi giữa 2 đội">
-                <span>🔄</span> Đổi Kèo
+                <span>🔄</span> Đổi đội
               </button>
             </div>
 
@@ -348,14 +310,14 @@
       <section id="tab-sessions" class="tab-view" style="display: none;">
         <div class="section-banner">
           <div class="banner-info">
-            <h2><span>📅</span> Lịch Buổi Đánh & Sân Cầu Lông</h2>
-            <p>Theo dõi lịch dạng ô lưới trực quan theo tháng, tự động highlight các ngày có kèo đánh</p>
+            <h2><span>📅</span> Lịch sân CLB</h2>
+            <p>Xem buổi đánh sắp tới và đăng ký tham gia.</p>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
             <button id="btn-toggle-calendar-view" class="btn-secondary" style="padding: 9px 14px; font-size: 0.85rem;">
-              <span id="calendar-view-icon">📋</span> <span id="calendar-view-text">Dạng Danh Sách</span>
+              <span id="calendar-view-icon">📅</span> <span id="calendar-view-text">Xem lịch tháng</span>
             </button>
-            <button id="btn-open-add-session" class="btn-primary" style="padding: 9px 16px; font-size: 0.88rem; flex: none;">
+            <button id="btn-open-add-session" data-admin-control class="btn-primary" style="padding: 9px 16px; font-size: 0.88rem; flex: none;">
               <span>➕</span> Đặt Lịch Mới
             </button>
           </div>
@@ -413,7 +375,7 @@
             <p>Hệ thống Elo Đánh Đôi linh hoạt, phân chia rõ ràng trình độ & đóng góp</p>
           </div>
           <div id="total-members-count-badge" class="session-status-pill">
-            16 Thành Viên
+            Đang tải thành viên
           </div>
         </div>
 
@@ -433,10 +395,10 @@
         <!-- Filter Sub-tabs -->
         <div class="leaderboard-tabs-bar">
           <button class="lb-subtab-btn active" data-lbsort="elo">
-            <span>👑</span> Cao Thủ (Elo)
+            <span>👑</span> Điểm Elo
           </button>
           <button class="lb-subtab-btn" data-lbsort="matches">
-            <span>⚡</span> Cày Cuốc (Số trận)
+            <span>⚡</span> Số trận
           </button>
           <button class="lb-subtab-btn" data-lbsort="wins">
             <span>🔥</span> Thắng Nhiều Nhất
@@ -445,7 +407,7 @@
             <span>🎯</span> Tỷ Lệ Thắng (%)
           </button>
           <button class="lb-subtab-btn" data-lbsort="coins">
-            <span>🪙</span> Đại Gia Xu
+            <span>🪙</span> Xu CLB
           </button>
         </div>
 
@@ -468,16 +430,16 @@
             <p>Tick chọn người có mặt để ghép sân • Xu điểm danh (+50 🪙) sẽ tự động cộng sau khi hoàn thành trận đầu tiên tại sân</p>
           </div>
           <div class="action-btn-row">
-            <button id="btn-open-add-guest" class="btn-primary" onclick="window.appOpenAddGuestModal()" style="font-size: 0.8rem; padding: 8px 14px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #4f46e5); border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+            <button id="btn-open-add-guest" data-auth-control class="btn-primary" onclick="window.appOpenAddGuestModal()" style="font-size: 0.8rem; padding: 8px 14px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #4f46e5); border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
               ➕ Thêm Khách
             </button>
-            <button id="btn-checkin-regulars" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+            <button id="btn-checkin-regulars" data-admin-control class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ⚡ Chọn Nòng Cốt
             </button>
-            <button id="btn-checkin-all" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+            <button id="btn-checkin-all" data-admin-control class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ✅ Chọn Tất Cả
             </button>
-            <button id="btn-checkin-none" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+            <button id="btn-checkin-none" data-admin-control class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ❌ Bỏ Chọn
             </button>
           </div>
@@ -490,16 +452,17 @@
 
       <!-- ================= 4. TAB: THÀNH VIÊN (MEMBERS MANAGEMENT) ================= -->
       <section id="tab-members" class="tab-view" style="display: none;">
+        <div class="section-banner"><div class="banner-info"><h2>Thành viên CLB</h2><p>Tìm bạn chơi và xem hồ sơ thi đấu.</p></div></div>
         <div class="members-header-bar">
           <div class="search-input-wrap">
             <span class="search-icon">🔍</span>
             <input type="text" id="member-search-input" class="search-input" placeholder="Tìm tên hoặc biệt danh...">
           </div>
           <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: center;">
-            <button id="btn-open-add-member" class="btn-primary" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
+            <button id="btn-open-add-member" data-admin-control class="btn-primary" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
               <span>➕</span> Thêm Thành Viên
             </button>
-            <button id="btn-open-add-guest-members" class="btn-secondary btn-open-add-guest" data-action="open-add-guest" onclick="window.appOpenAddGuestModal()" style="padding: 10px 13px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+            <button id="btn-open-add-guest-members" data-auth-control class="btn-secondary btn-open-add-guest" data-action="open-add-guest" onclick="window.appOpenAddGuestModal()" style="padding: 10px 13px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
               <span>👤</span> Thêm Khách
             </button>
           </div>
@@ -527,34 +490,24 @@
         </div>
       </section>
 
+      <section id="tab-me" class="tab-view" style="display:none;" aria-label="Cá nhân">
+        <div class="section-banner"><div class="banner-info"><p class="eyebrow">GÓC THÀNH VIÊN</p><h2>Cá nhân</h2><p>Hồ sơ, ví xu và vật phẩm của bạn ở cùng một nơi.</p></div></div>
+        <div id="member-home-content"></div>
+        <aside id="banner-celebrate-2010" class="member-event-note" style="display:none;">
+          <span aria-hidden="true">🎀</span><div><strong>Quà 20-10 của CLB</strong><p>Khung Nơ Hồng dành tặng các thành viên nữ.</p></div>
+          <button class="btn-secondary" onclick="window.appOpenShopModal('inventory')">Xem túi đồ</button>
+          <button class="btn-icon" onclick="window.appDismissBanner2010()" aria-label="Đóng thông báo quà 20-10">✕</button>
+        </aside>
+      </section>
+
     </main>
 
     <!-- Mobile Bottom Nav Bar -->
-    <nav class="mobile-nav">
-      <button class="mobile-nav-item active" data-tab="court">
-        <span class="nav-icon">🏸</span>
-        <span>Sân Đấu</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="sessions">
-        <span class="nav-icon">📅</span>
-        <span>Lịch Sân</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="leaderboard">
-        <span class="nav-icon">🏆</span>
-        <span>Xếp Hạng</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="attendance">
-        <span class="nav-icon">📋</span>
-        <span>Điểm Danh</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="members">
-        <span class="nav-icon">👥</span>
-        <span>Thành Viên</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="history">
-        <span class="nav-icon">📜</span>
-        <span>Lịch Sử</span>
-      </button>
+    <nav class="mobile-nav" aria-label="Điều hướng chính trên điện thoại">
+      <button class="mobile-nav-item active" data-tab="court"><span class="nav-icon" aria-hidden="true">🏸</span><span>Hôm nay</span></button>
+      <button class="mobile-nav-item" data-tab="sessions"><span class="nav-icon" aria-hidden="true">📅</span><span>Lịch sân</span></button>
+      <button class="mobile-nav-item" data-tab="leaderboard"><span class="nav-icon" aria-hidden="true">🏆</span><span>Xếp hạng</span></button>
+      <button class="mobile-nav-item" data-tab="me"><span class="nav-icon" aria-hidden="true">👤</span><span>Cá nhân</span></button>
     </nav>
   </div>
 

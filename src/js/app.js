@@ -1,5 +1,6 @@
 import confetti from 'canvas-confetti';
 import {installSafeHtml,escapeHtml} from './html.js';
+import {renderMemberHome as memberHomeMarkup,getUpcomingSessions,countMatchesOnDay} from './member-home.js';
 installSafeHtml();
 import { StorageService, getLocalDateStr, SHOP_ITEMS } from './storage.js';
 import { calculateDoublesElo, calculateBadges, getTierByElo, getNextTier, getPlayerDetailedStats, calculateBettingOdds, TIERS } from './elo.js';
@@ -126,7 +127,7 @@ const state = {
   editingMemberId: null,
   editingSessionId: null,
   tempAvatarBase64: null,
-  calendarViewMode: 'grid', // 'grid' | 'list'
+  calendarViewMode: 'list', // 'grid' | 'list'
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(), // 0 - 11
   calendarSelectedDate: getLocalDateStr(),
@@ -164,7 +165,7 @@ function initApp() {
   checkAndRenderOctober20Banner();
 
   const urlTab = new URLSearchParams(window.location.search).get('tab') || window.location.hash.replace('#', '');
-  if (['court', 'sessions', 'leaderboard', 'attendance', 'members', 'history'].includes(urlTab)) {
+  if (['court', 'sessions', 'leaderboard', 'attendance', 'members', 'history', 'me'].includes(urlTab)) {
     switchTab(urlTab);
   } else {
     switchTab('court');
@@ -317,15 +318,15 @@ function switchCourt(courtId) {
  * Thiết lập các bộ lắng nghe sự kiện (Event Listeners)
  */
 function setupEventListeners() {
-  // 1. Chuyển Tab (Desktop & Mobile)
-  document.querySelectorAll('.nav-tab-btn, .mobile-nav-item').forEach(btn => {
-    btn.addEventListener('click', (e) => {
-      const tab = btn.dataset.tab;
-      if (tab) {
-        SoundService.playClick();
-        switchTab(tab);
-      }
-    });
+  document.addEventListener('keydown',event=>{if(event.target.id==='header-user-widget'&&['Enter',' '].includes(event.key)){event.preventDefault();switchTab('me');}});
+  document.addEventListener('click', async event => {
+    const route=event.target.closest('[data-section-link], .nav-tab-btn, .mobile-nav-item');
+    if(route){const tab=route.dataset.sectionLink||route.dataset.tab;if(['court','attendance','history','sessions','leaderboard','members','me'].includes(tab)){SoundService.playClick();switchTab(tab);}return;}
+    const button=event.target.closest('[data-member-action]');
+    if(!button)return;
+    const user=StorageService.getCurrentUser();
+    const actions={login:()=>window.appOpenLoginModal(),register:()=>window.appOpenRegisterNewMember(),wallet:()=>window.appOpenUserWallet(),profile:()=>user&&window.appViewPlayerProfile(user.id),inventory:()=>window.appOpenShopModal('inventory'),shop:()=>window.appOpenShopModal(),edit:()=>window.appEditMyProfile(),members:()=>switchTab('members'),history:()=>switchTab('history'),fund:()=>document.getElementById('btn-open-club-fund')?.click(),admin:()=>window.appOpenAdminSettings(),logout:()=>window.appLogout()};
+    try{await actions[button.dataset.memberAction]?.();}catch(error){showToast(error.message||'Chưa thực hiện được thao tác.','error');}
   });
 
   // 1b. Chuyển Sân Song Song (Sân 1 <-> Sân 2)
@@ -745,7 +746,7 @@ function setupEventListeners() {
       const icon = document.getElementById('calendar-view-icon');
       const text = document.getElementById('calendar-view-text');
       if (icon) icon.textContent = state.calendarViewMode === 'grid' ? '📋' : '📅';
-      if (text) text.textContent = state.calendarViewMode === 'grid' ? 'Dạng Danh Sách' : 'Dạng Lịch Lưới';
+      if (text) text.textContent = state.calendarViewMode === 'grid' ? 'Xem danh sách' : 'Xem lịch tháng';
       renderSessions();
     });
   }
@@ -1143,17 +1144,20 @@ function setupEventListeners() {
  * Chuyển đổi giữa các màn hình Tab
  */
 function switchTab(tabId) {
-  state.currentTab = tabId;
-
-  // Cập nhật nút Desktop
-  document.querySelectorAll('.nav-tab-btn').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabId);
+  if(!['court','sessions','leaderboard','attendance','members','history','me'].includes(tabId))return;
+  state.currentTab=tabId;
+  const primary=['court','attendance','history'].includes(tabId)?'court':tabId==='members'?'me':tabId;
+  document.querySelectorAll('.nav-tab-btn, .mobile-nav-item').forEach(btn=>{
+    const active=btn.dataset.tab===primary;btn.classList.toggle('active',active);
+    if(active)btn.setAttribute('aria-current','page');else btn.removeAttribute('aria-current');
   });
-
-  // Cập nhật nút Mobile
-  document.querySelectorAll('.mobile-nav-item').forEach(btn => {
-    btn.classList.toggle('active', btn.dataset.tab === tabId);
-  });
+  const workspace=document.getElementById('workspace-nav');
+  if(workspace){
+    const items=primary==='court'?[['court','Sân đấu'],['attendance','Điểm danh'],['history','Lịch sử trận']]:primary==='me'?[['me','Cá nhân'],['members','Thành viên CLB']]:[];
+    workspace.hidden=!items.length;
+    workspace.setAttribute('aria-label',primary==='court'?'Trong buổi đánh':'Góc thành viên');
+    workspace.safeInnerHTML=items.map(([id,label])=>`<button data-section-link="${id}" class="workspace-link ${tabId===id?'active':''}" ${tabId===id?'aria-current="page"':''}>${label}</button>`).join('');
+  }
 
   // Ẩn/Hiện Tab Content
   document.querySelectorAll('.tab-view').forEach(view => {
@@ -1162,6 +1166,9 @@ function switchTab(tabId) {
 
   // Gọi hàm render tương ứng
   switch (tabId) {
+    case 'me':
+      renderMemberHome();
+      break;
     case 'court':
       renderCourt();
       break;
@@ -1252,7 +1259,7 @@ function renderCourt() {
   }
   const validT1 = t1.filter(Boolean);
   const elo1 = validT1.length > 0 ? Math.round(validT1.reduce((sum, p) => sum + p.elo, 0) / validT1.length) : 0;
-  if (t1AvgLabel) t1AvgLabel.safeInnerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo1}</span>`;
+  if (t1AvgLabel) t1AvgLabel.safeInnerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${validT1.length?elo1:'—'}</span>`;
 
   // Render Team 2 (2 slots)
   if (team2Grid) {
@@ -1260,7 +1267,7 @@ function renderCourt() {
   }
   const validT2 = t2.filter(Boolean);
   const elo2 = validT2.length > 0 ? Math.round(validT2.reduce((sum, p) => sum + p.elo, 0) / validT2.length) : 0;
-  if (t2AvgLabel) t2AvgLabel.safeInnerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${elo2}</span>`;
+  if (t2AvgLabel) t2AvgLabel.safeInnerHTML = `<span class="elo-tb-prefix">Elo TB: </span><span class="elo-tb-val">${validT2.length?elo2:'—'}</span>`;
 
   // Quản lý trạng thái thi đấu & badge
   const totalPlayers = validT1.length + validT2.length;
@@ -3507,7 +3514,9 @@ function updateSessionStatusBadge() {
 
   const counterEl = document.getElementById('session-counter-text');
   if (counterEl) {
-    counterEl.textContent = `Hôm nay: ${presentCount} người (${maleCount} Nam, ${femaleCount} Nữ) | Đã đấu: ${matches.length} trận`;
+    const todayCount=countMatchesOnDay(matches,getLocalDateStr());
+    counterEl.textContent = `${presentCount} người có mặt · ${todayCount} trận hôm nay`;
+    counterEl.title=`${maleCount} nam, ${femaleCount} nữ · Tổng ${matches.length} trận đã ghi`;
   }
 }
 
@@ -4009,6 +4018,7 @@ async function initCloudSyncAndRealtime() {
     if (table === 'user_inventory') {
       const inventory = await supabaseService.fetchInventory();
       if (inventory) StorageService.saveLocalInventory(inventory);
+      if(state.currentTab==='me')renderMemberHome();
       if (document.getElementById('modal-club-shop')?.classList.contains('open')) renderClubShop();
       return;
     }
@@ -4051,6 +4061,7 @@ async function initCloudSyncAndRealtime() {
  * =========================================================================
  */
 function renderSessions() {
+  if(state.currentTab==='me')renderMemberHome();
   const gridView = document.getElementById('calendar-grid-view');
   const listView = document.getElementById('sessions-list-container');
   const sessions = StorageService.getSessions();
@@ -4198,7 +4209,7 @@ function renderCalendarSelectedDayPanel(container, sessionsByDate, memberMap) {
         <span>🏸</span> Chi Tiết: ${dateFormatted}
         ${isToday ? '<span style="font-size: 0.72rem; padding: 2px 8px; border-radius: 99px; background: rgba(6,182,212,0.2); color: var(--cyan); border: 1px solid var(--cyan); font-weight: 800;">Hôm Nay</span>' : ''}
       </div>
-      <button class="btn-primary" style="padding: 7px 14px; font-size: 0.8rem;" onclick="window.appOpenAddSessionForDate('${selDate}')">
+      <button class="btn-primary" style="padding: 7px 14px; font-size: 0.8rem;" data-admin-control onclick="window.appOpenAddSessionForDate('${selDate}')">
         ➕ Đặt Lịch Cho Ngày Này
       </button>
     </div>
@@ -4211,8 +4222,8 @@ function renderCalendarSelectedDayPanel(container, sessionsByDate, memberMap) {
       <div class="cal-empty-day-box">
         <div style="font-size: 2rem; margin-bottom: 6px;">🏸</div>
         <div style="font-weight: 700; color: var(--text-main); margin-bottom: 4px;">Chưa có lịch đánh trong ngày ${parts[2]}/${parts[1]}</div>
-        <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 14px;">Bấm nút bên dưới để tạo buổi đánh mới cho ngày này!</p>
-        <button class="btn-primary" style="padding: 7px 16px; font-size: 0.82rem;" onclick="window.appOpenAddSessionForDate('${selDate}')">
+        <p style="font-size: 0.82rem; color: var(--text-dim); margin-bottom: 14px;">Lịch mới của CLB sẽ được cập nhật tại đây.</p>
+        <button class="btn-primary" style="padding: 7px 16px; font-size: 0.82rem;" data-admin-control onclick="window.appOpenAddSessionForDate('${selDate}')">
           ➕ Đặt Lịch Ngày ${parts[2]}/${parts[1]}
         </button>
       </div>
@@ -4230,13 +4241,15 @@ function renderSessionList(sessions, memberMap) {
   if (sessions.length === 0) {
     container.safeInnerHTML = `
       <div style="grid-column: 1/-1; text-align: center; padding: 40px; color: var(--text-muted);">
-        Chưa có lịch buổi đánh nào. Bấm <strong>"+ Đặt Lịch Mới"</strong> để lên lịch!
+        Chưa có lịch buổi đánh. Lịch mới của CLB sẽ xuất hiện tại đây.
       </div>
     `;
     return;
   }
 
-  container.safeInnerHTML = sessions.map(s => renderSingleSessionCard(s, memberMap)).join('');
+  const upcoming=getUpcomingSessions(sessions,getLocalDateStr());
+  const past=sessions.filter(s=>s.date<getLocalDateStr()).sort((a,b)=>(b.date+(b.startTime||'')).localeCompare(a.date+(a.startTime||'')));
+  container.safeInnerHTML = `<div class="session-list-group"><h3 class="list-group-title">Sắp tới <span>${upcoming.length}</span></h3>${upcoming.length?upcoming.map(s=>renderSingleSessionCard(s,memberMap)).join(''):'<div class="member-empty">Chưa có lịch sắp tới. CLB sẽ cập nhật tại đây.</div>'}</div>${past.length?`<details class="session-list-group past-sessions"><summary>Buổi đánh đã qua <span>${past.length}</span></summary><div class="past-session-list">${past.map(s=>renderSingleSessionCard(s,memberMap)).join('')}</div></details>`:''}`;
 }
 
 /**
@@ -4254,7 +4267,7 @@ function renderSingleSessionCard(s, memberMap) {
   const femaleCount = attendingMembers.filter(m => m.gender === 'female').length;
 
   const hasMap = Boolean(s.venueAddress || s.venueName);
-  const mapQuery = encodeURIComponent(`${escapeHtml(s.venueName || '')} ${escapeHtml(s.venueAddress || '')}`.trim());
+  const mapQuery = encodeURIComponent(`${s.venueName || ''} ${s.venueAddress || ''}`.trim());
   const mapUrl = `https://www.google.com/maps/search/?api=1&query=${mapQuery}`;
   const timeDisplay = s.startTime && s.endTime ? `${s.startTime} - ${s.endTime}` : (s.startTime || s.endTime || '');
 
@@ -4269,12 +4282,12 @@ function renderSingleSessionCard(s, memberMap) {
           <div class="session-title">${escapeHtml(s.title || 'Buổi Đánh Cầu')}</div>
           ${timeDisplay ? `
           <div class="session-time-row">
-            <span>⏰</span> ${timeDisplay}
+            <span>⏰</span> ${escapeHtml(timeDisplay)}
           </div>` : ''}
         </div>
         <div style="display: flex; gap: 4px;">
-          <button class="btn-mini-action" onclick="window.appEditSession('${s.id}')" title="Sửa thông tin">✎</button>
-          <button class="btn-mini-action btn-mini-danger" onclick="window.appDeleteSession('${s.id}')" title="Xóa buổi đánh">✕</button>
+          <button class="btn-mini-action" data-admin-control onclick="window.appEditSession('${s.id}')" title="Sửa thông tin">✎</button>
+          <button class="btn-mini-action btn-mini-danger" data-admin-control onclick="window.appDeleteSession('${s.id}')" title="Xóa buổi đánh">✕</button>
         </div>
       </div>
 
@@ -4310,9 +4323,9 @@ function renderSingleSessionCard(s, memberMap) {
 
       <div class="session-footer-actions">
         <button class="btn-secondary" style="flex: 1; font-size: 0.8rem; padding: 8px 10px;" onclick="window.appQuickRSVP('${s.id}')">
-          ✋ Đăng Ký Có Mặt
+          ✋ Xem / đổi đăng ký
         </button>
-        <button class="btn-primary" style="flex: 1.3; font-size: 0.82rem; padding: 8px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;" onclick="window.appStartSession('${s.id}')">
+        <button class="btn-primary" style="flex: 1.3; font-size: 0.82rem; padding: 8px 12px; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: #fff;" data-admin-control ${s.date===getLocalDateStr()?'':'hidden'} onclick="window.appStartSession('${s.id}')">
           🏸 Bắt Đầu Buổi Đánh
         </button>
       </div>
@@ -4681,12 +4694,14 @@ function renderUserAuthHeader() {
 
   const currentUser = StorageService.getCurrentUser();
   state.currentUser = currentUser;
+  document.body.classList.toggle('is-admin-view',StorageService.isAdmin(currentUser));
+  document.body.classList.toggle('is-signed-in',!!currentUser);
 
   if (currentUser) {
     const coins = currentUser.coins !== undefined ? currentUser.coins : 100;
     const isCurrentUserAdmin = StorageService.isAdmin(currentUser);
     container.safeInnerHTML = `
-      <div id="header-user-widget" class="header-user-pill" onclick="window.appOpenUserWallet()" title="Xem ví xu & hồ sơ cá nhân">
+      <div id="header-user-widget" class="header-user-pill" onclick="window.appSwitchTab('me')" title="Mở trang cá nhân" role="button" tabindex="0">
         ${renderAvatarHtml(currentUser, { size: 'xs', className: 'header-user-avatar' })}
         <span class="header-user-name">${escapeHtml(currentUser.name)}${isCurrentUserAdmin ? ' <span style="font-size: 0.68rem; background: rgba(239,68,68,0.2); color: #f87171; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 2px;">👑 Admin</span>' : ''}</span>
         <span class="header-coin-badge">🪙 <span id="header-user-coins">${coins}</span></span>
@@ -4699,6 +4714,7 @@ function renderUserAuthHeader() {
       </button>
     `;
   }
+  if(state.currentTab==='me')renderMemberHome();
 }
 
 window.appOpenLoginModal = function() {
@@ -5248,7 +5264,7 @@ function checkAndRenderOctober20Banner() {
     return;
   }
 
-  banner.style.display = 'block';
+  banner.style.display = 'flex';
 }
 
 window.appDismissBanner2010 = function() {
@@ -5410,3 +5426,9 @@ window.addEventListener('club:court-saved',event=>{loadInitialState(event.detail
 async function requireCourtSaved(match,courtId){if(!await StorageService.saveActiveMatch(match,courtId))throw new Error('Chưa lưu được sân. Vui lòng kiểm tra lại dữ liệu đã tải.');return true;}
 
 window.addEventListener('unhandledrejection',event=>{console.error('[App] Thao tác chưa hoàn tất:',event.reason?.message);showToast(event.reason?.message||'Thao tác chưa hoàn tất. Vui lòng tải lại để kiểm tra.','error');event.preventDefault();});
+
+function renderMemberHome() {
+  const container=document.getElementById('member-home-content');if(!container)return;
+  const user=StorageService.getCurrentUser();
+  container.safeInnerHTML=memberHomeMarkup({user,members:StorageService.getMembers(),matches:StorageService.getMatches(),inventory:user?StorageService.getUserInventory(user.id):[],sessions:StorageService.getSessions(),today:getLocalDateStr(),isAdmin:StorageService.isAdmin(user)});
+}

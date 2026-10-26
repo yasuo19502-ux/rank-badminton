@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "test": "node test_logic.js && node test_phase3.js && TZ=Asia/Ho_Chi_Minh node test_regressions.js && node test_wallet_db.js && node test_guarded_operations.js && node test_guarded_client.js && node test_ui_smoke.js",
+    "test": "node test_logic.js && node test_phase3.js && TZ=Asia/Ho_Chi_Minh node test_regressions.js && node test_wallet_db.js && node test_guarded_operations.js && node test_guarded_client.js && node test_member_home.js && node test_ui_smoke.js",
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview"
