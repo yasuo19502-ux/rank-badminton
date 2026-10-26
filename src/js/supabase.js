@@ -94,7 +94,7 @@ class SupabaseService {
       const args={p_id:requestId,p_court_id:id,p_match_id:matchId,p_action:action,p_values:values};
       let result=await this.walletAction('club_score',args);
       if(!result.success&&!result.definite)result=await this.walletAction('club_score',args);
-      if(!result.success)throw new Error(result.message);return result.data;
+      if(!result.success)throw Object.assign(new Error(result.message),{definite:!!result.definite});return result.data;
     });
     this.courtWriteQueues.set(id,write);
     try{return await write;}finally{if(this.courtWriteQueues.get(id)===write)this.courtWriteQueues.delete(id);}

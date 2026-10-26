@@ -154,12 +154,12 @@
             <!-- Bảng điểm trong sân cho bên Trái -->
             <div class="in-court-score-widget score-side-left" id="widget-score-team1">
               <button type="button" class="score-adj-btn minus" id="btn-t1-minus" title="-1 điểm">-</button>
-              <div class="score-tap-zone" id="zone-score-t1" title="Chạm để +1 điểm cho Đội 1">
+              <button type="button" class="score-tap-zone" id="zone-score-t1" aria-label="Cộng 1 điểm cho Đội 1" title="Chạm để +1 điểm cho Đội 1">
                 <div class="score-led-wrap">
-                  <div id="score-team1-val" class="score-number in-court-led" title="Bấm vào số để tự nhập điểm">0</div>
+                  <span id="score-team1-val" class="score-number in-court-led">0</span>
                   <span class="score-tap-hint">+1</span>
                 </div>
-              </div>
+              </button>
               <button type="button" class="score-adj-btn plus" id="btn-t1-plus" title="+1 điểm">+</button>
             </div>
 
@@ -189,12 +189,12 @@
             <!-- Bảng điểm trong sân cho bên Phải -->
             <div class="in-court-score-widget score-side-right" id="widget-score-team2">
               <button type="button" class="score-adj-btn minus" id="btn-t2-minus" title="-1 điểm">-</button>
-              <div class="score-tap-zone" id="zone-score-t2" title="Chạm để +1 điểm cho Đội 2">
+              <button type="button" class="score-tap-zone" id="zone-score-t2" aria-label="Cộng 1 điểm cho Đội 2" title="Chạm để +1 điểm cho Đội 2">
                 <div class="score-led-wrap">
-                  <div id="score-team2-val" class="score-number in-court-led" title="Bấm vào số để tự nhập điểm">0</div>
+                  <span id="score-team2-val" class="score-number in-court-led">0</span>
                   <span class="score-tap-hint">+1</span>
                 </div>
-              </div>
+              </button>
               <button type="button" class="score-adj-btn plus" id="btn-t2-plus" title="+1 điểm">+</button>
             </div>
 
@@ -208,6 +208,11 @@
           <div id="court-empty-overlay" class="court-empty-overlay" style="display: none;">
             <!-- Injected via JS -->
           </div>
+        </div>
+
+        <div class="score-sync-row">
+          <div id="score-sync-status" class="score-sync-status" hidden><span class="score-sync-dot" aria-hidden="true"></span><span id="score-sync-text" role="status" aria-live="polite"></span><button type="button" id="btn-retry-score" hidden>Thử lại</button></div>
+          <button type="button" id="btn-manual-score" class="score-manual-button">✎ Nhập tỷ số</button>
         </div>
 
         <!-- DẢI THAO TÁC NHANH & LƯU KẾT QUẢ NGAY DƯỚI SÂN -->
@@ -512,6 +517,14 @@
   </div>
 
   <!-- ================= MODALS ================= -->
+
+  <div id="modal-manual-score" class="modal-backdrop">
+    <form id="form-manual-score" class="modal-content manual-score-modal" aria-labelledby="manual-score-title">
+      <div class="modal-header"><h3 id="manual-score-title">Nhập tỷ số</h3><button type="button" class="btn-icon btn-close-modal" aria-label="Đóng nhập tỷ số">✕</button></div>
+      <div class="modal-body"><p>Chạm trực tiếp vào bảng điểm để cộng 1. Dùng ô bên dưới khi cần sửa tỷ số.</p><div class="manual-score-inputs"><label>Đội 1<input id="manual-score-1" type="number" inputmode="numeric" min="0" max="30" step="1" required></label><span aria-hidden="true">–</span><label>Đội 2<input id="manual-score-2" type="number" inputmode="numeric" min="0" max="30" step="1" required></label></div></div>
+      <div class="modal-footer"><button type="button" class="btn-secondary btn-close-modal">Hủy</button><button type="submit" class="btn-primary">Cập nhật tỷ số</button></div>
+    </form>
+  </div>
 
   <!-- Modal 1: Thêm / Sửa Thành Viên & Upload Avatar -->
   <div id="modal-member-form" class="modal-backdrop">

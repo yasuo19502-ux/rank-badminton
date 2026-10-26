@@ -1,4 +1,5 @@
 import confetti from 'canvas-confetti';
+import {ScoreSync,compareScoreVersions} from './score-sync.js';
 import {installSafeHtml,escapeHtml} from './html.js';
 import {renderMemberHome as memberHomeMarkup,getUpcomingSessions,countMatchesOnDay} from './member-home.js';
 installSafeHtml();
@@ -135,7 +136,13 @@ const state = {
 };
 
 let debouncedSyncLiveScore = () => {};
-const scoreWrites=new Map();
+const scoreExtraTimers=new Map();
+const scoreSync=new ScoreSync({
+  send:(courtId,matchId,op)=>supabaseService.score(courtId,matchId,op.action,op.values,op.requestId),
+  onRecord:applyScoreRecord,
+  onChange:()=>renderScoreSyncStatus(),
+  onError:(_court,error)=>showToast(error.cancelled?error.message:error.definite?'Có điểm chưa lưu được. Vui lòng tải lại điểm để kiểm tra.':'Mạng chậm, điểm đang chờ xác nhận. Bấm Thử lại để gửi tiếp.','error')
+});
 const actionLocks=new Set();
 function guardedAction(fn,key=fn.name) {
   return async function(...args){
@@ -201,6 +208,7 @@ function updateThemeButton(theme) {
  */
 function loadInitialState(onlyCourt = null) {
   const initCourt = (courtId, courtName) => {
+    if(scoreSync.hasPending(courtId))return;
     const saved = StorageService.getActiveMatch(courtId);
     const hasAny = saved && (
       (Array.isArray(saved.team1) && saved.team1.some(Boolean)) ||
@@ -272,7 +280,7 @@ function updateCourtTabStatusPills() {
 
   if (p1) {
     if (hasP1) {
-      p1.safeInnerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s1_1} - ${s1_2}</strong>`;
+      p1.textContent=`${s1_1} - ${s1_2}`;
       p1.style.color = 'var(--volt)';
     } else {
       p1.textContent = 'Đang trống';
@@ -282,7 +290,7 @@ function updateCourtTabStatusPills() {
 
   if (p2) {
     if (hasP2) {
-      p2.safeInnerHTML = `<strong style="font-size: 0.95rem; font-weight: 800; letter-spacing: 0.5px;">${s2_1} - ${s2_2}</strong>`;
+      p2.textContent=`${s2_1} - ${s2_2}`;
       p2.style.color = 'var(--cyan)';
     } else {
       p2.textContent = 'Đang trống';
@@ -421,27 +429,18 @@ function setupEventListeners() {
     const courtId=state.currentCourtId,match=state.activeMatch;
     if(!before){await requireCourtSaved(match,courtId);return;}
     match.score1=state.score1;match.score2=state.score2;match.matchStatus=state.matchStatus;match.isSwappedSides=state.isSwappedSides;
-    StorageService.saveLocalActiveMatch(match,courtId);updateCourtTabStatusPills();
-    if(!supabaseService.isConfigured()){await requireCourtSaved(match,courtId);return;}
+    updateCourtTabStatusPills();scheduleScoreExtras(courtId);
+    if(!supabaseService.isConfigured()){StorageService.saveLocalActiveMatch(match,courtId);return;}
     const diff1=state.score1-before.score1,diff2=state.score2-before.score2;
     if(!diff1&&!diff2)return;
     const delta=(Math.abs(diff1)===1&&!diff2)||(Math.abs(diff2)===1&&!diff1);
-    const action=delta?'delta':'set';
-    const values=delta?{team:diff1?'team1':'team2',delta:diff1||diff2}:{expected1:before.score1,expected2:before.score2,score1:state.score1,score2:state.score2};
-    const requestId='score_'+crypto.randomUUID(),matchId=match.matchId;
-    const previous=scoreWrites.get(courtId)||Promise.resolve();
-    const write=previous.catch(()=>{}).then(()=>supabaseService.score(courtId,matchId,action,values,requestId)).then(record=>{
-      const current=state.courtMatches[courtId];
-      if(current.activeMatch?.matchId!==matchId)return;
-      if(current.serverUpdatedAt&&Date.parse(record.updated_at)<Date.parse(current.serverUpdatedAt))return;
-      current.serverUpdatedAt=record.updated_at;
-      if(scoreWrites.get(courtId)===write){current.score1=record.score1;current.score2=record.score2;current.matchStatus=record.status;current.activeMatch.score1=record.score1;current.activeMatch.score2=record.score2;StorageService.saveLocalActiveMatch(current.activeMatch,courtId);if(state.currentCourtId===courtId)renderCourt();}
-    }).catch(async error=>{showToast(error.message||'Chưa lưu được điểm. Đang tải lại sân.','error');await StorageService.syncFromCloud();loadInitialState();renderCourt();}).finally(()=>{if(scoreWrites.get(courtId)===write)scoreWrites.delete(courtId);});
-    scoreWrites.set(courtId,write);
+    scoreSync.enqueue(courtId,match.matchId,{requestId:'score_'+crypto.randomUUID(),action:delta?'delta':'set',values:delta?{team:diff1?'team1':'team2',delta:diff1||diff2}:{expected1:before.score1,expected2:before.score2,score1:state.score1,score2:state.score2}});
   };
 
   const recordScoreChange = (newS1, newS2, pulseTeam = null) => {
-    if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+    if(!canRecordScore())return false;
+    newS1=Math.max(0,Math.min(30,newS1));newS2=Math.max(0,Math.min(30,newS2));
+    if(newS1===state.score1&&newS2===state.score2)return false;
     const before={score1:state.score1,score2:state.score2};
     if (!state.scoreHistory) state.scoreHistory = [];
     state.scoreHistory.push({ score1: state.score1, score2: state.score2 });
@@ -470,9 +469,8 @@ function setupEventListeners() {
     }
 
     updateScoreboardDisplay();
-    renderEloPrediction();
-    renderBettingWidget();
     debouncedSyncLiveScore(before);
+    return true;
   };
 
   // Nút Dọn Sân
@@ -507,69 +505,39 @@ function setupEventListeners() {
     });
   }
 
-  // Chạm trực tiếp vào hộp số để +1 điểm
-  const zoneT1 = document.getElementById('zone-score-t1');
-  if (zoneT1) {
-    zoneT1.addEventListener('click', (e) => {
-      if (e.target && e.target.id === 'score-team1-val') return;
-      SoundService.playSmash();
-      recordScoreChange(state.score1 + 1, state.score2, 'team1');
-    });
-  }
-
-  const zoneT2 = document.getElementById('zone-score-t2');
-  if (zoneT2) {
-    zoneT2.addEventListener('click', (e) => {
-      if (e.target && e.target.id === 'score-team2-val') return;
-      SoundService.playSmash();
-      recordScoreChange(state.score1, state.score2 + 1, 'team2');
-    });
-  }
-
-  // Bấm vào con số để nhập điểm bằng bàn phím
-  const led1 = document.getElementById('score-team1-val');
-  if (led1) {
-    led1.addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.appPromptManualScore(true);
-    });
-  }
-
-  const led2 = document.getElementById('score-team2-val');
-  if (led2) {
-    led2.addEventListener('click', (e) => {
-      e.stopPropagation();
-      window.appPromptManualScore(false);
-    });
-  }
-
-  const setupScoreButton = (id, delta, isTeam1) => {
-    const el = document.getElementById(id);
-    if (!el) return;
-    el.addEventListener('click', (e) => {
-      e.stopPropagation();
-      if (delta > 0) SoundService.playSmash();
-      else SoundService.playClick();
-      if (isTeam1) {
-        recordScoreChange(state.score1 + delta, state.score2, delta > 0 ? 'team1' : null);
-      } else {
-        recordScoreChange(state.score1, state.score2 + delta, delta > 0 ? 'team2' : null);
-      }
-    });
+  const pressScore=(team,delta)=>{
+    if(recordScoreChange(state.score1+(team===1?delta:0),state.score2+(team===2?delta:0),delta>0?(team===1?'team1':'team2'):null))playScoreSound(delta);
   };
-
-  setupScoreButton('btn-t1-minus', -1, true);
-  setupScoreButton('btn-t1-plus', 1, true);
-  setupScoreButton('btn-t2-minus', -1, false);
-  setupScoreButton('btn-t2-plus', 1, false);
+  for(const [id,team,delta] of [['zone-score-t1',1,1],['zone-score-t2',2,1],['btn-t1-plus',1,1],['btn-t2-plus',2,1],['btn-t1-minus',1,-1],['btn-t2-minus',2,-1]]){
+    document.getElementById(id)?.addEventListener('click',event=>{event.stopPropagation();pressScore(team,delta);});
+  }
+  document.getElementById('btn-manual-score')?.addEventListener('click',()=>window.appPromptManualScore(true));
+  document.getElementById('form-manual-score')?.addEventListener('submit',event=>{
+    event.preventDefault();const target=state.manualScoreTarget;
+    if(!target||target.courtId!==state.currentCourtId||target.matchId!==state.activeMatch?.matchId||target.score1!==state.score1||target.score2!==state.score2){showToast('Tỷ số đã thay đổi. Vui lòng mở lại để nhập điểm mới.','info');document.getElementById('modal-manual-score')?.classList.remove('open');return;}
+    const one=Number(document.getElementById('manual-score-1').value),two=Number(document.getElementById('manual-score-2').value);
+    if(![one,two].every(n=>Number.isInteger(n)&&n>=0&&n<=30))return;
+    if(recordScoreChange(one,two))playScoreSound(0);
+    document.getElementById('modal-manual-score')?.classList.remove('open');
+  });
+  document.getElementById('btn-retry-score')?.addEventListener('click',async()=>{
+    const courtId=state.currentCourtId,error=scoreSync.status(courtId).error;
+    if(!error)return;
+    if(!error.definite){scoreSync.retry(courtId);return;}
+    const record=await supabaseService.fetchLiveCourt(courtId);
+    if(!record){showToast('Chưa tải được điểm. Vui lòng kiểm tra mạng và thử lại.','error');return;}
+    scoreSync.cancel(courtId);
+    StorageService.saveLocalActiveMatch({...state.courtMatches[courtId].activeMatch,matchId:record.matchId,team1:record.team1Ids.map(id=>StorageService.getMemberById(id)),team2:record.team2Ids.map(id=>StorageService.getMemberById(id)),score1:record.score1,score2:record.score2,matchStatus:record.status,status:record.status},courtId);
+    loadInitialState(courtId);state.courtMatches[courtId].serverUpdatedAt=record.updatedAt;renderCourt();
+  });
+  window.addEventListener('beforeunload',event=>{if(['court_1','court_2'].some(id=>scoreSync.hasPending(id))){event.preventDefault();event.returnValue='';}});
 
   // Preset Tỷ số
   document.querySelectorAll('.preset-chip').forEach(chip => {
     chip.addEventListener('click', () => {
       const s1 = parseInt(chip.dataset.s1, 10);
       const s2 = parseInt(chip.dataset.s2, 10);
-      SoundService.playClick();
-      recordScoreChange(s1, s2);
+      if(recordScoreChange(s1,s2))playScoreSound(0);
     });
   });
 
@@ -1300,13 +1268,18 @@ function renderCourt() {
 function updateScoreboardDisplay() {
   const t1Val = document.getElementById('score-team1-val');
   const t2Val = document.getElementById('score-team2-val');
-  if (t1Val) t1Val.textContent = state.score1;
-  if (t2Val) t2Val.textContent = state.score2;
+  if(t1Val&&t1Val.textContent!==String(state.score1))t1Val.textContent=state.score1;
+  if(t2Val&&t2Val.textContent!==String(state.score2))t2Val.textContent=state.score2;
+  renderScoreSyncStatus();
+  const badge=document.getElementById('court-match-status-badge');
+  if(badge&&state.matchStatus==='in_progress'){badge.className='court-status-tag live';badge.textContent='Đang đấu';}
 
   // Làm nổi bật nút hoàn tất trận nếu có đội chạm 21 điểm
   const btnFinish = document.getElementById('btn-finish-match');
   if (btnFinish) {
     const isGamePoint = (state.score1 >= 21 || state.score2 >= 21) && Math.abs(state.score1 - state.score2) >= 2;
+    if(isGamePoint===btnFinish.classList.contains('at-game-point'))return;
+    btnFinish.classList.toggle('at-game-point',isGamePoint);
     if (isGamePoint) {
       btnFinish.style.boxShadow = '0 0 20px rgba(34, 197, 94, 0.7)';
       btnFinish.style.animation = 'startPulse 1.8s infinite';
@@ -1541,7 +1514,8 @@ function renderEloPrediction() {
   const previewBox = document.getElementById('elo-preview-box');
   if (!previewBox) return;
 
-  const refreshPlayer = player => player ? StorageService.getMemberById(player.id) || player : null;
+  const playerMap=new Map([...StorageService.getMembers(),...StorageService.getGuests()].map(p=>[p.id,p]));
+  const refreshPlayer = player => player ? playerMap.get(player.id) || player : null;
   const t1 = (state.activeMatch?.team1 || []).map(refreshPlayer);
   const t2 = (state.activeMatch?.team2 || []).map(refreshPlayer);
 
@@ -1580,6 +1554,7 @@ function renderEloPrediction() {
  * =========================================================================
  */
 function renderBettingWidget() {
+  state.courtMatches[state.currentCourtId].scoreBettingKey=scoreBettingKey(state.currentCourtId);
   const container = document.getElementById('live-betting-card');
   if (!container) return;
 
@@ -1973,7 +1948,9 @@ async function spinBothCourts() {
  */
 async function finishMatch() {
   const requestedCourt=state.currentCourtId,requestedMatch=state.activeMatch?.matchId;
-  await Promise.allSettled([...scoreWrites.values()]);
+  if(state.finishingMatch||state.closingScoreCourt)return;
+  state.closingScoreCourt=requestedCourt;renderScoreSyncStatus();
+  try{await scoreSync.flush(requestedCourt);}catch(error){showToast('Điểm chưa được xác nhận. Vui lòng xử lý trạng thái lưu điểm trước khi chốt.','error');return;}finally{state.closingScoreCourt=null;renderScoreSyncStatus();}
   if(state.currentCourtId!==requestedCourt||state.activeMatch?.matchId!==requestedMatch){showToast('Sân hoặc trận đã thay đổi. Vui lòng kiểm tra lại trước khi chốt.','info');return;}
   if (state.finishingMatch) return;
   if (!state.activeMatch || !state.activeMatch.team1 || !state.activeMatch.team2 ||
@@ -2017,7 +1994,7 @@ async function finishMatch() {
   const courtId = state.currentCourtId;
   const active = state.activeMatch;
   const cloudWallet = supabaseService.isConfigured();
-  state.finishingMatch = true;
+  state.finishingMatch = true;renderScoreSyncStatus();
   try {
   if (cloudWallet && await supabaseService.checkWalletVersion() !== 3) {
     showToast('Hệ thống xu chưa sẵn sàng. Chưa lưu kết quả, vui lòng thử lại sau.', 'error');
@@ -2241,7 +2218,7 @@ async function finishMatch() {
     console.error('[App] Không lưu được kết quả:',error);
     if (cloudWallet) await StorageService.syncFromCloud();
     showToast('Chưa xác nhận được kết quả. Vui lòng tải lại để kiểm tra trước khi thử tiếp.', 'error');
-  } finally { state.finishingMatch = false; }
+  } finally { state.finishingMatch = false;renderScoreSyncStatus(); }
 }
 
 /**
@@ -2907,7 +2884,7 @@ window.appSwapCourtSides = function() {
 
 // Global hook để Hoàn Tác Điểm Vừa Bấm (Undo)
 window.appUndoScore = function() {
-  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
+  if(!canRecordScore())return;
   const before={score1:state.score1,score2:state.score2};
   const hist = state.scoreHistory;
   if (!hist || hist.length === 0) {
@@ -2917,44 +2894,19 @@ window.appUndoScore = function() {
   const prev = hist.pop();
   state.score1 = prev.score1;
   state.score2 = prev.score2;
-  SoundService.playClick();
+  playScoreSound(0);
   updateScoreboardDisplay();
-  renderEloPrediction();
-  renderBettingWidget();
   debouncedSyncLiveScore(before);
   showToast(`↩️ Đã hoàn tác về tỷ số: ${state.score1} - ${state.score2}`);
 };
 
-// Global hook để Nhập Tỷ Số Bằng Bàn Phím Trực Tiếp
-window.appPromptManualScore = function(isTeam1) {
-  if(supabaseService.isConfigured()&&!StorageService.getCurrentUser()){window.appOpenLoginModal();return;}
-  const before={score1:state.score1,score2:state.score2};
-  const currentVal = isTeam1 ? state.score1 : state.score2;
-  const teamLabel = isTeam1 ? 'Đội 1' : 'Đội 2';
-  const input = prompt(`Nhập tỷ số trực tiếp cho ${teamLabel} (từ 0 đến 30):`, currentVal);
-  if (input === null) return;
-  const val = parseInt(input.trim(), 10);
-  if (isNaN(val) || val < 0 || val > 30) {
-    showToast('Tỷ số không hợp lệ! Vui lòng nhập số từ 0 đến 30.', 'error');
-    return;
-  }
-  if (!state.scoreHistory) state.scoreHistory = [];
-  state.scoreHistory.push({ score1: state.score1, score2: state.score2 });
-  if (isTeam1) {
-    state.score1 = val;
-  } else {
-    state.score2 = val;
-  }
-  if (state.matchStatus === 'ready') {
-    state.matchStatus = 'in_progress';
-    if (state.activeMatch) state.activeMatch.matchStatus = 'in_progress';
-  }
-  SoundService.playClick();
-  updateScoreboardDisplay();
-  renderEloPrediction();
-  renderBettingWidget();
-  debouncedSyncLiveScore(before);
-  showToast(`Đã đổi điểm ${teamLabel}: ${val}`);
+// Manual input remains available without intercepting normal score taps.
+window.appPromptManualScore = function(isTeam1=true) {
+  if(!canRecordScore())return;
+  state.manualScoreTarget={courtId:state.currentCourtId,matchId:state.activeMatch?.matchId,score1:state.score1,score2:state.score2};
+  document.getElementById('manual-score-1').value=state.score1;document.getElementById('manual-score-2').value=state.score2;
+  document.getElementById('modal-manual-score').classList.add('open');
+  document.getElementById(isTeam1?'manual-score-1':'manual-score-2').focus();
 };
 
 // Global hook để Chuyển Tab từ nút UI
@@ -3726,7 +3678,9 @@ async function initCloudSyncAndRealtime() {
       const record = payload.new;
       if (record && (record.id === 'court_1' || record.id === 'court_2' || record.id === 'current_court')) {
         const targetCourtId = record.id === 'court_2' ? 'court_2' : 'court_1';
-        if(state.courtMatches[targetCourtId].serverUpdatedAt&&Date.parse(record.updated_at)<Date.parse(state.courtMatches[targetCourtId].serverUpdatedAt))return;
+        if(compareScoreVersions(record.updated_at,state.courtMatches[targetCourtId].serverUpdatedAt)<0)return;
+        if(scoreSync.observe(targetCourtId,record))return;
+        if(isCurrentScoreLineup(targetCourtId,record)){applyScoreRecord(targetCourtId,record);return;}
         state.courtMatches[targetCourtId].serverUpdatedAt=record.updated_at;
         let allPeople = [...StorageService.getMembers(), ...StorageService.getGuests()];
         let personMap = new Map(allPeople.map(p => [p.id, p]));
@@ -3835,11 +3789,7 @@ async function initCloudSyncAndRealtime() {
 
         if (state.currentCourtId === targetCourtId) {
           renderCourt();
-          updateScoreboardDisplay();
-          renderEloPrediction();
-          renderBettingWidget();
-        }
-        renderCourtBench();
+        }else renderCourtBench();
       }
       return;
     }
@@ -3922,6 +3872,10 @@ async function initCloudSyncAndRealtime() {
 
     if (table === 'members') {
       const cloudMembers = await supabaseService.fetchMembers();
+      if(!cloudMembers)return;
+      const previousMembers=StorageService.getMembers();
+      const previousMap=new Map(previousMembers.map(m=>[m.id,m]));
+      if(cloudMembers&&cloudMembers.length===previousMembers.length&&cloudMembers.every(m=>{const old=previousMap.get(m.id);return old&&Object.keys(m).every(k=>k==='_metaInventory'||Object.is(m[k],old[k]));}))return;
       if (cloudMembers && cloudMembers.length > 0) {
         const localMembers = StorageService.getMembers();
         const localMap = new Map(localMembers.map(m => [m.id, m]));
@@ -3936,13 +3890,11 @@ async function initCloudSyncAndRealtime() {
         StorageService.saveLocalMembers(merged);
       }
 
-      renderLeaderboard();
-      renderMembers();
-      renderAttendance();
       renderUserAuthHeader();
-      renderCourt();
-      renderCourtBench();
-      updateSessionStatusBadge();
+      if(state.currentTab==='leaderboard')renderLeaderboard();
+      else if(state.currentTab==='members')renderMembers();
+      else if(state.currentTab==='attendance')renderAttendance();
+      else if(state.currentTab==='court')renderCourt();
       return;
     }
 
@@ -5423,7 +5375,7 @@ window.addEventListener('club:auth-required',()=>{state.currentUser=null;renderU
 window.addEventListener('club:write-error',()=>showToast('Chưa lưu được thay đổi sân. Đã tải lại dữ liệu máy chủ.','error'));
 window.addEventListener('club:court-saved',event=>{loadInitialState(event.detail.courtId);renderCourt();});
 
-async function requireCourtSaved(match,courtId){if(!await StorageService.saveActiveMatch(match,courtId))throw new Error('Chưa lưu được sân. Vui lòng kiểm tra lại dữ liệu đã tải.');return true;}
+async function requireCourtSaved(match,courtId){await scoreSync.flush(courtId);if(!await StorageService.saveActiveMatch(match,courtId))throw new Error('Chưa lưu được sân. Vui lòng kiểm tra lại dữ liệu đã tải.');return true;}
 
 window.addEventListener('unhandledrejection',event=>{console.error('[App] Thao tác chưa hoàn tất:',event.reason?.message);showToast(event.reason?.message||'Thao tác chưa hoàn tất. Vui lòng tải lại để kiểm tra.','error');event.preventDefault();});
 
@@ -5431,4 +5383,60 @@ function renderMemberHome() {
   const container=document.getElementById('member-home-content');if(!container)return;
   const user=StorageService.getCurrentUser();
   container.safeInnerHTML=memberHomeMarkup({user,members:StorageService.getMembers(),matches:StorageService.getMatches(),inventory:user?StorageService.getUserInventory(user.id):[],sessions:StorageService.getSessions(),today:getLocalDateStr(),isAdmin:StorageService.isAdmin(user)});
+}
+
+function canRecordScore() {
+  if(supabaseService.isConfigured()&&(!state.currentUser?.id||!supabaseService.getSessionToken())){window.appOpenLoginModal();return false;}
+  if(state.finishingMatch||state.closingScoreCourt===state.currentCourtId)return false;
+  if(scoreSync.status(state.currentCourtId).error){showToast('Điểm đang chờ xác nhận. Vui lòng xử lý trạng thái lưu điểm trước.','info');return false;}
+  const match=state.activeMatch;
+  if(!match||match.team1?.filter(Boolean).length!==2||match.team2?.filter(Boolean).length!==2){showToast('Chọn đủ 4 người trước khi ghi điểm.','info');return false;}
+  if(supabaseService.isConfigured()&&!match.matchId){showToast('Đội hình đang lưu. Vui lòng chờ xác nhận sân.','info');return false;}
+  return true;
+}
+function playScoreSound(delta) {
+  try{if(delta>0)SoundService.playSmash();else SoundService.playClick();}catch(error){console.debug('[Score] Âm thanh không khả dụng.');}
+}
+function scoreBettingKey(courtId) {
+  const c=state.courtMatches[courtId];return`${c.activeMatch?.matchId||''}:${c.score1>=10||c.score2>=10}`;
+}
+function scheduleScoreExtras(courtId) {
+  if(scoreExtraTimers.has(courtId))return;
+  scoreExtraTimers.set(courtId,setTimeout(()=>{
+    scoreExtraTimers.delete(courtId);
+    const current=state.courtMatches[courtId];
+    if(current.activeMatch)StorageService.saveLocalActiveMatch(current.activeMatch,courtId);
+    if(state.currentCourtId===courtId&&state.currentTab==='court'){
+      renderEloPrediction();
+      if(current.scoreBettingKey!==scoreBettingKey(courtId))renderBettingWidget();
+    }
+  },100));
+}
+function isCurrentScoreLineup(courtId,record) {
+  const match=state.courtMatches[courtId]?.activeMatch;
+  return !!match&&match.matchId===record.match_id&&['team1','team2'].every(team=>{
+    if(record[team]?.filter(Boolean).length!==2)return false;
+    const old=match[team]||[],ids=record[team]||[];
+    return old.length===ids.length&&old.every((p,i)=>(p?.id||'')===(ids[i]||''));
+  });
+}
+function applyScoreRecord(courtId,record) {
+  const c=state.courtMatches[courtId];
+  if(!isCurrentScoreLineup(courtId,record)||compareScoreVersions(record.updated_at,c.serverUpdatedAt)<0)return;
+  c.serverUpdatedAt=record.updated_at;c.score1=record.score1;c.score2=record.score2;c.matchStatus=record.status;
+  Object.assign(c.activeMatch,{score1:record.score1,score2:record.score2,matchStatus:record.status,status:record.status});
+  if(state.currentCourtId===courtId){
+    updateScoreboardDisplay();
+    const badge=document.getElementById('court-match-status-badge');
+    if(badge){badge.className='court-status-tag '+(record.status==='in_progress'?'live':record.status==='ready'?'ready':'empty');badge.textContent=record.status==='in_progress'?'Đang đấu':record.status==='ready'?'Sẵn sàng':'Đang trống';}
+  }
+  updateCourtTabStatusPills();scheduleScoreExtras(courtId);
+}
+function renderScoreSyncStatus() {
+  const box=document.getElementById('score-sync-status'),text=document.getElementById('score-sync-text'),button=document.getElementById('btn-retry-score');
+  const status=scoreSync.status(state.currentCourtId);
+  if(box){box.hidden=!state.activeMatch?.team1?.filter(Boolean).length;box.dataset.state=status.error?'error':status.pending?'pending':'saved';}
+  if(text)text.textContent=status.error?`Chưa xác nhận · ${status.pending} lượt bấm`:status.pending?`Đang lưu ${status.pending} lượt bấm…`:supabaseService.isConfigured()?'Đã đồng bộ':'Đã ghi trên thiết bị';
+  if(button){button.hidden=!status.error;button.textContent=status.error?.definite?'Tải lại điểm':'Thử lại';}
+  const finish=document.getElementById('btn-finish-match');if(finish)finish.disabled=!!state.finishingMatch||state.closingScoreCourt===state.currentCourtId;
 }

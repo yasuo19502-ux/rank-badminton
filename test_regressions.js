@@ -29,7 +29,7 @@ const start = app.indexOf('async function finishMatch() {');
 const finishSource = app.slice(start, app.indexOf('\n/**', start));
 const state = { currentCourtId: 'court_1', currentUser: null, courtMatches: { court_1: {} } };
 const context = vm.createContext({
-  state, scoreWrites:new Map(),loadInitialState(){},renderHistory(){},renderLeaderboard(){}, StorageService: storage, supabaseService: cloud,
+  state, scoreSync:{flush:async()=>{}},renderScoreSyncStatus(){},loadInitialState(){},renderHistory(){},renderLeaderboard(){}, StorageService: storage, supabaseService: cloud,
   calculateDoublesElo, getTierByElo, getLocalDateStr,
   showToast() {}, renderCourt() {}, updateCourtTabStatusPills() {}, renderUserAuthHeader() {},
   SoundService: { playFanfare() {}, playLevelUp() {} }, confetti() {}, setTimeout() {}, Date: TestDate
