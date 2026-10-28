@@ -111,7 +111,7 @@ export function renderAvatarHtml(member, options = {}) {
   const imgStyle = options.imgStyle || '';
   const wrapStyle = options.wrapStyle || '';
   const avatarUrl = getAvatarUrl(member);
-  const activeFrame = /^frame_[a-z0-9_]+$/.test(member?.activeFrame||'') ? member.activeFrame : '';
+  const activeFrame = /^frame_[a-z0-9_]+$/.test(member?.activeFrame||'') && !(member.activeFrame === 'frame_ribbon_2010' && member.gender === 'male') ? member.activeFrame : '';
 
   if (!activeFrame) {
     return `

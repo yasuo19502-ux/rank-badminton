@@ -27,6 +27,7 @@ if(process.env.CLUB_PRESERVATION_BACKUP){
 const baseline=await snapshot();await db.exec(migration);assert.deepEqual(await snapshot(),baseline);await db.exec(migration);assert.deepEqual(await snapshot(),baseline);
 const shieldMigration=fs.readFileSync('supabase/migrations/20261028_per_match_shield.sql','utf8');
 const shieldBaseline=await snapshot();await db.exec(shieldMigration);assert.deepEqual(await snapshot(),shieldBaseline);await db.exec(shieldMigration);assert.deepEqual(await snapshot(),shieldBaseline);
+const ribbonMigration=fs.readFileSync('supabase/migrations/20261028_end_ribbon_event.sql','utf8');await db.exec(ribbonMigration);
 let passed=0;const admin='mem_1789569517045';
 async function actor(id=admin){const token='test-token-'+id;await q("insert into club_private.sessions values(sha256(convert_to($1,'UTF8')),$2,clock_timestamp()+interval '1 day') on conflict(token_hash) do update set expires_at=excluded.expires_at",[token,id]);await q("select set_config('request.headers',$1,false)",[JSON.stringify({'x-club-session':token})]);}
 async function reset(){await db.exec(`reset role;truncate matches,live_court,bets,coin_transactions,user_inventory,club_daily_rewards,attendance,sessions,club_private.operations,members cascade;
@@ -120,6 +121,30 @@ await test('Disabled or empty shields never consume a card or change full Elo',a
  await db.exec("insert into user_inventory(id,member_id,item_id,item_type,quantity) values('disabled_shield','a','elo_shield','perk',1),('empty_shield','c','elo_shield','perk',0);update members set phone=jsonb_set(phone::jsonb,'{activeEloShield}','true')::text where id='c'");
  await court();await finish();assert.equal(await scalar("select elo from members where id='a'"),1011);assert.equal(await scalar("select elo from members where id='c'"),989);assert.equal(await scalar("select quantity from user_inventory where id='disabled_shield'"),1);assert.equal(await scalar("select quantity from user_inventory where id='empty_shield'"),0);
 });
+await test('Ribbon recall affects male cosmetics only; closed event cannot grant or buy more',async()=>{
+ await db.exec(`update members set gender='female',phone=jsonb_set(phone::jsonb,'{activeFrame}','"frame_ribbon_2010"')::text where id='b';
+ update members set phone=jsonb_set(jsonb_set(phone::jsonb,'{activeFrame}','"frame_ribbon_2010"'),'{inventory}','[{"itemId":"frame_ribbon_2010","quantity":1},{"itemId":"elo_shield","quantity":2}]')::text where id='a';
+ insert into user_inventory(id,member_id,item_id,item_type,quantity) values('male_ribbon','a','frame_ribbon_2010','frame',1),('female_ribbon','b','frame_ribbon_2010','frame',1),('other_item','a','elo_shield','perk',2);`);
+ const protectedBefore=(await q('select id,elo,matches_played,wins,losses,streak,coins from members order by id')).rows;
+ const femaleBefore=await scalar("select to_jsonb(m) from members m where id='b'");
+ await db.exec(ribbonMigration);
+ assert.deepEqual((await q('select id,elo,matches_played,wins,losses,streak,coins from members order by id')).rows,protectedBefore);
+ assert.deepEqual(await scalar("select to_jsonb(m) from members m where id='b'"),femaleBefore);
+ assert.equal(await scalar("select quantity from user_inventory where id='male_ribbon'"),0);
+ assert.equal(await scalar("select quantity from user_inventory where id='female_ribbon'"),1);
+ assert.equal(await scalar("select quantity from user_inventory where id='other_item'"),2);
+ assert.equal(await scalar("select phone::jsonb->>'activeFrame' from members where id='a'"),'');
+ assert.equal(await scalar("select jsonb_array_length(phone::jsonb->'inventory') from members where id='a'"),1);
+ const after=await snapshot();await db.exec(ribbonMigration);assert.deepEqual(await snapshot(),after);
+ await actor('a');await assert.rejects(rpc('club_buy_item',['purchase_ribbon_closed','a','frame_ribbon_2010']),/kết thúc/);
+ await assert.rejects(rpc('club_patch_member',['a',{activeFrame:'frame_ribbon_2010'},await scalar("select updated_at::text from members where id='a'")]),/thành viên nữ/);
+ await actor('b');await rpc('club_patch_member',['b',{activeFrame:'frame_ribbon_2010'},await scalar("select updated_at::text from members where id='b'")]);
+ await assert.rejects(rpc('club_buy_item',['purchase_ribbon_closed_f','b','frame_ribbon_2010']),/kết thúc/);
+ assert.equal(await rpc('club_gift_october20'),0);
+ await rpc('club_patch_member',['b',{gender:'male'},await scalar("select updated_at::text from members where id='b'")]);
+ assert.equal(await scalar("select quantity from user_inventory where id='female_ribbon'"),0);
+ assert.equal(await scalar("select phone::jsonb->>'activeFrame' from members where id='b'"),'');
+});
 await test('Export includes all operational tables and never exposes PIN or session tokens',async()=>{
  const data=await rpc('club_export_snapshot');for(const k of ['members','matches','sessions','attendance','coinTransactions','bets','inventory','courts','settings'])assert.ok(Array.isArray(data[k]),k);assert.ok(!JSON.stringify(data).includes('pinCode'));assert.ok(!JSON.stringify(data).includes('2468'));await actor('a');await assert.rejects(rpc('club_export_snapshot'),/không có quyền/);
 });
@@ -140,7 +165,7 @@ await test('Registration requires PIN and is retry-safe without storing plaintex
  await q("select set_config('request.headers','{}',false)");
  const p={requestId:'register_test_123456789',name:'New',pinCode:'1357',gender:'female',elo:2300};
  await assert.rejects(rpc('club_create_member',[{...p,pinCode:''}]),/PIN/);
- const a=await rpc('club_create_member',[p]);const b=await rpc('club_create_member',[p]);assert.equal(a.memberId,b.memberId);assert.equal(a.token,b.token);assert.equal(await scalar('select elo from members where id=$1',[a.memberId]),1000);assert.equal(await scalar('select coins from members where id=$1',[a.memberId]),100);assert.equal((await rpc('club_login',[a.memberId,'1357'])).success,true);
+ const a=await rpc('club_create_member',[p]);const b=await rpc('club_create_member',[p]);assert.equal(a.memberId,b.memberId);assert.equal(await scalar("select count(*) from user_inventory where member_id=$1 and item_id='frame_ribbon_2010'",[a.memberId]),0);assert.equal(await scalar("select phone::jsonb->>'activeFrame' from members where id=$1",[a.memberId]),'');assert.equal(a.token,b.token);assert.equal(await scalar('select elo from members where id=$1',[a.memberId]),1000);assert.equal(await scalar('select coins from members where id=$1',[a.memberId]),100);assert.equal((await rpc('club_login',[a.memberId,'1357'])).success,true);
  assert.ok(!JSON.stringify(await scalar('select arguments from club_private.operations where id=$1',[p.requestId])).includes('1357'));
 });
 await test('Malformed null inputs cannot erase PIN, guests or RSVPs',async()=>{

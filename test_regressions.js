@@ -320,14 +320,14 @@ await test('Đặt cược mất mạng không trừ ví local và gửi lại c
   assert.equal(storage.getCoinTransactions().length,0);
 });
 
-await test('Mở app online không tặng khung bằng cách ghi hồ sơ cũ',async()=>{
+await test('Sự kiện đóng không gọi cấp quà online hoặc ghi hồ sơ cũ',async()=>{
   storage.saveLocalMembers([player('a',{gender:'female',elo:800,coins:0})]);
   cloud.isConfigured=()=>true;
   let calls=0;
   cloud.giftOctober20Frames=async()=>{calls++;return {success:true,count:1};};
   cloud.upsertMember=()=>{throw Error('Không được gửi hồ sơ cache khi tặng khung');};
   await storage.giftOctober20Frames();
-  assert.equal(calls,1);
+  assert.equal(calls,0);
   assert.equal(storage.getMemberById('a').elo,800);
   assert.equal(storage.getLocalInventory().length,0);
 });

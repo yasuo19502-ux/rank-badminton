@@ -191,6 +191,7 @@ export const SHOP_ITEMS = [
   },
   {
     id: 'frame_ribbon_2010',
+    eventClosed: true,
     name: 'Khung Nơ Hồng Duyên Dáng 20/10',
     price: 0,
     icon: '🎀',
@@ -296,8 +297,6 @@ export const StorageService = {
         this.saveLocalMembers(mergedMembers);
       }
 
-      // Tự động tặng Khung Avatar 20-10 cho thành viên nữ
-      this.giftOctober20Frames();
       if (cloudMatches) {
         this.saveLocalMatches(cloudMatches);
       }
@@ -484,23 +483,6 @@ export const StorageService = {
       coins: initialCoins,
       role: memberData.role || 'member'
     };
-
-    // Tặng quà khung 20-10 nếu là thành viên nữ
-    if (newMember.gender === 'female') {
-      newMember.activeFrame = 'frame_ribbon_2010';
-      const inv = this.getLocalInventory();
-      inv.push({
-        id: `inv_${newMember.id}_frame_ribbon_2010`,
-        memberId: newMember.id,
-        itemId: 'frame_ribbon_2010',
-        itemType: 'frame',
-        quantity: 1,
-        status: 'available',
-        createdAt: new Date().toISOString(),
-        updatedAt: new Date().toISOString()
-      });
-      this.saveLocalInventory(inv);
-    }
 
     members.push(newMember);
     this.saveLocalMembers(members);
@@ -1690,6 +1672,7 @@ export const StorageService = {
     if (!itemDef) {
       return { success: false, message: 'Vật phẩm không tồn tại!' };
     }
+    if (itemDef.eventClosed) return {success:false,message:'Sự kiện tặng khung Nơ Hồng đã kết thúc.'};
 
     const members = this.getMembers();
     const mem = members.find(m => m.id === memberId);
@@ -1760,6 +1743,7 @@ export const StorageService = {
   async buyCloudItem(memberId,itemId) {
     const item = SHOP_ITEMS.find(i => i.id===itemId);
     if (!item) return {success:false,message:'Vật phẩm không tồn tại!'};
+    if (item.eventClosed) return {success:false,message:'Sự kiện tặng khung Nơ Hồng đã kết thúc.'};
     const key = `cbb_purchase_request_${memberId}_${itemId}`;
     let id = localStorage.getItem(key);
     if (!id) { id = 'purchase_' + crypto.randomUUID(); localStorage.setItem(key,id); }
@@ -1789,7 +1773,8 @@ export const StorageService = {
 
     // Kiểm tra xem đã sở hữu khung này chưa
     const userInv = this.getUserInventory(memberId);
-    const hasFrame = userInv.some(i => i.itemId === frameId);
+    if (frameId === 'frame_ribbon_2010' && mem.gender !== 'female') return {success:false,message:'Khung Nơ Hồng chỉ dành cho thành viên nữ.'};
+    const hasFrame = userInv.some(i => i.itemId === frameId && Number(i.quantity ?? 1) > 0);
     if (!hasFrame) {
       return { success: false, message: 'Bạn chưa sở hữu khung Avatar này!' };
     }
@@ -1892,56 +1877,8 @@ export const StorageService = {
    * và kích hoạt đeo khung avatar nếu chưa có khung riêng biệt
    */
   giftOctober20Frames() {
-    // Cloud gifts must never upload a cached member profile: opening an old tab
-    // could otherwise roll back Elo, statistics and shield state.
-    if (supabaseService.isConfigured()) {
-      return supabaseService.giftOctober20Frames();
-    }
-    try {
-      const members = this.getMembers();
-      let inv = this.getLocalInventory();
-      let membersChanged = false;
-      let invChanged = false;
-      const updatedFemales = [];
-
-      members.forEach(m => {
-        if (m.gender === 'female') {
-          // 1. Kiểm tra Túi Đồ cá nhân
-          const hasItem = inv.some(i => i.memberId === m.id && i.itemId === 'frame_ribbon_2010');
-          if (!hasItem) {
-            inv.push({
-              id: `inv_${m.id}_frame_ribbon_2010`,
-              memberId: m.id,
-              itemId: 'frame_ribbon_2010',
-              itemType: 'frame',
-              quantity: 1,
-              status: 'available',
-              createdAt: '2026-10-20T00:00:00.000Z',
-              updatedAt: new Date().toISOString()
-            });
-            invChanged = true;
-          }
-
-          // 2. Tự động kích hoạt đeo khung nếu chưa có khung riêng
-          if (!m.activeFrame) {
-            m.activeFrame = 'frame_ribbon_2010';
-            membersChanged = true;
-          }
-          updatedFemales.push(m);
-        }
-      });
-
-      if (invChanged) {
-        this.saveLocalInventory(inv);
-      }
-      if (membersChanged) {
-        this.saveLocalMembers(members);
-      }
-
-      return { success: true, count: updatedFemales.length };
-    } catch (e) {
-      console.error('[20-10] Lỗi tặng quà khung avatar:', e);
-      return { success: false, error: e.message };
-    }
+    // Ended event: kept as a no-op for compatibility with older callers.
+    return { success: true, count: 0 };
   }
+
 };

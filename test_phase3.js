@@ -265,17 +265,23 @@ assert(giftResult.success === true, 'Hàm giftOctober20Frames chạy thành côn
 // Kiểm tra Túi đồ của bạn nữ
 const fInv = StorageService.getUserInventory('usr_f1');
 const hasRibbon = fInv.some(i => i.itemId === 'frame_ribbon_2010');
-assert(hasRibbon === true, 'Bạn nữ nhận được Khung Nơ Hồng 20-10 trong Túi Đồ');
+assert(hasRibbon === false && giftResult.count === 0, 'Sự kiện đã kết thúc, không tự cấp thêm khung cho nữ');
 
 // Kiểm tra Túi đồ của bạn nam (không nhận nhầm)
 const mInv = StorageService.getUserInventory('usr_m5');
 assert(!mInv.some(i => i.itemId === 'frame_ribbon_2010'), 'Bạn nam không nhận nhầm khung 20-10 của nữ');
 
+assert(StorageService.buyShopItem('usr_m5','frame_ribbon_2010').success === false, 'Nam không nhận miễn phí khung đã đóng sự kiện');
+assert(StorageService.buyShopItem('usr_f1','frame_ribbon_2010').success === false, 'Sự kiện đóng cả đường nhận mới cho nữ');
+StorageService.saveLocalInventory([{id:'old_female_ribbon',memberId:'usr_f1',itemId:'frame_ribbon_2010',itemType:'frame',quantity:1},{id:'revoked_male_ribbon',memberId:'usr_m5',itemId:'frame_ribbon_2010',itemType:'frame',quantity:0}]);
+assert(StorageService.equipAvatarFrame('usr_f1','frame_ribbon_2010').success === true, 'Nữ giữ và tiếp tục đeo khung đã sở hữu');
+assert(StorageService.equipAvatarFrame('usr_m5','frame_ribbon_2010').success === false, 'Nam không đeo lại khung đã thu hồi');
 // Kiểm tra renderAvatarHtml với frame_ribbon_2010
-const memWithRibbon = { id: 'usr_f1', name: 'Mai Phương', activeFrame: 'frame_ribbon_2010' };
+const memWithRibbon = { id: 'usr_f1', name: 'Mai Phương', gender: 'female', activeFrame: 'frame_ribbon_2010' };
 const ribbonHtml = renderAvatarHtml(memWithRibbon);
 assert(ribbonHtml.includes('frame-ribbon_2010'), 'renderAvatarHtml chứa class frame-ribbon_2010');
 assert(ribbonHtml.includes('frame_ribbon_2010.webp'), 'renderAvatarHtml chứa art asset frame_ribbon_2010.webp');
+assert(!renderAvatarHtml({...memWithRibbon,gender:'male'}).includes('frame-ribbon_2010'), 'Avatar nam không hiển thị khung nơ từ cache cũ');
 
 console.log(`\n=== TỔNG KẾT: ${passed} PASS, ${failed} FAIL ===\n`);
 if (failed > 0) process.exit(1);

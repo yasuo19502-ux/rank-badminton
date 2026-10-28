@@ -167,8 +167,7 @@ function initApp() {
   state.currentUser = StorageService.getCurrentUser();
   renderUserAuthHeader();
 
-  // Tặng quà 20-10 & hiển thị banner tuần lễ chúc mừng Phụ Nữ Việt Nam
-  StorageService.giftOctober20Frames();
+  // The October gift event has ended.
   checkAndRenderOctober20Banner();
 
   const urlTab = new URLSearchParams(window.location.search).get('tab') || window.location.hash.replace('#', '');
@@ -4778,13 +4777,6 @@ window.appSubmitAuthPin = async function() {
     showToast(`👋 Chào mừng trở lại, ${state.currentUser.name}!`);
   }
 
-  // Chúc mừng ngày 20-10 đặc biệt cho thành viên nữ
-  if (state.currentUser?.gender === 'female') {
-    setTimeout(() => {
-      showToast(`💐 Chúc mừng ngày 20-10, ${state.currentUser.name}! CLB đã gửi tặng bạn Khung Avatar Nơ Hồng Kỷ Niệm trong Túi Đồ 🎀`, 'success');
-    }, 600);
-  }
-
   renderUserAuthHeader();
   renderMembers();
 };
@@ -4908,7 +4900,7 @@ function renderClubShop() {
   const userCoins = user && user.coins !== undefined ? user.coins : 100;
   if (coinsSpan) coinsSpan.textContent = userCoins;
 
-  const userInv = user ? StorageService.getUserInventory(user.id) : [];
+  const userInv = user ? StorageService.getUserInventory(user.id).filter(i => Number(i.quantity ?? 1) > 0 && (i.itemId !== 'frame_ribbon_2010' || user.gender === 'female')) : [];
   if (invCountBadge) {
     const totalItems = userInv.reduce((sum, item) => sum + Math.max(0, Number(item.quantity ?? 1) || 0), 0);
     invCountBadge.textContent = totalItems;
@@ -4916,7 +4908,7 @@ function renderClubShop() {
 
   // 1. RENDER SHOP ITEMS (Flat Grid, Không chia kệ)
   if (itemsContainer) {
-    itemsContainer.safeInnerHTML = SHOP_ITEMS.map(item => {
+    itemsContainer.safeInnerHTML = SHOP_ITEMS.filter(item => !item.eventClosed).map(item => {
       const isLegendary = item.rarity === 'legendary';
       let badgeClass = 'badge-real';
       if (item.category === 'perk') badgeClass = 'badge-perk';
@@ -5229,27 +5221,7 @@ window.appOpenShopModal = function(initialTab = 'store') {
  */
 function checkAndRenderOctober20Banner() {
   const banner = document.getElementById('banner-celebrate-2010');
-  if (!banner) return;
-
-  const now = new Date();
-  const year = now.getFullYear();
-  // Tuần lễ 20-10: Từ 00:00 ngày 20/10 đến hết 23:59:59 ngày 27/10 (1 tuần)
-  const start = new Date(year, 9, 20, 0, 0, 0);
-  const end = new Date(year, 9, 27, 23, 59, 59);
-
-  if (now < start || now > end) {
-    banner.style.display = 'none';
-    return;
-  }
-
-  // Nếu người dùng đã tạm đóng banner trong vòng 12 tiếng qua thì ẩn
-  const dismissedUntil = localStorage.getItem('cbb_dismissed_2010_until');
-  if (dismissedUntil && now.getTime() < Number(dismissedUntil)) {
-    banner.style.display = 'none';
-    return;
-  }
-
-  banner.style.display = 'flex';
+  if (banner) { banner.hidden = true; banner.style.display = 'none'; }
 }
 
 window.appDismissBanner2010 = function() {
