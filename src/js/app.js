@@ -128,7 +128,7 @@ const state = {
   editingMemberId: null,
   editingSessionId: null,
   tempAvatarBase64: null,
-  calendarViewMode: 'list', // 'grid' | 'list'
+  calendarViewMode: 'grid', // 'grid' | 'list'
   calendarYear: new Date().getFullYear(),
   calendarMonth: new Date().getMonth(), // 0 - 11
   calendarSelectedDate: getLocalDateStr(),
