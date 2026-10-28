@@ -1504,7 +1504,7 @@ function renderCourtPlayerCard(player, teamKey = 'team1', slotIndex = 0) {
       <div class="player-info">
         <div class="player-name">
           <span class="player-name-text">${escapeHtml(player.name)}</span>
-          ${player.activeEloShield ? '<span title="Khiên bảo vệ Elo đang BẬT (Giảm 50% điểm trừ nếu thua)" style="font-size: 0.82rem; flex-shrink: 0;">🛡️</span>' : ''}
+          ${player.activeEloShield ? '<span title="Khiên đang bật: thua giảm 50% điểm trừ, thắng nhận đủ Elo; dùng 1 thẻ mỗi trận" style="font-size: 0.82rem; flex-shrink: 0;">🛡️</span>' : ''}
         </div>
         <div class="player-meta-row">
           <span class="tier-pill" style="background: ${tier.bgColor}; color: ${tier.color}; border: 1px solid ${tier.borderColor};">
@@ -2048,14 +2048,16 @@ async function finishMatch() {
       let shieldUsed = false;
       let shieldItemId = null;
       // Giai đoạn 3: Quyền lợi Thẻ Khiên Bảo Vệ Elo
-      if (!won && delta < 0 && mem.activeEloShield) {
+      if (mem.activeEloShield) {
         const item = StorageService.getUserInventory(mem.id).find(i => i.itemId === 'elo_shield' && i.quantity > 0);
         shieldUsed = StorageService.consumeEloShield(mem.id, members, !cloudWallet);
         if (shieldUsed) {
           shieldItemId = item.id;
-          finalDelta = Math.min(-1, Math.round(delta * 0.5));
+          if (!won && delta < 0) finalDelta = Math.min(-1, Math.round(delta * 0.5));
           setTimeout(() => {
-            showToast(`🛡️ Khiên bảo vệ Elo của ${mem.name} đã kích hoạt! Giảm 50% điểm trừ (${delta} ➔ ${finalDelta})!`, 'info');
+            showToast(won
+              ? `🛡️ ${mem.name} đã dùng 1 thẻ khiên. Điểm thắng được cộng đầy đủ.`
+              : `🛡️ Khiên bảo vệ Elo của ${mem.name} đã kích hoạt! Giảm 50% điểm trừ (${delta} ➔ ${finalDelta})!`, 'info');
           }, 500);
         }
       }
@@ -5002,8 +5004,8 @@ function renderClubShop() {
       </div>
       <div class="perk-banner-desc">
         ${isShieldActive
-          ? `<strong style="color: #10b981;">Khiên đang BẬT:</strong> Nếu thua trận tiếp theo, bạn chỉ bị trừ 50% số điểm Elo! Nếu thắng, bạn nhận đủ 100% Elo và không bị trừ thẻ.`
-          : `Khiên đang TẮT. Bật khiên trước khi đánh trận để kích hoạt quyền lợi giảm 50% trừ điểm Elo khi thua.`}
+          ? `<strong style="color: #10b981;">Khiên đang BẬT:</strong> Mỗi trận được lưu tiêu hao 1 thẻ dù thắng hay thua. Thua giảm 50% điểm trừ; thắng nhận đủ Elo. Còn thẻ thì khiên tiếp tục bật, hết thẻ sẽ tự tắt.`
+          : `Khiên đang TẮT. Bật trước trận: thua giảm 50% điểm trừ, thắng nhận đủ Elo. Mỗi trận được lưu tiêu hao 1 thẻ khi đang bật.`}
       </div>
     `;
   }

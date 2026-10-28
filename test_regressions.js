@@ -92,10 +92,16 @@ await test('Flag khiên cũ không tạo quyền lợi khi túi trống', async 
   assert.equal(storage.getMemberById('c').elo,1000+match.deltaTeam2);
   assert.equal(storage.getMemberById('c').activeEloShield,false);
 });
-await test('Thắng không tiêu hao khiên', async () => {
+await test('Thắng vẫn nhận đủ Elo, tiêu hao khiên và hoàn tác trả lại thẻ', async () => {
   storage.updateMember('a',{activeEloShield:true});
   storage.saveLocalInventory([{id:'shieldA',memberId:'a',itemId:'elo_shield',itemType:'perk',quantity:1}]);
-  await play();
+  const match=await play();
+  assert.equal(storage.getMemberById('a').elo,1011);
+  assert.equal(storage.getUserInventory('a')[0].quantity,0);
+  assert.equal(storage.getMemberById('a').activeEloShield,false);
+  assert.equal(match.playerResults.a.shieldUsed,true);
+  await storage.undoMatch(match.id);
+  assert.equal(storage.getMemberById('a').elo,1000);
   assert.equal(storage.getUserInventory('a')[0].quantity,1);
 });
 await test('Lịch sử dùng delta cá nhân; hoàn tác trả điểm và thẻ đúng', async () => {

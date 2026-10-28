@@ -46,7 +46,7 @@ export const SHOP_ITEMS = [
     rarity: 'rare',
     badge: 'Đặc Quyền Trận',
     tierBadge: 'Bảo Hiểm Elo',
-    description: 'Bật trước trận: Nếu thua chỉ bị trừ 50% Elo! Nếu thắng vẫn nhận đủ 100% Elo và không mất thẻ.'
+    description: 'Bật trước trận: thua giảm 50% điểm trừ, thắng nhận đủ Elo. Mỗi trận được lưu tiêu hao 1 thẻ dù thắng hay thua.'
   },
   // 3. Khung Avatar Tinh Anh (Rare - Thiết kế ngầu, sắc nét)
   {

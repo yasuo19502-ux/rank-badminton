@@ -25,6 +25,8 @@ if(process.env.CLUB_PRESERVATION_BACKUP){
  console.log('Loaded complete private backup into isolated database; no network used.');
 }
 const baseline=await snapshot();await db.exec(migration);assert.deepEqual(await snapshot(),baseline);await db.exec(migration);assert.deepEqual(await snapshot(),baseline);
+const shieldMigration=fs.readFileSync('supabase/migrations/20261028_per_match_shield.sql','utf8');
+const shieldBaseline=await snapshot();await db.exec(shieldMigration);assert.deepEqual(await snapshot(),shieldBaseline);await db.exec(shieldMigration);assert.deepEqual(await snapshot(),shieldBaseline);
 let passed=0;const admin='mem_1789569517045';
 async function actor(id=admin){const token='test-token-'+id;await q("insert into club_private.sessions values(sha256(convert_to($1,'UTF8')),$2,clock_timestamp()+interval '1 day') on conflict(token_hash) do update set expires_at=excluded.expires_at",[token,id]);await q("select set_config('request.headers',$1,false)",[JSON.stringify({'x-club-session':token})]);}
 async function reset(){await db.exec(`reset role;truncate matches,live_court,bets,coin_transactions,user_inventory,club_daily_rewards,attendance,sessions,club_private.operations,members cascade;
@@ -92,6 +94,31 @@ await test('Guest Elo and attendance counters commit/undo with match, not a late
 });
 await test('Shield discount matches JS rounding and consumption/reversal is atomic',async()=>{
  await db.exec("insert into user_inventory(id,member_id,item_id,item_type,quantity) values('shield','c','elo_shield','perk',1);update members set phone=jsonb_set(phone::jsonb,'{activeEloShield}','true')::text where id='c'");await court();await finish();assert.equal(await scalar("select elo from members where id='c'"),995);assert.equal(await scalar("select quantity from user_inventory where id='shield'"),0);await rpc('club_undo_match',['match_zs_audit']);assert.equal(await scalar("select elo from members where id='c'"),1000);assert.equal(await scalar("select quantity from user_inventory where id='shield'"),1);
+});
+await test('Enabled shields consume one per finished match for winners and losers, with safe retry and undo',async()=>{
+ await db.exec("insert into user_inventory(id,member_id,item_id,item_type,quantity) values('win_shield','a','elo_shield','perk',2),('loss_shield','c','elo_shield','perk',1);update members set phone=jsonb_set(phone::jsonb,'{activeEloShield}','true')::text where id in('a','c')");
+ await court();const result=await finish();
+ assert.equal(await scalar("select elo from members where id='a'"),1011);
+ assert.equal(await scalar("select elo from members where id='c'"),995);
+ assert.equal(await scalar("select quantity from user_inventory where id='win_shield'"),1);
+ assert.equal(await scalar("select quantity from user_inventory where id='loss_shield'"),0);
+ assert.equal(await scalar("select (phone::jsonb->>'activeEloShield')::boolean from members where id='a'"),true);
+ assert.equal(await scalar("select (phone::jsonb->>'activeEloShield')::boolean from members where id='c'"),false);
+ const audit=await scalar('select club_match_audit($1)',[result.court_number]);
+ assert.equal(audit.playerResults.a.shieldUsed,true);assert.equal(audit.playerResults.c.shieldUsed,true);
+ await finish();assert.equal(await scalar("select quantity from user_inventory where id='win_shield'"),1);
+ await court('court_1','match_zs_second_shield');await finish('match_zs_second_shield');
+ assert.equal(await scalar("select quantity from user_inventory where id='win_shield'"),0);
+ assert.equal(await scalar("select (phone::jsonb->>'activeEloShield')::boolean from members where id='a'"),false);
+ await rpc('club_undo_match',['match_zs_second_shield']);
+ assert.equal(await scalar("select quantity from user_inventory where id='win_shield'"),1);
+ await rpc('club_undo_match',['match_zs_audit']);
+ assert.equal(await scalar("select elo from members where id='a'"),1000);assert.equal(await scalar("select quantity from user_inventory where id='win_shield'"),2);assert.equal(await scalar("select quantity from user_inventory where id='loss_shield'"),1);
+ await rpc('club_undo_match',['match_zs_audit']);assert.equal(await scalar("select quantity from user_inventory where id='win_shield'"),2);
+});
+await test('Disabled or empty shields never consume a card or change full Elo',async()=>{
+ await db.exec("insert into user_inventory(id,member_id,item_id,item_type,quantity) values('disabled_shield','a','elo_shield','perk',1),('empty_shield','c','elo_shield','perk',0);update members set phone=jsonb_set(phone::jsonb,'{activeEloShield}','true')::text where id='c'");
+ await court();await finish();assert.equal(await scalar("select elo from members where id='a'"),1011);assert.equal(await scalar("select elo from members where id='c'"),989);assert.equal(await scalar("select quantity from user_inventory where id='disabled_shield'"),1);assert.equal(await scalar("select quantity from user_inventory where id='empty_shield'"),0);
 });
 await test('Export includes all operational tables and never exposes PIN or session tokens',async()=>{
  const data=await rpc('club_export_snapshot');for(const k of ['members','matches','sessions','attendance','coinTransactions','bets','inventory','courts','settings'])assert.ok(Array.isArray(data[k]),k);assert.ok(!JSON.stringify(data).includes('pinCode'));assert.ok(!JSON.stringify(data).includes('2468'));await actor('a');await assert.rejects(rpc('club_export_snapshot'),/không có quyền/);
