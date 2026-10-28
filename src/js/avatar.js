@@ -1,3 +1,4 @@
+import {escapeHtml,safeImageUrl} from './html.js';
 /**
  * avatar.js - Xử lý tải ảnh đại diện, crop vuông, nén ảnh nhẹ và sinh avatar mặc định
  */
@@ -65,6 +66,7 @@ export function generateDefaultAvatar(name, gender = 'male') {
   }
 
   const isMale = gender === 'male';
+  const gradientId='grad_'+[...initials].map(c=>c.codePointAt(0).toString(16)).join('_');
   const bgGradient = isMale
     ? ['#0284c7', '#0369a1'] // Xanh dương thể thao nam
     : ['#ec4899', '#be185d']; // Hồng thể thao nữ
@@ -72,14 +74,14 @@ export function generateDefaultAvatar(name, gender = 'male') {
   const svg = `
     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100" width="100%" height="100%">
       <defs>
-        <linearGradient id="grad_${initials}" x1="0%" y1="0%" x2="100%" y2="100%">
+        <linearGradient id="${gradientId}" x1="0%" y1="0%" x2="100%" y2="100%">
           <stop offset="0%" stop-color="${bgGradient[0]}" />
           <stop offset="100%" stop-color="${bgGradient[1]}" />
         </linearGradient>
       </defs>
-      <circle cx="50" cy="50" r="48" fill="url(#grad_${initials})" stroke="#ffffff" stroke-width="2" />
+      <circle cx="50" cy="50" r="48" fill="url(#${gradientId})" stroke="#ffffff" stroke-width="2" />
       <text x="50" y="58" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif" font-size="34" font-weight="700" fill="#ffffff" text-anchor="middle" dominant-baseline="middle">
-        ${initials}
+        ${escapeHtml(initials)}
       </text>
     </svg>
   `;
@@ -92,7 +94,7 @@ export function generateDefaultAvatar(name, gender = 'male') {
  */
 export function getAvatarUrl(member) {
   if (member && member.avatar && member.avatar.trim() !== '') {
-    return member.avatar;
+    const url=safeImageUrl(member.avatar);if(url)return url;
   }
   return generateDefaultAvatar(member ? member.name : '', member ? member.gender : 'male');
 }
@@ -109,12 +111,12 @@ export function renderAvatarHtml(member, options = {}) {
   const imgStyle = options.imgStyle || '';
   const wrapStyle = options.wrapStyle || '';
   const avatarUrl = getAvatarUrl(member);
-  const activeFrame = member?.activeFrame || '';
+  const activeFrame = /^frame_[a-z0-9_]+$/.test(member?.activeFrame||'') ? member.activeFrame : '';
 
   if (!activeFrame) {
     return `
       <div class="avatar-container avatar-${size} ${extraClass}" style="${wrapStyle}">
-        <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
+        <img src="${escapeHtml(avatarUrl)}" class="avatar-img" style="${imgStyle}" alt="${escapeHtml(member ? member.name : 'Avatar')}" loading="lazy">
       </div>
     `;
   }
@@ -122,7 +124,8 @@ export function renderAvatarHtml(member, options = {}) {
   const frameType = activeFrame.replace(/^frame_/, '');
   const artFrameMap = {
     glory_wings: '/images/frame_glory_wings.webp',
-    master_econ: '/images/frame_master_econ.webp'
+    master_econ: '/images/frame_master_econ.webp',
+    ribbon_2010: '/images/frame_ribbon_2010.webp'
   };
   const artFrameSrc = artFrameMap[frameType] || '';
   const isArtFrame = Boolean(artFrameSrc);
@@ -133,7 +136,7 @@ export function renderAvatarHtml(member, options = {}) {
       <div class="frame-fx-layer"></div>
       <div class="frame-spin-ring"></div>
       <div class="frame-inner-ring"></div>
-      <img src="${avatarUrl}" class="avatar-img" style="${imgStyle}" alt="${member ? member.name : 'Avatar'}" loading="lazy">
+      <img src="${escapeHtml(avatarUrl)}" class="avatar-img" style="${imgStyle}" alt="${escapeHtml(member ? member.name : 'Avatar')}" loading="lazy">
       ${isArtFrame ? `<img src="${artFrameSrc}" class="frame-art-asset frame-art-${frameType}" alt="Frame Art" loading="eager">` : ''}
     </div>
   `;

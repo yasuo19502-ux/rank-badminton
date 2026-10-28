@@ -2,7 +2,7 @@
 <html lang="vi" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
   <title>CLB Cầu Lông Thái Thịnh - Bảng Xếp Hạng & Ghép Sân</title>
   <meta name="description" content="Ứng dụng xếp hạng Elo đánh đôi, ghép cặp tự động thông minh và quản lý buổi đánh cho CLB Cầu Lông Thái Thịnh">
   <link rel="icon" href="/icons/icon.svg">
@@ -13,6 +13,7 @@
   <meta name="apple-mobile-web-app-title" content="Cầu Lông TT">
   <link rel="apple-touch-icon" href="/icons/icon-192.png">
   <link rel="stylesheet" href="/src/styles/main.css">
+  <link rel="stylesheet" href="/src/styles/layout.css">
 </head>
 <body>
   <div class="app-container">
@@ -32,45 +33,31 @@
       </div>
 
       <!-- Desktop Navigation -->
-      <nav class="desktop-nav">
-        <button class="nav-tab-btn active" data-tab="court">
-          <span>🏸</span> Sân Đấu
-        </button>
-        <button class="nav-tab-btn" data-tab="sessions">
-          <span>📅</span> Lịch Sân
-        </button>
-        <button class="nav-tab-btn" data-tab="leaderboard">
-          <span>🏆</span> Xếp Hạng
-        </button>
-        <button class="nav-tab-btn" data-tab="attendance">
-          <span>📋</span> Điểm Danh
-        </button>
-        <button class="nav-tab-btn" data-tab="members">
-          <span>👥</span> Thành Viên
-        </button>
-        <button class="nav-tab-btn" data-tab="history">
-          <span>📜</span> Lịch Sử
-        </button>
+      <nav class="desktop-nav" aria-label="Điều hướng chính">
+        <button class="nav-tab-btn active" data-tab="court"><span aria-hidden="true">🏸</span> Hôm nay</button>
+        <button class="nav-tab-btn" data-tab="sessions"><span aria-hidden="true">📅</span> Lịch sân</button>
+        <button class="nav-tab-btn" data-tab="leaderboard"><span aria-hidden="true">🏆</span> Xếp hạng</button>
+        <button class="nav-tab-btn" data-tab="me"><span aria-hidden="true">👤</span> Cá nhân</button>
       </nav>
 
       <!-- Header Quick Actions -->
       <div class="header-actions">
+        <!-- 1. Nút Quỹ Cầu Lông MoMo / VietQR -->
+        <button id="btn-open-club-fund" class="btn-fund-chip" title="Quỹ CLB" aria-label="Quỹ CLB">
+          <span class="fund-chip-icon">💰</span>
+          <span class="fund-chip-text">Quỹ <span class="chip-desktop-label">CLB</span></span>
+        </button>
+
+        <!-- Nút Cửa Hàng & Túi Đồ (Giai đoạn 3) -->
+        <button id="btn-open-shop" class="btn-fund-chip btn-shop-chip" onclick="window.appOpenShopModal()" title="Cửa hàng" aria-label="Cửa hàng">
+          <span class="fund-chip-icon">🛒</span>
+          <span class="fund-chip-text"><span class="chip-desktop-label">Cửa hàng</span><span class="chip-mobile-label">Shop</span></span>
+        </button>
+
         <!-- 0. Widget Người Dùng & Ví Xu (Giai đoạn 1) -->
         <div id="header-user-container" class="header-user-container">
           <!-- Render tự động: nút đăng nhập hoặc avatar + xu -->
         </div>
-
-        <!-- 1. Nút Quỹ Cầu Lông MoMo / VietQR -->
-        <button id="btn-open-club-fund" class="btn-fund-chip" title="Góp Quỹ Sân & Cầu MoMo">
-          <span class="fund-chip-icon">💰</span>
-          <span class="fund-chip-text">Quỹ CLB</span>
-        </button>
-
-        <!-- Nút Cửa Hàng & Túi Đồ (Giai đoạn 3) -->
-        <button id="btn-open-shop" class="btn-fund-chip btn-shop-chip" onclick="window.appOpenShopModal()" title="Cửa Hàng Vật Phẩm & Túi Đồ">
-          <span class="fund-chip-icon">🛒</span>
-          <span class="fund-chip-text">Cửa Hàng</span>
-        </button>
 
         <!-- 2. Chuyển đổi Giao diện Sáng / Tối -->
         <button id="btn-toggle-theme" class="btn-icon" title="Đổi giao diện Sáng / Tối">
@@ -82,17 +69,38 @@
     <!-- MAIN VIEWS -->
     <main id="main-content">
       
+      <nav id="workspace-nav" class="workspace-nav" aria-label="Trong buổi đánh"></nav>
+
       <!-- ================= 1. TAB: SÂN ĐẤU (COURT & MATCHMAKER) ================= -->
       <section id="tab-court" class="tab-view active">
         <!-- Banner thông tin buổi đánh -->
         <div class="section-banner">
           <div class="banner-info">
-            <h2><span>🏸</span> Sân Đấu & Xếp Trận 1 Chạm</h2>
-            <p>Ghép cặp tự động cân kèo Elo, ưu tiên người nghỉ lâu và ghi điểm trực tiếp</p>
+            <h2><span>🏸</span> Hôm nay ở sân</h2>
+            <p>Theo dõi hai sân, xếp đội và ghi điểm trong buổi đánh.</p>
           </div>
           <div class="session-status-pill">
             <span class="status-dot"></span>
             <span id="session-counter-text">Có mặt: 0 | Đã đấu: 0 trận</span>
+          </div>
+        </div>
+
+        <div class="bench-panel">
+          <div class="panel-heading"><div><h3>Người có mặt</h3><p>Chạm để xếp vào <span id="bench-current-court">Sân 1</span> · Vuốt ngang xem thêm.</p></div><button class="btn-secondary" onclick="window.appSwitchTab('attendance')">Điểm danh →</button></div>
+          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
+          <div id="court-bench-container" class="court-bench-container">
+            <div class="bench-gender-row male-row">
+              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
+              <div id="bench-male-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
+            <div class="bench-gender-row female-row">
+              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
+              <div id="bench-female-avatars" class="bench-avatars-scroll">
+                <!-- Injected via JS -->
+              </div>
+            </div>
           </div>
         </div>
 
@@ -115,21 +123,6 @@
             </button>
           </div>
 
-          <!-- BĂNG GHẾ CHỜ AVATAR 1-CHẠM (THAY THẾ GHÉP CẢ 2 SÂN THEO YÊU CẦU) -->
-          <div id="court-bench-container" class="court-bench-container">
-            <div class="bench-gender-row male-row">
-              <span class="bench-gender-tag male" title="Thành viên Nam có mặt">♂</span>
-              <div id="bench-male-avatars" class="bench-avatars-scroll">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-            <div class="bench-gender-row female-row">
-              <span class="bench-gender-tag female" title="Thành viên Nữ có mặt">♀</span>
-              <div id="bench-female-avatars" class="bench-avatars-scroll">
-                <!-- Injected via JS -->
-              </div>
-            </div>
-          </div>
         </div>
 
         <!-- THANH CÔNG CỤ TRỌNG TÀI & SÂN ĐẤU -->
@@ -180,12 +173,12 @@
             <!-- Bảng điểm trong sân cho bên Trái -->
             <div class="in-court-score-widget score-side-left" id="widget-score-team1">
               <button type="button" class="score-adj-btn minus" id="btn-t1-minus" title="-1 điểm">-</button>
-              <div class="score-tap-zone" id="zone-score-t1" title="Chạm để +1 điểm cho Đội 1">
+              <button type="button" class="score-tap-zone" id="zone-score-t1" aria-label="Cộng 1 điểm cho Đội 1" title="Chạm để +1 điểm cho Đội 1">
                 <div class="score-led-wrap">
-                  <div id="score-team1-val" class="score-number in-court-led" title="Bấm vào số để tự nhập điểm">0</div>
+                  <span id="score-team1-val" class="score-number in-court-led">0</span>
                   <span class="score-tap-hint">+1</span>
                 </div>
-              </div>
+              </button>
               <button type="button" class="score-adj-btn plus" id="btn-t1-plus" title="+1 điểm">+</button>
             </div>
 
@@ -215,12 +208,12 @@
             <!-- Bảng điểm trong sân cho bên Phải -->
             <div class="in-court-score-widget score-side-right" id="widget-score-team2">
               <button type="button" class="score-adj-btn minus" id="btn-t2-minus" title="-1 điểm">-</button>
-              <div class="score-tap-zone" id="zone-score-t2" title="Chạm để +1 điểm cho Đội 2">
+              <button type="button" class="score-tap-zone" id="zone-score-t2" aria-label="Cộng 1 điểm cho Đội 2" title="Chạm để +1 điểm cho Đội 2">
                 <div class="score-led-wrap">
-                  <div id="score-team2-val" class="score-number in-court-led" title="Bấm vào số để tự nhập điểm">0</div>
+                  <span id="score-team2-val" class="score-number in-court-led">0</span>
                   <span class="score-tap-hint">+1</span>
                 </div>
-              </div>
+              </button>
               <button type="button" class="score-adj-btn plus" id="btn-t2-plus" title="+1 điểm">+</button>
             </div>
 
@@ -236,6 +229,11 @@
           </div>
         </div>
 
+        <div class="score-sync-row">
+          <div id="score-sync-status" class="score-sync-status" hidden><span class="score-sync-dot" aria-hidden="true"></span><span id="score-sync-text" role="status" aria-live="polite"></span><button type="button" id="btn-retry-score" hidden>Thử lại</button></div>
+          <button type="button" id="btn-manual-score" class="score-manual-button">✎ Nhập tỷ số</button>
+        </div>
+
         <!-- DẢI THAO TÁC NHANH & LƯU KẾT QUẢ NGAY DƯỚI SÂN -->
         <div class="court-bottom-action-strip">
           <div class="score-presets-row in-strip">
@@ -249,17 +247,17 @@
 
           <!-- Nút Lưu Kết Quả Trận Đấu -->
           <button type="button" id="btn-finish-match" class="btn-primary btn-save-match-record">
-            <span>🏆</span> XÁC NHẬN KẾT QUẢ & CẬP NHẬT RANK
+            <span>🏆</span> LƯU KẾT QUẢ TRẬN
           </button>
         </div>
 
         <!-- KHU VỰC ĐIỀU KHIỂN GHÉP CẶP & DỰ ĐOÁN TÁCH BIỆT -->
         <div class="court-lower-grid">
-          <!-- Cột Trái: Chế Độ Xếp Cặp & Vị Trí Sân -->
+          <!-- Cột Trái: Xếp đội hình & Vị Trí Sân -->
           <div class="match-controls-card">
             <div class="controls-card-header">
               <h3 class="controls-card-title">
-                <span>⚙️</span> Chế Độ Xếp Cặp
+                <span>⚙️</span> Xếp đội hình
               </h3>
               <div class="court-pos-wrap">
                 <span class="court-pos-label">Vị trí:</span>
@@ -291,10 +289,10 @@
             <!-- Nút Tạo Trận / Đổi Người -->
             <div class="action-btn-row">
               <button id="btn-generate-match" class="btn-primary">
-                <span>⚡</span> Quay Trận Mới
+                <span>⚡</span> Xếp trận mới
               </button>
               <button id="btn-swap-teams" class="btn-secondary" title="Đổi chéo người chơi giữa 2 đội">
-                <span>🔄</span> Đổi Kèo
+                <span>🔄</span> Đổi đội
               </button>
             </div>
 
@@ -317,14 +315,14 @@
       <section id="tab-sessions" class="tab-view" style="display: none;">
         <div class="section-banner">
           <div class="banner-info">
-            <h2><span>📅</span> Lịch Buổi Đánh & Sân Cầu Lông</h2>
-            <p>Theo dõi lịch dạng ô lưới trực quan theo tháng, tự động highlight các ngày có kèo đánh</p>
+            <h2><span>📅</span> Lịch sân CLB</h2>
+            <p>Xem buổi đánh sắp tới và đăng ký tham gia.</p>
           </div>
           <div style="display: flex; gap: 8px; flex-wrap: wrap; align-items: center;">
             <button id="btn-toggle-calendar-view" class="btn-secondary" style="padding: 9px 14px; font-size: 0.85rem;">
-              <span id="calendar-view-icon">📋</span> <span id="calendar-view-text">Dạng Danh Sách</span>
+              <span id="calendar-view-icon">📋</span> <span id="calendar-view-text">Xem danh sách</span>
             </button>
-            <button id="btn-open-add-session" class="btn-primary" style="padding: 9px 16px; font-size: 0.88rem; flex: none;">
+            <button id="btn-open-add-session" data-admin-control class="btn-primary" style="padding: 9px 16px; font-size: 0.88rem; flex: none;">
               <span>➕</span> Đặt Lịch Mới
             </button>
           </div>
@@ -382,7 +380,7 @@
             <p>Hệ thống Elo Đánh Đôi linh hoạt, phân chia rõ ràng trình độ & đóng góp</p>
           </div>
           <div id="total-members-count-badge" class="session-status-pill">
-            16 Thành Viên
+            Đang tải thành viên
           </div>
         </div>
 
@@ -402,10 +400,10 @@
         <!-- Filter Sub-tabs -->
         <div class="leaderboard-tabs-bar">
           <button class="lb-subtab-btn active" data-lbsort="elo">
-            <span>👑</span> Cao Thủ (Elo)
+            <span>👑</span> Điểm Elo
           </button>
           <button class="lb-subtab-btn" data-lbsort="matches">
-            <span>⚡</span> Cày Cuốc (Số trận)
+            <span>⚡</span> Số trận
           </button>
           <button class="lb-subtab-btn" data-lbsort="wins">
             <span>🔥</span> Thắng Nhiều Nhất
@@ -414,7 +412,7 @@
             <span>🎯</span> Tỷ Lệ Thắng (%)
           </button>
           <button class="lb-subtab-btn" data-lbsort="coins">
-            <span>🪙</span> Đại Gia Xu
+            <span>🪙</span> Xu CLB
           </button>
         </div>
 
@@ -437,16 +435,16 @@
             <p>Tick chọn người có mặt để ghép sân • Xu điểm danh (+50 🪙) sẽ tự động cộng sau khi hoàn thành trận đầu tiên tại sân</p>
           </div>
           <div class="action-btn-row">
-            <button id="btn-open-add-guest" class="btn-primary" onclick="window.appOpenAddGuestModal()" style="font-size: 0.8rem; padding: 8px 14px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #4f46e5); border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
+            <button id="btn-open-add-guest" data-auth-control class="btn-primary" onclick="window.appOpenAddGuestModal()" style="font-size: 0.8rem; padding: 8px 14px; font-weight: 700; background: linear-gradient(135deg, #0284c7, #4f46e5); border: none; box-shadow: 0 4px 12px rgba(79, 70, 229, 0.3);">
               ➕ Thêm Khách
             </button>
-            <button id="btn-checkin-regulars" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+            <button id="btn-checkin-regulars" data-admin-control class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ⚡ Chọn Nòng Cốt
             </button>
-            <button id="btn-checkin-all" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+            <button id="btn-checkin-all" data-admin-control class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ✅ Chọn Tất Cả
             </button>
-            <button id="btn-checkin-none" class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
+            <button id="btn-checkin-none" data-admin-control class="btn-secondary" style="font-size: 0.8rem; padding: 8px 12px;">
               ❌ Bỏ Chọn
             </button>
           </div>
@@ -459,16 +457,17 @@
 
       <!-- ================= 4. TAB: THÀNH VIÊN (MEMBERS MANAGEMENT) ================= -->
       <section id="tab-members" class="tab-view" style="display: none;">
+        <div class="section-banner"><div class="banner-info"><h2>Thành viên CLB</h2><p>Tìm bạn chơi và xem hồ sơ thi đấu.</p></div></div>
         <div class="members-header-bar">
           <div class="search-input-wrap">
             <span class="search-icon">🔍</span>
             <input type="text" id="member-search-input" class="search-input" placeholder="Tìm tên hoặc biệt danh...">
           </div>
           <div style="display: flex; gap: 8px; flex-shrink: 0; align-items: center;">
-            <button id="btn-open-add-member" class="btn-primary" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
+            <button id="btn-open-add-member" data-admin-control class="btn-primary" style="padding: 10px 16px; font-size: 0.85rem; white-space: nowrap;">
               <span>➕</span> Thêm Thành Viên
             </button>
-            <button id="btn-open-add-guest-members" class="btn-secondary btn-open-add-guest" data-action="open-add-guest" onclick="window.appOpenAddGuestModal()" style="padding: 10px 13px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
+            <button id="btn-open-add-guest-members" data-auth-control class="btn-secondary btn-open-add-guest" data-action="open-add-guest" onclick="window.appOpenAddGuestModal()" style="padding: 10px 13px; font-size: 0.85rem; font-weight: 700; white-space: nowrap;">
               <span>👤</span> Thêm Khách
             </button>
           </div>
@@ -496,38 +495,36 @@
         </div>
       </section>
 
+      <section id="tab-me" class="tab-view" style="display:none;" aria-label="Cá nhân">
+        <div class="section-banner"><div class="banner-info"><p class="eyebrow">GÓC THÀNH VIÊN</p><h2>Cá nhân</h2><p>Hồ sơ, ví xu và vật phẩm của bạn ở cùng một nơi.</p></div></div>
+        <div id="member-home-content"></div>
+        <aside id="banner-celebrate-2010" class="member-event-note" style="display:none;">
+          <span aria-hidden="true">🎀</span><div><strong>Quà 20-10 của CLB</strong><p>Khung Nơ Hồng dành tặng các thành viên nữ.</p></div>
+          <button class="btn-secondary" onclick="window.appOpenShopModal('inventory')">Xem túi đồ</button>
+          <button class="btn-icon" onclick="window.appDismissBanner2010()" aria-label="Đóng thông báo quà 20-10">✕</button>
+        </aside>
+      </section>
+
     </main>
 
     <!-- Mobile Bottom Nav Bar -->
-    <nav class="mobile-nav">
-      <button class="mobile-nav-item active" data-tab="court">
-        <span class="nav-icon">🏸</span>
-        <span>Sân Đấu</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="sessions">
-        <span class="nav-icon">📅</span>
-        <span>Lịch Sân</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="leaderboard">
-        <span class="nav-icon">🏆</span>
-        <span>Xếp Hạng</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="attendance">
-        <span class="nav-icon">📋</span>
-        <span>Điểm Danh</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="members">
-        <span class="nav-icon">👥</span>
-        <span>Thành Viên</span>
-      </button>
-      <button class="mobile-nav-item" data-tab="history">
-        <span class="nav-icon">📜</span>
-        <span>Lịch Sử</span>
-      </button>
+    <nav class="mobile-nav" aria-label="Điều hướng chính trên điện thoại">
+      <button class="mobile-nav-item active" data-tab="court"><span class="nav-icon" aria-hidden="true">🏸</span><span>Hôm nay</span></button>
+      <button class="mobile-nav-item" data-tab="sessions"><span class="nav-icon" aria-hidden="true">📅</span><span>Lịch sân</span></button>
+      <button class="mobile-nav-item" data-tab="leaderboard"><span class="nav-icon" aria-hidden="true">🏆</span><span>Xếp hạng</span></button>
+      <button class="mobile-nav-item" data-tab="me"><span class="nav-icon" aria-hidden="true">👤</span><span>Cá nhân</span></button>
     </nav>
   </div>
 
   <!-- ================= MODALS ================= -->
+
+  <div id="modal-manual-score" class="modal-backdrop">
+    <form id="form-manual-score" class="modal-content manual-score-modal" aria-labelledby="manual-score-title">
+      <div class="modal-header"><h3 id="manual-score-title">Nhập tỷ số</h3><button type="button" class="btn-icon btn-close-modal" aria-label="Đóng nhập tỷ số">✕</button></div>
+      <div class="modal-body"><p>Chạm trực tiếp vào bảng điểm để cộng 1. Dùng ô bên dưới khi cần sửa tỷ số.</p><div class="manual-score-inputs"><label>Đội 1<input id="manual-score-1" type="number" inputmode="numeric" min="0" max="30" step="1" required></label><span aria-hidden="true">–</span><label>Đội 2<input id="manual-score-2" type="number" inputmode="numeric" min="0" max="30" step="1" required></label></div></div>
+      <div class="modal-footer"><button type="button" class="btn-secondary btn-close-modal">Hủy</button><button type="submit" class="btn-primary">Cập nhật tỷ số</button></div>
+    </form>
+  </div>
 
   <!-- Modal 1: Thêm / Sửa Thành Viên & Upload Avatar -->
   <div id="modal-member-form" class="modal-backdrop">
@@ -864,6 +861,18 @@
   </div>
 
   <!-- Modal 4: Quỹ Cầu Lông MoMo / VietQR (CLB Thái Thịnh) -->
+  <dialog id="account-menu" class="account-sheet" aria-labelledby="account-menu-title">
+    <div class="account-menu-heading"><h2 id="account-menu-title">Tài khoản của bạn</h2><button type="button" id="btn-close-account-menu" aria-label="Đóng menu cá nhân">✕</button></div>
+    <div id="account-menu-summary" class="account-menu-summary"></div>
+    <nav class="account-menu-links" aria-label="Menu cá nhân">
+      <button type="button" data-member-action="me"><span aria-hidden="true">👤</span> Cá nhân <span aria-hidden="true">→</span></button>
+      <div class="account-wallet-group"><p>Ví xu &amp; túi đồ</p><div><button type="button" data-member-action="wallet"><span aria-hidden="true">🪙</span> Ví xu</button><button type="button" data-member-action="inventory"><span aria-hidden="true">🎒</span> Túi đồ</button></div></div>
+      <button type="button" data-member-action="myhistory"><span aria-hidden="true">📜</span> Lịch sử trận của tôi <span aria-hidden="true">→</span></button>
+      <button type="button" data-member-action="members"><span aria-hidden="true">👥</span> Thành viên CLB <span aria-hidden="true">→</span></button>
+      <button type="button" data-member-action="logout" class="account-logout"><span aria-hidden="true">↪</span> Đăng xuất</button>
+    </nav>
+  </dialog>
+
   <div id="modal-club-fund" class="modal-backdrop">
     <div class="modal-content" style="max-width: 440px; text-align: center;">
       <div class="modal-header">
