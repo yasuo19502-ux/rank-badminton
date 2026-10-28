@@ -14,7 +14,6 @@ body { background-image:none; }
 .nav-tab-btn { min-height:42px; padding:10px 14px; font-size:.82rem; border-radius:10px; }
 .nav-tab-btn.active, [data-theme="dark"] .nav-tab-btn.active { background:var(--layout-soft); color:var(--layout-accent); box-shadow:none; }
 .header-actions { gap:10px; }
-#btn-open-shop, #btn-open-club-fund { display:none; }
 .header-user-pill { box-shadow:none; border-radius:12px; }
 .header-user-name { max-width:110px; }
 .btn-header-login { box-shadow:none; min-height:40px; }
@@ -256,7 +255,6 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible, summary:fo
   .tab-view, .nav-tab-btn, .mobile-nav-item, .court-switch-btn { animation:none; transition:none; }
 }
 /* Override legacy phone-only !important rules for the simplified header. */
-#btn-open-shop, #btn-open-club-fund { display:none !important; }
 .btn-header-login .login-text-short { display:none !important; }
 .btn-header-login .login-text-full { display:inline !important; }
 .nav-tab-btn.active, [data-theme="dark"] .nav-tab-btn.active { color:var(--layout-accent) !important; }
@@ -306,3 +304,57 @@ button:focus-visible, [role="button"]:focus-visible, a:focus-visible, summary:fo
 .manual-score-inputs { display:flex; align-items:center; gap:18px; margin-top:20px; }
 .manual-score-inputs label { flex:1; font-size:.8rem; font-weight:700; color:var(--text-main); }
 .manual-score-inputs input { display:block; width:100%; text-align:center; margin-top:8px; padding:14px 8px; border:1px solid var(--border-subtle); border-radius:12px; background:var(--bg-card); color:var(--text-main); font-size:1.65rem; font-weight:700; }
+
+/* Shared club shortcuts stay outside the personal account menu. */
+.app-header .header-actions #btn-open-shop,
+.app-header .header-actions #btn-open-club-fund {
+  display:inline-flex !important; align-items:center; justify-content:center;
+  width:auto !important; height:auto !important; min-width:44px !important; min-height:44px !important;
+  padding:8px 10px !important; gap:5px; border-radius:10px !important;
+  background:var(--layout-soft); color:var(--layout-accent) !important;
+  border:1px solid var(--border-glass); box-shadow:none;
+}
+.header-actions .fund-chip-text { display:inline !important; }
+.chip-mobile-label { display:none; }
+.header-user-pill { cursor:pointer; color:var(--text-main); font:inherit; min-height:44px; }
+.account-sheet { width:min(400px,calc(100vw - 32px)); max-height:calc(100dvh - 32px); margin:auto; padding:20px; border:1px solid var(--border-glass); border-radius:20px; background:var(--bg-card); color:var(--text-main); box-shadow:var(--shadow-lg); overflow-y:auto; }
+.account-sheet::backdrop { background:rgba(15,23,42,.42); }
+.account-menu-heading { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:16px; }
+.account-menu-heading h2 { font-size:1rem; margin:0; }
+.account-menu-heading > button { width:44px; height:44px; border:1px solid var(--border-glass); border-radius:12px; background:var(--bg-card-hover); color:var(--text-main); cursor:pointer; }
+.account-menu-summary { display:flex; align-items:center; gap:14px; padding-bottom:18px; margin-bottom:10px; border-bottom:1px solid var(--border-glass); }
+.account-menu-summary > div:last-child { min-width:0; }
+.account-menu-summary strong { display:block; overflow-wrap:anywhere; font-size:1rem; }
+.account-menu-summary > div:last-child > span { display:block; margin-top:5px; font-size:.8rem; color:var(--text-dim); }
+.account-menu-links { display:grid; gap:6px; }
+.account-menu-links button { display:flex; align-items:center; gap:12px; min-height:48px; border:0; border-radius:10px; padding:12px; background:transparent; color:var(--text-main); font:inherit; font-size:.85rem; font-weight:600; text-align:left; cursor:pointer; }
+.account-menu-links button:hover { background:var(--layout-soft); }
+.account-menu-links > button > span:last-child:not(:first-child) { margin-left:auto; color:var(--text-dim); }
+.account-wallet-group { padding:10px 12px; background:var(--bg-card-hover); border-radius:12px; }
+.account-wallet-group p { margin:0 0 5px; font-size:.72rem; color:var(--text-dim); }
+.account-wallet-group > div { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+.account-wallet-group button { background:var(--bg-card); border:1px solid var(--border-glass); }
+.account-menu-links .account-logout { margin-top:8px; border-top:1px solid var(--border-glass); border-radius:0; color:var(--coral); }
+@media (max-width:859px) {
+  .app-header .header-actions #btn-open-shop,
+  .app-header .header-actions #btn-open-club-fund { flex-direction:column; gap:2px; width:44px !important; padding:4px !important; font-size:.62rem; line-height:1.2; }
+  .header-actions .chip-desktop-label { display:none; }
+  .chip-mobile-label { display:inline; }
+  .header-actions .header-coin-badge { display:none; }
+  .header-actions .header-user-pill { min-width:44px; min-height:44px; justify-content:center; padding:5px !important; }
+  .account-sheet { width:100%; max-width:100%; margin:auto 0 0; border-radius:22px 22px 0 0; max-height:calc(100dvh - 24px); padding:16px 20px calc(20px + env(safe-area-inset-bottom)); }
+}
+@media (max-width:480px) {
+  .app-header { padding:8px; gap:5px; }
+  .app-header .brand-title { font-size:.72rem !important; }
+  .header-actions { gap:3px !important; }
+  .header-actions .btn-header-login { min-width:40px; min-height:44px; padding:6px; }
+  .header-actions .btn-header-login .login-text-full { display:none !important; }
+  .header-actions .btn-header-login .login-text-short { display:inline !important; }
+  .header-actions #btn-toggle-theme { width:32px !important; min-width:32px !important; min-height:44px !important; }
+}
+
+@media (prefers-reduced-motion:no-preference) {
+  .account-sheet[open] { animation:account-menu-enter .16s ease-out; }
+  @keyframes account-menu-enter { from { opacity:0; transform:translateY(16px); } to { opacity:1; transform:translateY(0); } }
+}

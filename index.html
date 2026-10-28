@@ -42,22 +42,22 @@
 
       <!-- Header Quick Actions -->
       <div class="header-actions">
+        <!-- 1. Nút Quỹ Cầu Lông MoMo / VietQR -->
+        <button id="btn-open-club-fund" class="btn-fund-chip" title="Quỹ CLB" aria-label="Quỹ CLB">
+          <span class="fund-chip-icon">💰</span>
+          <span class="fund-chip-text">Quỹ <span class="chip-desktop-label">CLB</span></span>
+        </button>
+
+        <!-- Nút Cửa Hàng & Túi Đồ (Giai đoạn 3) -->
+        <button id="btn-open-shop" class="btn-fund-chip btn-shop-chip" onclick="window.appOpenShopModal()" title="Cửa hàng" aria-label="Cửa hàng">
+          <span class="fund-chip-icon">🛒</span>
+          <span class="fund-chip-text"><span class="chip-desktop-label">Cửa hàng</span><span class="chip-mobile-label">Shop</span></span>
+        </button>
+
         <!-- 0. Widget Người Dùng & Ví Xu (Giai đoạn 1) -->
         <div id="header-user-container" class="header-user-container">
           <!-- Render tự động: nút đăng nhập hoặc avatar + xu -->
         </div>
-
-        <!-- 1. Nút Quỹ Cầu Lông MoMo / VietQR -->
-        <button id="btn-open-club-fund" class="btn-fund-chip" title="Góp Quỹ Sân & Cầu MoMo">
-          <span class="fund-chip-icon">💰</span>
-          <span class="fund-chip-text">Quỹ CLB</span>
-        </button>
-
-        <!-- Nút Cửa Hàng & Túi Đồ (Giai đoạn 3) -->
-        <button id="btn-open-shop" class="btn-fund-chip btn-shop-chip" onclick="window.appOpenShopModal()" title="Cửa Hàng Vật Phẩm & Túi Đồ">
-          <span class="fund-chip-icon">🛒</span>
-          <span class="fund-chip-text">Cửa Hàng</span>
-        </button>
 
         <!-- 2. Chuyển đổi Giao diện Sáng / Tối -->
         <button id="btn-toggle-theme" class="btn-icon" title="Đổi giao diện Sáng / Tối">
@@ -861,6 +861,18 @@
   </div>
 
   <!-- Modal 4: Quỹ Cầu Lông MoMo / VietQR (CLB Thái Thịnh) -->
+  <dialog id="account-menu" class="account-sheet" aria-labelledby="account-menu-title">
+    <div class="account-menu-heading"><h2 id="account-menu-title">Tài khoản của bạn</h2><button type="button" id="btn-close-account-menu" aria-label="Đóng menu cá nhân">✕</button></div>
+    <div id="account-menu-summary" class="account-menu-summary"></div>
+    <nav class="account-menu-links" aria-label="Menu cá nhân">
+      <button type="button" data-member-action="me"><span aria-hidden="true">👤</span> Cá nhân <span aria-hidden="true">→</span></button>
+      <div class="account-wallet-group"><p>Ví xu &amp; túi đồ</p><div><button type="button" data-member-action="wallet"><span aria-hidden="true">🪙</span> Ví xu</button><button type="button" data-member-action="inventory"><span aria-hidden="true">🎒</span> Túi đồ</button></div></div>
+      <button type="button" data-member-action="myhistory"><span aria-hidden="true">📜</span> Lịch sử trận của tôi <span aria-hidden="true">→</span></button>
+      <button type="button" data-member-action="members"><span aria-hidden="true">👥</span> Thành viên CLB <span aria-hidden="true">→</span></button>
+      <button type="button" data-member-action="logout" class="account-logout"><span aria-hidden="true">↪</span> Đăng xuất</button>
+    </nav>
+  </dialog>
+
   <div id="modal-club-fund" class="modal-backdrop">
     <div class="modal-content" style="max-width: 440px; text-align: center;">
       <div class="modal-header">

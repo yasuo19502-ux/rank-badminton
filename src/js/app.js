@@ -326,14 +326,19 @@ function switchCourt(courtId) {
  * Thiết lập các bộ lắng nghe sự kiện (Event Listeners)
  */
 function setupEventListeners() {
-  document.addEventListener('keydown',event=>{if(event.target.id==='header-user-widget'&&['Enter',' '].includes(event.key)){event.preventDefault();switchTab('me');}});
+  const accountMenu = document.getElementById('account-menu');
+  document.getElementById('btn-close-account-menu')?.addEventListener('click', closeAccountMenu);
+  accountMenu?.addEventListener('click', event => { if (event.target === accountMenu) closeAccountMenu(); });
+  accountMenu?.addEventListener('close', () => document.getElementById('header-user-widget')?.setAttribute('aria-expanded', String(accountMenu.open)));
   document.addEventListener('click', async event => {
+    if (event.target.closest('#header-user-widget')) { openAccountMenu(); return; }
     const route=event.target.closest('[data-section-link], .nav-tab-btn, .mobile-nav-item');
     if(route){const tab=route.dataset.sectionLink||route.dataset.tab;if(['court','attendance','history','sessions','leaderboard','members','me'].includes(tab)){SoundService.playClick();switchTab(tab);}return;}
     const button=event.target.closest('[data-member-action]');
     if(!button)return;
+    if (button.closest('#account-menu')) closeAccountMenu();
     const user=StorageService.getCurrentUser();
-    const actions={login:()=>window.appOpenLoginModal(),register:()=>window.appOpenRegisterNewMember(),wallet:()=>window.appOpenUserWallet(),profile:()=>user&&window.appViewPlayerProfile(user.id),inventory:()=>window.appOpenShopModal('inventory'),shop:()=>window.appOpenShopModal(),edit:()=>window.appEditMyProfile(),members:()=>switchTab('members'),history:()=>switchTab('history'),fund:()=>document.getElementById('btn-open-club-fund')?.click(),admin:()=>window.appOpenAdminSettings(),logout:()=>window.appLogout()};
+    const actions={me:()=>switchTab('me'),myhistory:()=>user&&window.appViewPlayerProfile(user.id),login:()=>window.appOpenLoginModal(),register:()=>window.appOpenRegisterNewMember(),wallet:()=>window.appOpenUserWallet(),profile:()=>user&&window.appViewPlayerProfile(user.id),inventory:()=>window.appOpenShopModal('inventory'),shop:()=>window.appOpenShopModal(),edit:()=>window.appEditMyProfile(),members:()=>switchTab('members'),history:()=>switchTab('history'),fund:()=>document.getElementById('btn-open-club-fund')?.click(),admin:()=>window.appOpenAdminSettings(),logout:()=>window.appLogout()};
     try{await actions[button.dataset.memberAction]?.();}catch(error){showToast(error.message||'Chưa thực hiện được thao tác.','error');}
   });
 
@@ -3479,6 +3484,7 @@ function updateSessionStatusBadge() {
 }
 
 function closeAllModals() {
+  closeAccountMenu();
   document.querySelectorAll('.modal-backdrop').forEach(m => m.classList.remove('open'));
 }
 
@@ -4646,6 +4652,20 @@ window.appViewPlayerProfile = function(memberId) {
 // 8. ĐỊNH DANH NGƯỜI DÙNG, MÃ PIN & VÍ XU (GIAI ĐOẠN 1)
 // =========================================================================
 
+function closeAccountMenu() {
+  const menu = document.getElementById('account-menu');
+  if (menu?.open) menu.close();
+  document.getElementById('header-user-widget')?.setAttribute('aria-expanded', 'false');
+}
+
+function openAccountMenu() {
+  if (!state.currentUser) { window.appOpenLoginModal(); return; }
+  const menu = document.getElementById('account-menu');
+  if (!menu || menu.open) return;
+  menu.showModal();
+  document.getElementById('header-user-widget')?.setAttribute('aria-expanded', 'true');
+}
+
 function renderUserAuthHeader() {
   const container = document.getElementById('header-user-container');
   if (!container) return;
@@ -4659,11 +4679,11 @@ function renderUserAuthHeader() {
     const coins = currentUser.coins !== undefined ? currentUser.coins : 100;
     const isCurrentUserAdmin = StorageService.isAdmin(currentUser);
     container.safeInnerHTML = `
-      <div id="header-user-widget" class="header-user-pill" onclick="window.appSwitchTab('me')" title="Mở trang cá nhân" role="button" tabindex="0">
+      <button type="button" id="header-user-widget" class="header-user-pill" title="Mở menu cá nhân" aria-label="Mở menu cá nhân" aria-haspopup="dialog" aria-controls="account-menu" aria-expanded="${document.getElementById('account-menu')?.open ? 'true' : 'false'}">
         ${renderAvatarHtml(currentUser, { size: 'xs', className: 'header-user-avatar' })}
         <span class="header-user-name">${escapeHtml(currentUser.name)}${isCurrentUserAdmin ? ' <span style="font-size: 0.68rem; background: rgba(239,68,68,0.2); color: #f87171; padding: 1px 5px; border-radius: 4px; font-weight: 700; margin-left: 2px;">👑 Admin</span>' : ''}</span>
         <span class="header-coin-badge">🪙 <span id="header-user-coins">${coins}</span></span>
-      </div>
+      </button>
     `;
   } else {
     container.safeInnerHTML = `
@@ -4672,6 +4692,11 @@ function renderUserAuthHeader() {
       </button>
     `;
   }
+  const summary = document.getElementById('account-menu-summary');
+  if (summary) summary.safeInnerHTML = currentUser
+    ? `${renderAvatarHtml(currentUser, { size: 'sm' })}<div><strong>${escapeHtml(currentUser.name)}</strong><span>🪙 ${Number(currentUser.coins ?? 100).toLocaleString('vi-VN')} xu</span></div>`
+    : '';
+  if (!currentUser) closeAccountMenu();
   if(state.currentTab==='me')renderMemberHome();
 }
 
