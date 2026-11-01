@@ -2,6 +2,8 @@
  * elo.js - Thuật toán Doubles Elo & Cấp bậc Xếp hạng CLB Thái Thịnh
  */
 
+import { getMatchPlayerDelta } from './match-record.js';
+
 export const TIERS = [
   {
     id: 'ga_nhat_cau',
@@ -369,17 +371,7 @@ export function getPlayerDetailedStats(memberId, members, matches = []) {
         if (isWin) partnerStats[partnerId].won++;
       }
 
-      let myEloDelta;
-      if (inTeam1 && m.deltaTeam1 !== undefined) {
-        myEloDelta = Number(m.deltaTeam1);
-      } else if (inTeam2 && m.deltaTeam2 !== undefined) {
-        myEloDelta = Number(m.deltaTeam2);
-      } else {
-        const baseChange = Number(m.eloChange) || 16;
-        const usesZeroSum = String(m.id || '').startsWith(ZERO_SUM_MATCH_PREFIX);
-        const lossChange = usesZeroSum ? baseChange : Math.max(1, Math.round(baseChange * 0.8));
-        myEloDelta = isWin ? baseChange : -lossChange;
-      }
+      const myEloDelta = getMatchPlayerDelta(m, memberId);
 
       personalMatches.push({
         id: m.id,
