@@ -48,6 +48,11 @@ export const SHOP_ITEMS = [
     tierBadge: 'Bảo Hiểm Elo',
     description: 'Bật trước trận: thua giảm 50% điểm trừ, thắng nhận đủ Elo. Mỗi trận được lưu tiêu hao 1 thẻ dù thắng hay thua.'
   },
+  {
+    id: 'hope_star', name: 'Ngôi Sao Hy Vọng', price: 120, icon: '⭐',
+    type: 'perk', category: 'perk', rarity: 'rare', tierBadge: 'Thưởng Elo',
+    description: 'Đặt trước khi trận bắt đầu: thắng nhận thêm 50% Elo, thua tính điểm bình thường. Mỗi trận tiêu hao 1 sao, tối đa 1 lần mỗi ngày.'
+  },
   // 3. Khung Avatar Tinh Anh (Rare - Thiết kế ngầu, sắc nét)
   {
     id: 'frame_carbon',
@@ -1673,6 +1678,7 @@ export const StorageService = {
       return { success: false, message: 'Vật phẩm không tồn tại!' };
     }
     if (itemDef.eventClosed) return {success:false,message:'Sự kiện tặng khung Nơ Hồng đã kết thúc.'};
+    if (itemId === 'hope_star') return {success:false,message:'Ngôi sao Hy vọng cần kết nối mạng để sử dụng.'};
 
     const members = this.getMembers();
     const mem = members.find(m => m.id === memberId);

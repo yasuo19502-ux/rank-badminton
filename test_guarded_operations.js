@@ -28,6 +28,7 @@ const baseline=await snapshot();await db.exec(migration);assert.deepEqual(await 
 const shieldMigration=fs.readFileSync('supabase/migrations/20261028_per_match_shield.sql','utf8');
 const shieldBaseline=await snapshot();await db.exec(shieldMigration);assert.deepEqual(await snapshot(),shieldBaseline);await db.exec(shieldMigration);assert.deepEqual(await snapshot(),shieldBaseline);
 const ribbonMigration=fs.readFileSync('supabase/migrations/20261028_end_ribbon_event.sql','utf8');await db.exec(ribbonMigration);
+const starMigration=fs.readFileSync('supabase/migrations/20261101_hope_star.sql','utf8');await db.exec(starMigration);
 let passed=0;const admin='mem_1789569517045';
 async function actor(id=admin){const token='test-token-'+id;await q("insert into club_private.sessions values(sha256(convert_to($1,'UTF8')),$2,clock_timestamp()+interval '1 day') on conflict(token_hash) do update set expires_at=excluded.expires_at",[token,id]);await q("select set_config('request.headers',$1,false)",[JSON.stringify({'x-club-session':token})]);}
 async function reset(){await db.exec(`reset role;truncate matches,live_court,bets,coin_transactions,user_inventory,club_daily_rewards,attendance,sessions,club_private.operations,members cascade;
@@ -38,6 +39,18 @@ const court=async(...args)=>rpc('club_save_court',[payload(...args),null]);
 const finish=async(id='match_zs_audit',s1=21,s2=19)=>{const c=(await q('select * from live_court where match_id=$1',[id])).rows[0];if(c)await q('update live_court set score1=$1,score2=$2 where id=$3',[s1,s2,c.id]);return rpc('club_finish_match',[id,s1,s2]);};
 try{
 console.log('PASS migration preserves every existing record, including rerun');passed++;
+await test('Hope Star purchase, one daily use, winner bonus and undo',async()=>{
+ await db.exec("select club_apply_coin('a',400,'test','test','test:star');insert into user_inventory(id,member_id,item_id,item_type,quantity) values('star_b','b','hope_star','perk',2),('star_c','c','hope_star','perk',1),('shield_c','c','elo_shield','perk',1);update members set phone=jsonb_set(phone::jsonb,'{activeEloShield}','true')::text where id='c'");
+ await actor('a');await rpc('club_buy_item',['purchase_star_001','a','hope_star']);await rpc('club_buy_item',['purchase_star_001','a','hope_star']);assert.equal(await scalar("select coins from members where id='a'"),380);assert.equal(await scalar("select quantity from user_inventory where member_id='a' and item_id='hope_star'"),1);
+ await actor();await court();for(const x of ['a','b','c']){await actor(x);await rpc('club_hope_star',[true]);}await actor();await finish();
+ assert.equal(await scalar("select elo from members where id='a'"),1017);assert.equal(await scalar("select elo from members where id='b'"),1017);assert.equal(await scalar("select elo from members where id='c'"),995);assert.equal(await scalar("select quantity from user_inventory where id='star_c'"),0);assert.equal(await scalar("select count(*)::int from club_private.hope_stars where used_date is not null"),3);
+ await finish();assert.equal(await scalar("select elo from members where id='a'"),1017);
+ await court('court_1','match_zs_second');await actor('b');await assert.rejects(rpc('club_hope_star',[true]),/hôm nay/);
+ await actor();await rpc('club_undo_match',['match_zs_audit']);assert.equal(await scalar("select elo from members where id='a'"),1000);assert.equal(await scalar("select quantity from user_inventory where id='star_b'"),2);assert.equal(await scalar("select count(*)::int from club_private.hope_stars where used_date is not null"),0);
+});
+await test('Hope Star requires complete lineup, before scoring, and correct member',async()=>{
+ await db.exec("insert into user_inventory(id,member_id,item_id,item_type,quantity) values('star','a','hope_star','perk',1)");await actor('a');await assert.rejects(rpc('club_hope_star',[true]),/đội hình/);await actor();await court();await q("update live_court set score1=1 where id='court_1'");await actor('a');await assert.rejects(rpc('club_hope_star',[true]),/trước khi ghi điểm/);await q("update live_court set score1=0 where id='court_1'");await rpc('club_hope_star',[true]);assert.equal((await rpc('club_hope_star_status')).active,true);await rpc('club_hope_star',[false]);assert.equal((await rpc('club_hope_star_status')).active,false);
+});
 await test('Anonymous actor cannot spend another wallet or directly update protected tables',async()=>{
  await q("select set_config('request.headers','{}',false)");await db.exec('set role anon');
  await assert.rejects(rpc('club_buy_item',['purchase_audit_x','x','elo_shield']),/đăng nhập/);

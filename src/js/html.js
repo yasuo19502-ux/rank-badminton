@@ -10,7 +10,7 @@ export function safeImageUrl(value) {
   return '';
 }
 
-const actions=new Set(['appTriggerAvatarUpload','appViewPlayerProfile','appOpenSwapPlayerModal','appRemoveGuest','appUnassignSlot','appApplySwapPlayer','appBenchSelectPlayer','appBuyShopItem','appClaimGrip','appConfirmBet','appDeleteMatch','appDeleteMember','appDeleteSession','appEditMember','appEditSession','appEquipFrame','appLoadMoreHistory','appOpenAddGuestModal','appOpenAddMember','appOpenAddSessionForDate','appOpenLoginModal','appOpenCourtBetsModal','appOpenUserWallet','appQuickRSVP','appSelectBetAmount','appSelectBetTeam','appSelectCalendarDate','appStartSession','appSwitchTab','appToggleAttendance','appToggleEloShield','appToggleMemberRSVP']);
+const actions=new Set(['appTriggerAvatarUpload','appViewPlayerProfile','appOpenSwapPlayerModal','appRemoveGuest','appUnassignSlot','appApplySwapPlayer','appBenchSelectPlayer','appBuyShopItem','appClaimGrip','appConfirmBet','appDeleteMatch','appDeleteMember','appDeleteSession','appEditMember','appEditSession','appEquipFrame','appLoadMoreHistory','appOpenAddGuestModal','appOpenAddMember','appOpenAddSessionForDate','appOpenLoginModal','appOpenCourtBetsModal','appOpenUserWallet','appQuickRSVP','appSelectBetAmount','appSelectBetTeam','appSelectCalendarDate','appStartSession','appSwitchTab','appToggleAttendance','appToggleEloShield','appToggleHopeStar','appToggleMemberRSVP']);
 export function createHtmlSanitizer(win) {
   const purifier=createDOMPurify(win);
   purifier.addHook('uponSanitizeAttribute',(_node,data)=>{

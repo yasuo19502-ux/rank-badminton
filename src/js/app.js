@@ -4895,6 +4895,7 @@ function renderClubShop() {
   const itemsContainer = document.getElementById('shop-items-container');
   const invCountBadge = document.getElementById('inventory-count-badge');
   const shieldBox = document.getElementById('inventory-elo-shield-box');
+  const starBox = document.getElementById('inventory-hope-star-box');
   const invItemsContainer = document.getElementById('inventory-items-container');
 
   const userCoins = user && user.coins !== undefined ? user.coins : 100;
@@ -5000,6 +5001,21 @@ function renderClubShop() {
           : `Khiên đang TẮT. Bật trước trận: thua giảm 50% điểm trừ, thắng nhận đủ Elo. Mỗi trận được lưu tiêu hao 1 thẻ khi đang bật.`}
       </div>
     `;
+  }
+
+  if (starBox) {
+    const count = userInv.filter(i => i.itemId === 'hope_star').reduce((sum, i) => sum + Number(i.quantity || 0), 0);
+    starBox.safeInnerHTML = `<div class="perk-banner-header"><div class="perk-banner-title">⭐ Ngôi Sao Hy Vọng (Đang có: <strong>${count}</strong> sao)</div></div><div class="perk-banner-desc" id="hope-star-status">Đang kiểm tra trạng thái...</div>`;
+    const statusNode = document.getElementById('hope-star-status');
+    if (!supabaseService.isConfigured() || !user) {
+      statusNode.textContent = 'Cần đăng nhập và kết nối mạng để dùng sao.';
+    } else {
+      supabaseService.mutation('club_hope_star_status', {}).then(status => {
+        if (!statusNode.isConnected) return;
+        const label = status.usedToday ? 'Đã dùng hôm nay' : status.active ? 'Đã đặt vào trận trên sân' : 'Chưa đặt vào trận';
+        statusNode.safeInnerHTML = `<strong>${label}.</strong> Thắng cộng thêm 50% Elo (làm tròn lên); thua tính bình thường. Mất 1 sao sau trận, tối đa 1 lần/ngày. Đặt sao khi đội hình đủ 4 người và trước khi ghi điểm. <button class="perk-shield-toggle-btn" onclick="window.appToggleHopeStar(${status.active ? 'false' : 'true'})" ${status.usedToday || (!status.active && count < 1) ? 'disabled' : ''}>${status.active ? 'Hủy đặt sao' : '⭐ Đặt sao vào trận'}</button>`;
+      }).catch(() => { if (statusNode.isConnected) statusNode.textContent = 'Chưa kiểm tra được trạng thái sao. Vui lòng mở lại túi đồ.'; });
+    }
   }
 
   if (invItemsContainer) {
@@ -5330,6 +5346,15 @@ window.appEquipFrame = async function(frameId) {
   renderCourt();
 };
 
+window.appToggleHopeStar = async function(enabled) {
+  if (!StorageService.getCurrentUser()) return;
+  try {
+    await supabaseService.mutation('club_hope_star', {p_enabled: enabled});
+    showToast(enabled ? '⭐ Đã đặt Ngôi sao Hy vọng vào trận!' : 'Đã hủy đặt ngôi sao.', 'success');
+    renderClubShop();
+  } catch (error) { showToast(error.message || 'Không thể đặt sao. Vui lòng thử lại.', 'error'); }
+};
+
 window.appToggleEloShield = async function() {
   const user = StorageService.getCurrentUser();
   if (!user) return;
@@ -5375,7 +5400,7 @@ window.appClaimGrip = async function() {
 
 
 // Every asynchronous UI mutation reports a server failure instead of success.
-for(const name of ['appSubmitAddGuest','appRemoveGuest','appToggleAttendance','appDeleteMember','appDeleteSession','appToggleMemberRSVP','appStartSession','appEquipFrame','appToggleEloShield','appClaimGrip','appSubmitAuthPin','appLogout','appBenchSelectPlayer','appUnassignSlot','appStartMatch','appApplySwapPlayer','appRemovePlayerFromSlot','appClearCourt']){window[name]=guardedAction(window[name],name);}
+for(const name of ['appSubmitAddGuest','appRemoveGuest','appToggleAttendance','appDeleteMember','appDeleteSession','appToggleMemberRSVP','appStartSession','appEquipFrame','appToggleEloShield','appToggleHopeStar','appClaimGrip','appSubmitAuthPin','appLogout','appBenchSelectPlayer','appUnassignSlot','appStartMatch','appApplySwapPlayer','appRemovePlayerFromSlot','appClearCourt']){window[name]=guardedAction(window[name],name);}
 window.addEventListener('club:auth-required',()=>{state.currentUser=null;renderUserAuthHeader();window.appOpenLoginModal();});
 window.addEventListener('club:write-error',()=>showToast('Chưa lưu được thay đổi sân. Đã tải lại dữ liệu máy chủ.','error'));
 window.addEventListener('club:court-saved',event=>{loadInitialState(event.detail.courtId);renderCourt();});
